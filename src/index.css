@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-navy-900 antialiased;
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent-500 ring-offset-2 ring-offset-white;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+
+  .section-eyebrow {
+    @apply text-sm font-semibold uppercase tracking-widest text-accent-600;
+  }
+
+  .section-title {
+    @apply mt-2 text-3xl font-bold text-navy-900 sm:text-4xl;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-primary {
+    @apply btn bg-amber-500 text-navy-950 shadow-soft hover:bg-amber-400 hover:shadow-card active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply btn bg-navy-800 text-white hover:bg-navy-700 active:scale-[0.98];
+  }
+
+  .btn-outline {
+    @apply btn border-2 border-navy-800 bg-transparent text-navy-800 hover:bg-navy-800 hover:text-white active:scale-[0.98];
+  }
+
+  .card {
+    @apply rounded-xl2 border border-navy-100 bg-white p-6 shadow-soft transition-shadow duration-200 hover:shadow-card;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-sm font-semibold text-navy-800;
+  }
+
+  .field-input {
+    @apply w-full rounded-xl border-2 border-navy-100 bg-white px-4 py-3 text-base text-navy-900 placeholder:text-navy-300 transition-colors duration-150 focus:border-accent-500;
+  }
+
+  .field-input-error {
+    @apply border-red-400 focus:border-red-500;
+  }
+
+  .field-error {
+    @apply mt-1.5 text-sm font-medium text-red-600;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
