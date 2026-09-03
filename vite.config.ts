@@ -13,5 +13,12 @@ export default defineConfig({
   build: {
     target: 'es2020',
     sourcemap: false,
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        // Ferramenta interna (uso do Gabriel) — não linkada no site público, sem indexação.
+        calculo: path.resolve(__dirname, 'calculo.html'),
+      },
+    },
   },
 });

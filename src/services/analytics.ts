@@ -42,6 +42,69 @@ function isAnalyticsAvailable(): boolean {
   return typeof window !== 'undefined';
 }
 
+let analyticsInitialized = false;
+
+/**
+ * Carrega as bibliotecas de analytics (gtag.js para GA4/Google Ads, e o Meta Pixel)
+ * de forma dinâmica — SOMENTE se o respectivo ID estiver configurado nas variáveis
+ * de ambiente. Sem nenhum ID configurado, nada é carregado e nada é enviado.
+ *
+ * Chame esta função uma única vez, no início da aplicação (ver src/main.tsx).
+ */
+export function initAnalytics(): void {
+  if (analyticsInitialized || typeof window === 'undefined') return;
+  analyticsInitialized = true;
+
+  // GA4 e/ou Google Ads compartilham a mesma biblioteca (gtag.js).
+  if (GA4_ID || GOOGLE_ADS_ID) {
+    const loaderId = GA4_ID ?? GOOGLE_ADS_ID!;
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${loaderId}`;
+    document.head.appendChild(script);
+
+    window.dataLayer = window.dataLayer ?? [];
+    window.gtag = function gtag(...args: unknown[]) {
+      window.dataLayer!.push(args);
+    };
+    window.gtag('js', new Date());
+
+    if (GA4_ID) window.gtag('config', GA4_ID);
+    if (GOOGLE_ADS_ID) window.gtag('config', GOOGLE_ADS_ID);
+  }
+
+  // Meta Pixel — loader padrão fornecido pela Meta.
+  if (META_PIXEL_ID) {
+    const win = window as typeof window & {
+      fbq: ((...args: unknown[]) => void) & { callMethod?: (...args: unknown[]) => void; queue?: unknown[]; loaded?: boolean; version?: string };
+      _fbq?: unknown;
+    };
+
+    if (!win.fbq) {
+      const fbqFn = function fbq(...args: unknown[]) {
+        if (fbqFn.callMethod) {
+          fbqFn.callMethod(...args);
+        } else {
+          fbqFn.queue!.push(args);
+        }
+      } as typeof win.fbq;
+      fbqFn.queue = [];
+      fbqFn.loaded = true;
+      fbqFn.version = '2.0';
+      win.fbq = fbqFn;
+      win._fbq = fbqFn;
+
+      const script = document.createElement('script');
+      script.async = true;
+      script.src = 'https://connect.facebook.net/en_US/fbevents.js';
+      document.head.appendChild(script);
+    }
+
+    window.fbq?.('init', META_PIXEL_ID);
+    window.fbq?.('track', 'PageView');
+  }
+}
+
 /**
  * Dispara um evento de analytics para todas as plataformas configuradas.
  * Se nenhum ID estiver configurado, o evento é apenas registrado no console

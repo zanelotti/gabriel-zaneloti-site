@@ -13,6 +13,11 @@ export function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
 }
 
+/** Formata um número como percentual com 2 casas decimais (ex: 57,53%) — usado onde a precisão importa. */
+export function formatPercentPrecise(value: number): string {
+  return `${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+}
+
 /** Aplica a máscara brasileira de WhatsApp: (XX) XXXXX-XXXX enquanto o usuário digita. */
 export function maskWhatsApp(rawValue: string): string {
   const digits = rawValue.replace(/\D/g, '').slice(0, 11);
