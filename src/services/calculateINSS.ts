@@ -1,5 +1,6 @@
-import type { CalculatorData, INSSResult, Responsavel } from '@/types/calculator';
+import type { CalculatorData, INSSResult } from '@/types/calculator';
 import type { RMTIndiretaInput } from '@/types/rmtIndireta';
+import type { ResponsavelObra } from '@/types/fatorAjuste';
 import { calculateRMTIndireta } from './calculateRMTIndireta';
 import { calculateFatorAjuste } from './calculateFatorAjuste';
 
@@ -87,7 +88,7 @@ export function calculateINSS(data: CalculatorData): INSSResult {
       areaM2: rmtResult.areaTotal,
       dataInicio: data.dataInicio,
       dataFim: dataFimEfetiva,
-      responsavel: data.responsavel as Responsavel,
+      responsavel: data.responsavel as ResponsavelObra,
       dataCalculo: hoje,
       honorarios: null,
     });
