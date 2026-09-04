@@ -516,15 +516,24 @@ export const SELIC_MENSAL: Record<string, number> = {
   '2026-08': 1.09,
 };
 
-/** Formata um Date (ou "AAAA-MM") como chave "AAAA-MM" usada na tabela acima. */
+/**
+ * Formata um Date (ou "AAAA-MM") como chave "AAAA-MM" usada na tabela acima.
+ * O ano é sempre normalizado para 4 dígitos com zero à esquerda — importante
+ * para que a comparação de chaves como texto (compareCompetencia) continue
+ * válida mesmo para um ano digitado errado (ex: ano 202 em vez de 2022), em
+ * vez de gerar uma chave como "202-01" que quebraria essa comparação.
+ */
 export function toCompetenciaKey(input: string | Date): string {
   if (input instanceof Date) {
-    const year = input.getFullYear();
+    const year = String(input.getFullYear()).padStart(4, '0');
     const month = String(input.getMonth() + 1).padStart(2, '0');
     return `${year}-${month}`;
   }
   // Aceita "AAAA-MM" diretamente, ou "AAAA-MM-DD" (de um <input type="date">).
-  return input.slice(0, 7);
+  const [anoBruto, mesBruto] = input.split('-');
+  const ano = (anoBruto ?? '').padStart(4, '0');
+  const mes = (mesBruto ?? '01').padStart(2, '0');
+  return `${ano}-${mes}`;
 }
 
 /** Soma 1 mês a uma chave de competência "AAAA-MM". */
@@ -537,6 +546,29 @@ export function addMonths(key: string, months: number): string {
 /** Compara duas chaves de competência "AAAA-MM" (-1, 0, 1). */
 export function compareCompetencia(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+const SELIC_MENSAL_KEYS = Object.keys(SELIC_MENSAL).sort();
+/** Primeira e última competência com taxa cadastrada na tabela acima. */
+const PRIMEIRA_COMPETENCIA_TABELA = SELIC_MENSAL_KEYS[0];
+const ULTIMA_COMPETENCIA_TABELA = SELIC_MENSAL_KEYS[SELIC_MENSAL_KEYS.length - 1];
+
+/**
+ * Taxa Selic de uma competência. Toda simulação preenchida corretamente pelo
+ * cliente deve gerar um resultado — nunca um erro — então, para uma
+ * competência fora do intervalo coberto pela tabela (obra anterior a 08/1986,
+ * ou mês futuro ainda não divulgado pelo Bacen), usamos a taxa conhecida mais
+ * próxima (a primeira ou a última da tabela) como aproximação, em vez de
+ * falhar o cálculo.
+ */
+function taxaSelicDoMes(competencia: string): number {
+  const chave =
+    compareCompetencia(competencia, PRIMEIRA_COMPETENCIA_TABELA) < 0
+      ? PRIMEIRA_COMPETENCIA_TABELA
+      : compareCompetencia(competencia, ULTIMA_COMPETENCIA_TABELA) > 0
+        ? ULTIMA_COMPETENCIA_TABELA
+        : competencia;
+  return SELIC_MENSAL[chave];
 }
 
 /**
@@ -559,19 +591,15 @@ export function calcularSelicAcumulada(competencia: string, referencia: string):
   // Se a competência for muito recente (menos de 2 meses antes da referência),
   // não há meses a somar — só o 1% fixo do mês de referência.
   while (compareCompetencia(cursor, fimSoma) <= 0) {
-    // Teto de segurança: nunca deveria chegar perto disso (a tabela cobre ~40
-    // anos, de 08/1986 até hoje) — evita qualquer laço longo em caso de data
-    // muito fora do esperado.
-    if (meses > 800) {
-      throw new Error('Período entre a competência e a data de referência é longo demais para calcular.');
+    // Teto de segurança apenas contra um laço absurdamente longo (datas com
+    // milhares de anos de intervalo) — nunca deveria ser atingido em uso
+    // normal. Em vez de falhar o cálculo, simplesmente paramos de somar mais
+    // meses aqui (o restante já foi acumulado) para toda simulação sempre
+    // terminar em um resultado.
+    if (meses > 5000) {
+      break;
     }
-    const taxa = SELIC_MENSAL[cursor];
-    if (taxa === undefined) {
-      throw new Error(
-        `Taxa Selic não encontrada para a competência ${cursor}. Atualize src/data/selicMensal.ts com o valor desse mês.`
-      );
-    }
-    acumulado += taxa;
+    acumulado += taxaSelicDoMes(cursor);
     cursor = addMonths(cursor, 1);
     meses += 1;
   }
