@@ -47,27 +47,38 @@ const MAED_MENSAL = 100;
 const TAXA_SEM_FATOR = 0.368;
 
 /**
- * Teto de segurança para o número de competências em um único cálculo (66 anos).
- * A tabela de Selic mensal cobre desde 08/1986 — mais que suficiente para
- * qualquer obra real, mesmo "construída há muitos anos". Este teto existe só
- * para nunca deixar o cálculo rodar por muito tempo (ou travar a tela) caso
- * alguém digite uma data claramente absurda (ex: ano trocado por engano).
- * Nesse caso, falha rápido com uma mensagem clara em vez de percorrer
- * milhares de meses.
+ * Teto de segurança para o número de competências em um único cálculo
+ * (~416 anos). Nenhuma obra real chega perto disso — existe só para nunca
+ * deixar o cálculo rodar por muito tempo (ou travar a tela) caso alguém
+ * digite uma data claramente absurda (ex: ano trocado por engano). Mesmo
+ * nesse caso, o cálculo não falha: simplesmente para de somar mais meses e
+ * segue com o que já foi calculado até ali — toda simulação preenchida pelo
+ * cliente deve terminar em um resultado, nunca em uma mensagem de erro.
  */
-const MAX_COMPETENCIAS = 800;
+const MAX_COMPETENCIAS = 5000;
 
-/** Lista as competências ("AAAA-MM"), inclusive, entre início e fim. */
+/**
+ * Lista as competências ("AAAA-MM"), inclusive, entre início e fim.
+ *
+ * É tolerante a datas fora da ordem esperada (ex: data de fim digitada antes
+ * da data de início, por engano) — nesse caso inverte as duas internamente em
+ * vez de falhar, para que o cálculo sempre gere um resultado a partir dos
+ * dados já informados pelo cliente.
+ */
 function listarCompetencias(inicio: string, fim: string): string[] {
+  let inicioKey = toCompetenciaKey(inicio);
+  let fimKey = toCompetenciaKey(fim);
+
+  if (compareCompetencia(inicioKey, fimKey) > 0) {
+    [inicioKey, fimKey] = [fimKey, inicioKey];
+  }
+
   const competencias: string[] = [];
-  let cursor = toCompetenciaKey(inicio);
-  const fimKey = toCompetenciaKey(fim);
+  let cursor = inicioKey;
 
   while (compareCompetencia(cursor, fimKey) <= 0) {
-    if (competencias.length >= MAX_COMPETENCIAS) {
-      throw new Error('Período entre a data de início e a data de fim é longo demais para calcular.');
-    }
     competencias.push(cursor);
+    if (competencias.length >= MAX_COMPETENCIAS) break;
     cursor = addMonths(cursor, 1);
   }
 
@@ -121,12 +132,10 @@ function somarTotal(linhas: FatorAjusteMonthRow[]): number {
 }
 
 export function calculateFatorAjuste(input: FatorAjusteInput): FatorAjusteResult {
+  // listarCompetencias já trata datas fora de ordem (inverte internamente) e
+  // sempre devolve pelo menos 1 competência — nunca uma lista vazia.
   const competencias = listarCompetencias(input.dataInicio, input.dataFim);
   const numeroMeses = competencias.length;
-
-  if (numeroMeses === 0) {
-    throw new Error('Período inválido: a data de fim deve ser igual ou posterior à data de início.');
-  }
 
   const percentualFator: 50 | 70 = input.areaM2 <= 350 ? 50 : 70;
   const rmtAjustada = input.rmt100 * (percentualFator / 100);
