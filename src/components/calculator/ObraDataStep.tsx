@@ -1,11 +1,20 @@
-import type { CalculatorData, Destinacao, FormErrors, Responsavel, SituacaoObra, TipoObra } from '@/types/calculator';
+import type {
+  CalculatorData,
+  CategoriaObra,
+  Destinacao,
+  FormErrors,
+  Responsavel,
+  SituacaoObra,
+  TipoObra,
+} from '@/types/calculator';
 import { BRAZILIAN_STATES } from '@/data/states';
+import { DateField } from '../ui/DateField';
 import { CalculatorStep } from './CalculatorStep';
 
 interface ObraDataStepProps {
   data: Pick<
     CalculatorData,
-    'dataInicio' | 'dataFim' | 'responsavel' | 'tipoObra' | 'situacao' | 'estado' | 'destinacao'
+    'dataInicio' | 'dataFim' | 'responsavel' | 'tipoObra' | 'situacao' | 'categoria' | 'estado' | 'destinacao'
   >;
   errors: FormErrors<CalculatorData>;
   onChange: <K extends keyof CalculatorData>(field: K, value: CalculatorData[K]) => void;
@@ -15,6 +24,13 @@ const TIPO_OBRA_OPTIONS: { value: TipoObra; label: string }[] = [
   { value: 'alvenaria', label: 'Alvenaria' },
   { value: 'madeira', label: 'Madeira' },
   { value: 'mista', label: 'Mista' },
+];
+
+const CATEGORIA_OPTIONS: { value: CategoriaObra; label: string }[] = [
+  { value: 'obra_nova', label: 'Obra nova' },
+  { value: 'acrescimo', label: 'Acréscimo' },
+  { value: 'reforma', label: 'Reforma' },
+  { value: 'demolicao', label: 'Demolição' },
 ];
 
 const SITUACAO_OPTIONS: { value: SituacaoObra; label: string }[] = [
@@ -44,41 +60,22 @@ export function ObraDataStep({ data, errors, onChange }: ObraDataStepProps) {
   return (
     <CalculatorStep title="Dados da obra" description="Conte um pouco mais sobre a sua construção.">
       <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <label htmlFor="dataInicio" className="field-label">
-            Data de início da obra
-          </label>
-          <input
-            id="dataInicio"
-            name="dataInicio"
-            type="date"
-            className="field-input"
-            value={data.dataInicio}
-            onChange={(event) => onChange('dataInicio', event.target.value)}
-          />
-        </div>
+        <DateField
+          id="dataInicio"
+          label="Data de início da obra"
+          value={data.dataInicio}
+          onChange={(value) => onChange('dataInicio', value)}
+          error={errors.dataInicio}
+        />
 
-        <div>
-          <label htmlFor="dataFim" className="field-label">
-            Data de fim da obra
-          </label>
-          <input
-            id="dataFim"
-            name="dataFim"
-            type="date"
-            className={`field-input ${errors.dataFim ? 'field-input-error' : ''}`}
-            value={data.dataFim}
-            onChange={(event) => onChange('dataFim', event.target.value)}
-            aria-invalid={Boolean(errors.dataFim)}
-            aria-describedby={errors.dataFim ? 'dataFim-error' : undefined}
-          />
-          {errors.dataFim && (
-            <p id="dataFim-error" className="field-error">
-              {errors.dataFim}
-            </p>
-          )}
-          <p className="mt-1.5 text-xs text-navy-400">Deixe em branco se a obra ainda está em andamento.</p>
-        </div>
+        <DateField
+          id="dataFim"
+          label="Data de fim da obra"
+          value={data.dataFim}
+          onChange={(value) => onChange('dataFim', value)}
+          error={errors.dataFim}
+          helperText="Deixe em branco se a obra ainda está em andamento."
+        />
       </div>
 
       <fieldset>
@@ -152,6 +149,28 @@ export function ObraDataStep({ data, errors, onChange }: ObraDataStepProps) {
             ))}
           </select>
           {errors.situacao && <p className="field-error">{errors.situacao}</p>}
+        </div>
+
+        <div>
+          <label htmlFor="categoria" className="field-label">
+            Categoria da obra
+          </label>
+          <select
+            id="categoria"
+            name="categoria"
+            className={`field-input ${errors.categoria ? 'field-input-error' : ''}`}
+            value={data.categoria}
+            onChange={(event) => onChange('categoria', event.target.value as CategoriaObra)}
+            aria-invalid={Boolean(errors.categoria)}
+          >
+            <option value="">Selecione</option>
+            {CATEGORIA_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {errors.categoria && <p className="field-error">{errors.categoria}</p>}
         </div>
 
         <div>

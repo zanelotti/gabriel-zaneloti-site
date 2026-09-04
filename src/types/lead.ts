@@ -1,4 +1,5 @@
 import type {
+  CategoriaObra,
   Destinacao,
   Responsavel,
   SituacaoObra,
@@ -19,15 +20,17 @@ export interface Lead {
   responsavel: Responsavel;
   tipoObra: TipoObra;
   situacao: SituacaoObra;
+  categoria: CategoriaObra;
   estado: string;
   destinacao: Destinacao;
   areaPrincipal: number | null;
   areaPiscina: number | null;
   observacoes: string;
-  inssEstimado: number;
-  economiaEstimada: number;
-  percentualReducao: number;
-  valorAposReducao: number;
+  /** null quando não foi possível gerar a estimativa automática para os dados informados. */
+  inssEstimado: number | null;
+  economiaEstimada: number | null;
+  percentualReducao: number | null;
+  valorAposReducao: number | null;
   createdAt: string;
 }
 

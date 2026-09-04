@@ -40,10 +40,14 @@ export function validateStep1(data: Pick<CalculatorData, 'nome' | 'whatsapp'>): 
 export function validateStep2(
   data: Pick<
     CalculatorData,
-    'dataInicio' | 'dataFim' | 'responsavel' | 'tipoObra' | 'situacao' | 'estado' | 'destinacao'
+    'dataInicio' | 'dataFim' | 'responsavel' | 'tipoObra' | 'situacao' | 'categoria' | 'estado' | 'destinacao'
   >
 ): FormErrors<CalculatorData> {
   const errors: FormErrors<CalculatorData> = {};
+
+  if (!data.dataInicio) {
+    errors.dataInicio = 'Informe a data de início da obra.';
+  }
 
   if (data.dataInicio && data.dataFim) {
     const inicio = new Date(data.dataInicio);
@@ -63,6 +67,10 @@ export function validateStep2(
 
   if (!data.situacao) {
     errors.situacao = 'Selecione a situação da obra.';
+  }
+
+  if (!data.categoria) {
+    errors.categoria = 'Selecione a categoria da obra.';
   }
 
   if (!data.estado) {

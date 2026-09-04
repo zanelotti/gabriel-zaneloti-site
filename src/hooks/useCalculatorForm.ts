@@ -11,6 +11,8 @@ interface UseCalculatorFormReturn {
   step: CalculatorStepIndex;
   errors: FormErrors<CalculatorData>;
   result: INSSResult | null;
+  /** Mensagem amigável quando não foi possível gerar a estimativa automática para os dados informados. */
+  calcError: string | null;
   isSubmitting: boolean;
   updateField: <K extends keyof CalculatorData>(field: K, value: CalculatorData[K]) => void;
   goNext: () => void;
@@ -28,6 +30,7 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
   const [step, setStep] = useState<CalculatorStepIndex>(1);
   const [errors, setErrors] = useState<FormErrors<CalculatorData>>({});
   const [result, setResult] = useState<INSSResult | null>(null);
+  const [calcError, setCalcError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [started, setStarted] = useState(false);
 
@@ -73,16 +76,28 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
     if (Object.keys(stepErrors).length > 0) return;
 
     setIsSubmitting(true);
+    setCalcError(null);
     try {
-      const calcResult = calculateINSS(data);
-      setResult(calcResult);
+      let calcResult: INSSResult | null = null;
+      try {
+        calcResult = calculateINSS(data);
+        setResult(calcResult);
+      } catch (err) {
+        // Datas fora da faixa suportada (ex: obra iniciada antes de jan/2021) ou combinação
+        // de dados que o motor não sabe tratar — não trava a captura do lead por isso.
+        setCalcError(
+          err instanceof Error
+            ? err.message
+            : 'Não foi possível gerar uma estimativa automática para os dados informados.'
+        );
+      }
 
       await leadService.createLead({
         ...data,
-        inssEstimado: calcResult.inssEstimado,
-        economiaEstimada: calcResult.economiaEstimada,
-        percentualReducao: calcResult.percentualReducao,
-        valorAposReducao: calcResult.valorAposReducao,
+        inssEstimado: calcResult?.inssEstimado ?? null,
+        economiaEstimada: calcResult?.economiaEstimada ?? null,
+        percentualReducao: calcResult?.percentualReducao ?? null,
+        valorAposReducao: calcResult?.valorAposReducao ?? null,
       });
 
       trackEvent('calculator_completed', {
@@ -99,8 +114,9 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
     setStep(1);
     setErrors({});
     setResult(null);
+    setCalcError(null);
     setStarted(false);
   }, []);
 
-  return { data, step, errors, result, isSubmitting, updateField, goNext, goBack, submit, reset };
+  return { data, step, errors, result, calcError, isSubmitting, updateField, goNext, goBack, submit, reset };
 }

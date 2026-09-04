@@ -51,22 +51,31 @@ src/
 
 ## Simulador público (site) vs. calculadora interna (`/calculo.html`)
 
-O projeto tem **dois motores de cálculo, propositalmente separados**:
+O projeto tem dois motores de cálculo, que hoje usam as **mesmas mecânicas oficiais** da IN RFB nº 2021/2021, mas para propósitos diferentes:
 
-- **`src/services/calculateINSS.ts`** — usado pelo simulador de 3 etapas do site público. Continua sendo **uma estimativa (mock)**, pensada apenas para gerar uma faixa de valor e capturar o lead pelo WhatsApp — não depende da RMT (que exige as tabelas CUB/VAU do Sinduscon, apuradas manualmente) e não deve ser usada como cálculo oficial.
-- **`src/services/calculateFatorAjuste.ts`** — o motor **real** do Fator de Ajuste (Art. 33 da IN RFB nº 2021/2021), usado na página interna `/calculo.html` (ver seção abaixo). Foi validado, mês a mês e no total, contra 3 relatórios reais que você forneceu — bateu exatamente (até o centavo) em todos os valores, exceto o parcelamento (que é uma estimativa simplificada, sem os juros próprios do parcelamento da Receita).
+- **`src/services/calculateINSS.ts`** — usado pelo simulador de 3 etapas do site público. Estima a RMT (100% SERO) sozinho, a partir da área/destinação/tipo/categoria da obra e da tabela oficial de **VAU por estado** (`src/data/vauEstadual.ts`), reproduzindo a "aferição indireta" da Receita (`src/services/calculateRMTIndireta.ts`) — e então aplica o mesmo motor de Fator de Ajuste abaixo. Ainda é rotulado como **estimativa** (`isEstimativaProvisoria: true`) porque simplifica alguns pontos que o formulário público não pergunta (ver comentário no topo do arquivo) — não substitui a apuração oficial.
+- **`src/services/calculateFatorAjuste.ts`** — o motor do Fator de Ajuste (Art. 33 da IN RFB nº 2021/2021: Selic, CPP, multa, mora, MAED), usado tanto pelo simulador público quanto pela página interna `/calculo.html` (ver seção abaixo). Foi validado, mês a mês e no total, contra 4 relatórios reais que você forneceu — bateu exatamente (até o centavo) em todos os valores, exceto o parcelamento (estimativa simplificada, sem os juros próprios do parcelamento da Receita).
 
-Se um dia você quiser que o simulador público também use a fórmula real, dá para trocar — mas ele precisaria pedir a RMT já calculada como um dos campos do formulário, já que essa página não tem como calculá-la sozinha.
+A diferença entre os dois "motores" é só a **origem da RMT**: no simulador público ela é estimada a partir da área (você não digita nada a mais); na calculadora interna, você já informa a RMT real que apurou.
 
-### Se quiser ajustar o mock do site público
+### Tabela VAU por estado (`src/data/vauEstadual.ts`)
 
-Edite **apenas** o corpo da função `calculateINSS()` em `src/services/calculateINSS.ts`, mantendo a mesma assinatura:
+O VAU é o índice oficial (R$/m², por estado e destinação) que a Receita usa para estimar o custo da obra a partir da área — é a mesma tabela que aparece dentro do próprio Sero (não uma estimativa via CUB/Sinduscon). Como esse índice muda todo mês, atualize-o assim:
+
+1. Entre no e-CAC (https://cav.receita.fazenda.gov.br) com sua conta gov.br.
+2. Vá em **Declarações e Demonstrativos → Acessar o Sero** → menu **Aferições → Consultar Tabela VAU**.
+3. Escolha o ano atual e cada estado, clique em **Buscar** — a tela traz todos os meses já publicados no ano; use a linha do mês mais recente.
+4. Atualize os valores em `src/data/vauEstadual.ts` (e o `VAU_COMPETENCIA` no topo do arquivo) — o resto do sistema usa isso automaticamente.
+
+### Se quiser ajustar a estimativa do site público
+
+Edite `src/services/calculateINSS.ts` (orquestra tudo) ou `src/services/calculateRMTIndireta.ts` (a fórmula da RMT em si), mantendo a assinatura de `calculateINSS`:
 
 ```ts
 function calculateINSS(data: CalculatorData): INSSResult
 ```
 
-Nenhum outro arquivo precisa mudar — formulário, resultado, WhatsApp, leads e analytics continuam funcionando normalmente.
+Nenhum outro arquivo precisa mudar — formulário, resultado, WhatsApp, leads e analytics continuam funcionando normalmente. Se os dados informados estiverem fora do que o motor sabe tratar (ex: obra iniciada antes de jan/2021, fora da tabela de Selic), a função lança um erro tratado — a tela mostra uma mensagem pedindo para falar direto no WhatsApp, em vez de travar.
 
 ## Calculadora interna do Fator de Ajuste (`/calculo.html`)
 

@@ -34,6 +34,13 @@ const DESTINACAO_LABEL: Record<string, string> = {
   edificio_garagem: 'Edifício garagem',
 };
 
+const CATEGORIA_LABEL: Record<string, string> = {
+  obra_nova: 'Obra nova',
+  acrescimo: 'Acréscimo',
+  reforma: 'Reforma',
+  demolicao: 'Demolição',
+};
+
 function estadoLabel(uf: string): string {
   const found = BRAZILIAN_STATES.find((state) => state.uf === uf);
   return found ? `${found.uf} — ${found.nome}` : uf || 'Não informado';
@@ -53,6 +60,7 @@ export function buildWhatsAppMessageText(data: CalculatorData, result: INSSResul
     `Responsável: ${RESPONSAVEL_LABEL[data.responsavel] ?? 'Não informado'}`,
     `Tipo de obra: ${TIPO_OBRA_LABEL[data.tipoObra] ?? 'Não informado'}`,
     `Situação: ${SITUACAO_LABEL[data.situacao] ?? 'Não informado'}`,
+    `Categoria da obra: ${CATEGORIA_LABEL[data.categoria] ?? 'Não informado'}`,
     `Estado: ${estadoLabel(data.estado)}`,
     `Destinação: ${DESTINACAO_LABEL[data.destinacao] ?? 'Não informado'}`,
     `Área principal: ${formatArea(data.areaPrincipal)}`,
@@ -70,6 +78,35 @@ export function buildWhatsAppMessageText(data: CalculatorData, result: INSSResul
 /** Gera a URL completa (wa.me) já com a mensagem codificada, pronta para abrir o WhatsApp. */
 export function generateWhatsAppMessage(data: CalculatorData, result: INSSResult): string {
   const text = buildWhatsAppMessageText(data, result);
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+}
+
+/**
+ * Mensagem usada quando a simulação não conseguiu gerar uma estimativa automática
+ * (ex: data da obra fora da faixa suportada) — leva os dados da obra sem o resultado.
+ */
+export function buildFallbackWhatsAppMessageText(data: CalculatorData): string {
+  return [
+    'Olá, Gabriel! Tentei fazer uma simulação no seu site, mas não consegui ver o resultado. Segue o que preenchi:',
+    '',
+    `Nome: ${data.nome || 'Não informado'}`,
+    `WhatsApp: ${data.whatsapp || 'Não informado'}`,
+    `Início da obra: ${formatDateBR(data.dataInicio)}`,
+    `Fim da obra: ${formatDateBR(data.dataFim)}`,
+    `Responsável: ${RESPONSAVEL_LABEL[data.responsavel] ?? 'Não informado'}`,
+    `Tipo de obra: ${TIPO_OBRA_LABEL[data.tipoObra] ?? 'Não informado'}`,
+    `Categoria da obra: ${CATEGORIA_LABEL[data.categoria] ?? 'Não informado'}`,
+    `Estado: ${estadoLabel(data.estado)}`,
+    `Destinação: ${DESTINACAO_LABEL[data.destinacao] ?? 'Não informado'}`,
+    `Área principal: ${formatArea(data.areaPrincipal)}`,
+    `Área da piscina: ${formatArea(data.areaPiscina)}`,
+    '',
+    'Pode me ajudar a analisar?',
+  ].join('\n');
+}
+
+export function generateFallbackWhatsAppMessage(data: CalculatorData): string {
+  const text = buildFallbackWhatsAppMessageText(data);
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
 }
 

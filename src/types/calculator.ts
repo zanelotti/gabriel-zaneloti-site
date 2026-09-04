@@ -6,6 +6,9 @@ export type Responsavel = 'PF' | 'PJ' | '';
 
 export type TipoObra = 'alvenaria' | 'madeira' | 'mista' | '';
 
+/** Categoria da obra, conforme IN RFB nº 2021/2021 — define o "percentual de cálculo por categoria" (art. 19.2). */
+export type CategoriaObra = 'obra_nova' | 'acrescimo' | 'reforma' | 'demolicao' | '';
+
 export type SituacaoObra =
   | 'concluida_com_habite_se'
   | 'concluida_sem_habite_se'
@@ -35,6 +38,7 @@ export interface CalculatorData {
   responsavel: Responsavel;
   tipoObra: TipoObra;
   situacao: SituacaoObra;
+  categoria: CategoriaObra;
   estado: string;
   destinacao: Destinacao;
 
@@ -52,6 +56,7 @@ export const INITIAL_CALCULATOR_DATA: CalculatorData = {
   responsavel: '',
   tipoObra: '',
   situacao: '',
+  categoria: '',
   estado: '',
   destinacao: '',
   areaPrincipal: null,

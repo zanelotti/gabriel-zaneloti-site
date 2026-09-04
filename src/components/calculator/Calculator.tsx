@@ -2,6 +2,8 @@ import type { FormEvent } from 'react';
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { useCalculatorForm } from '@/hooks/useCalculatorForm';
+import { generateFallbackWhatsAppMessage } from '@/services/whatsapp';
+import { trackEvent } from '@/services/analytics';
 import { ProgressBar } from './ProgressBar';
 import { LeadForm } from './LeadForm';
 import { ObraDataStep } from './ObraDataStep';
@@ -9,7 +11,7 @@ import { AreasStep } from './AreasStep';
 import { ResultCard } from './ResultCard';
 
 export function Calculator() {
-  const { data, step, errors, result, isSubmitting, updateField, goNext, goBack, submit, reset } =
+  const { data, step, errors, result, calcError, isSubmitting, updateField, goNext, goBack, submit, reset } =
     useCalculatorForm();
 
   const handleSubmit = (event: FormEvent) => {
@@ -78,6 +80,31 @@ export function Calculator() {
           )}
 
           {result && <ResultCard data={data} result={result} onReset={reset} />}
+
+          {!result && calcError && (
+            <div className="animate-fade-in-up text-center sm:text-left">
+              <h3 className="text-xl font-bold text-navy-900">
+                Não conseguimos gerar uma estimativa automática agora
+              </h3>
+              <p className="mt-3 text-sm leading-relaxed text-navy-500">
+                Isso pode acontecer para obras com datas fora do período que nossa calculadora cobre hoje.
+                Seus dados já foram registrados — fale direto com o Gabriel pelo WhatsApp que ele analisa sua
+                obra manualmente.
+              </p>
+              <a
+                href={generateFallbackWhatsAppMessage(data)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary mt-5 w-full sm:w-auto"
+                onClick={() => trackEvent('whatsapp_clicked', { origem: 'fallback_calculo' })}
+              >
+                Falar com o Gabriel no WhatsApp
+              </a>
+              <button type="button" onClick={reset} className="mt-5 block text-sm font-semibold text-navy-500 underline">
+                Fazer uma nova simulação
+              </button>
+            </div>
+          )}
         </div>
       </Container>
     </section>

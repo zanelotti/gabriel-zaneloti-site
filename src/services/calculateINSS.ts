@@ -1,84 +1,111 @@
-import type { CalculatorData, INSSResult } from '@/types/calculator';
+import type { CalculatorData, INSSResult, Responsavel } from '@/types/calculator';
+import type { RMTIndiretaInput } from '@/types/rmtIndireta';
+import { calculateRMTIndireta } from './calculateRMTIndireta';
+import { calculateFatorAjuste } from './calculateFatorAjuste';
 
 /**
  * ============================================================================
- *  MOTOR DE CÁLCULO DO INSS DE OBRA — IMPLEMENTAÇÃO PROVISÓRIA (MOCK)
+ *  MOTOR DE CÁLCULO DO SIMULADOR PÚBLICO DO SITE
  * ============================================================================
+ * Estima o INSS de obra em duas etapas, ambas com base em mecânicas OFICIAIS
+ * da IN RFB nº 2021/2021 (não é mais um mock arbitrário):
  *
- * ATENÇÃO: Esta função NÃO implementa a fórmula oficial de cálculo do INSS de
- * obra. É uma estimativa provisória, criada apenas para permitir que a
- * interface, o fluxo de resultado e a integração com WhatsApp funcionem de
- * ponta a ponta antes que a fórmula real seja fornecida.
+ *  1. Estima a RMT (100% SERO) a partir da área/destinação/tipo/categoria da
+ *     obra e da tabela oficial de VAU por estado — `calculateRMTIndireta()`,
+ *     que reproduz a aferição indireta (arts. 15 a 19).
+ *  2. Aplica o Fator de Ajuste (50%/70%) e a mecânica mensal de Selic, CPP,
+ *     multa, mora e MAED — `calculateFatorAjuste()`, o MESMO motor validado
+ *     contra os relatórios reais do Gabriel, usado também na ferramenta
+ *     interna (/calculo.html).
  *
- * Quando a fórmula definitiva (CUB regional, composição do Fator de Ajuste,
- * alíquotas, regras por tipo/destinação de obra etc.) for definida, troque
- * SOMENTE o corpo desta função — a assinatura (entrada/saída) deve ser
- * mantida para que o restante do site (formulário, resultado, WhatsApp,
- * leads, analytics) continue funcionando sem alterações.
+ * Por que ainda é uma ESTIMATIVA (`isEstimativaProvisoria: true`), mesmo
+ * usando fórmulas reais:
+ *  - A RMT real depende de detalhes que o formulário público não pergunta
+ *    (mais de uma área/destinação por obra, notas fiscais de pré-moldado,
+ *    se a área complementar é coberta ou descoberta — aqui sempre tratada
+ *    como descoberta).
+ *  - A "data de fim" pode ficar em branco (obra em andamento); nesse caso,
+ *    assume-se o mês atual como referência, o que muda o resultado conforme
+ *    o dia em que a simulação é refeita.
+ *  - O parcelamento mostrado é aproximado (ver `calculateFatorAjuste.ts`).
  *
- * NÃO apresentar o valor retornado como cálculo tributário oficial.
+ * Este motor pode lançar erros (ex: obra com data de início anterior a
+ * jan/2021, fora da tabela de Selic mantida no projeto) — quem chama esta
+ * função deve tratar isso com try/catch, exibindo uma mensagem amigável em
+ * vez de travar a simulação (ver `useCalculatorForm`).
  * ============================================================================
  */
 
-/** Valor de referência simplificado por m² (mock), usado apenas para simular uma base de cálculo. */
-const VALOR_BASE_POR_M2 = 1900;
+/** Data de hoje, no formato "AAAA-MM-DD", em UTC. */
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
-/** Alíquota simplificada de INSS de obra utilizada apenas na simulação provisória. */
-const ALIQUOTA_INSS_MOCK = 0.2;
-
-const FATOR_TIPO_OBRA: Record<string, number> = {
-  alvenaria: 1,
-  madeira: 0.75,
-  mista: 0.9,
-};
-
-const FATOR_DESTINACAO: Record<string, number> = {
-  residencial_unifamiliar: 1,
-  multifamiliar: 1.05,
-  comercial_salas_lojas: 1.1,
-  galpao_industrial: 0.95,
-  conjunto_habitacional: 1.05,
-  edificio_garagem: 0.9,
-};
-
-const FATOR_SITUACAO_REDUCAO: Record<string, number> = {
-  concluida_com_habite_se: 0.35,
-  concluida_sem_habite_se: 0.28,
-  em_construcao: 0.32,
-  iniciar_em_breve: 0.4,
-  construida_ha_mais_de_5_anos: 0.22,
-};
-
-function clampPercentual(valor: number): number {
-  return Math.min(70, Math.max(10, valor));
+/** Maior das duas datas ISO ("AAAA-MM-DD"), como string. */
+function maxISODate(a: string, b: string): string {
+  return a > b ? a : b;
 }
 
 export function calculateINSS(data: CalculatorData): INSSResult {
-  const areaPrincipal = data.areaPrincipal ?? 0;
-  const areaPiscina = data.areaPiscina ?? 0;
+  if (!data.dataInicio) {
+    throw new Error('Informe a data de início da obra.');
+  }
+  if (!data.destinacao || !data.tipoObra || !data.categoria || !data.estado) {
+    throw new Error('Preencha destinação, tipo de obra, categoria e estado da obra.');
+  }
+  if (!data.responsavel) {
+    throw new Error('Selecione o responsável pela obra (Pessoa Física ou Jurídica).');
+  }
 
-  const fatorTipo = FATOR_TIPO_OBRA[data.tipoObra] ?? 1;
-  const fatorDestinacao = FATOR_DESTINACAO[data.destinacao] ?? 1;
+  const hoje = todayISO();
 
-  // Base simulada: área principal com peso do tipo/destinação da obra + piscina com peso reduzido.
-  const areaEquivalente = areaPrincipal * fatorTipo * fatorDestinacao + areaPiscina * 0.4;
+  const rmtInput: RMTIndiretaInput = {
+    estado: data.estado,
+    destinacao: data.destinacao,
+    tipoObra: data.tipoObra,
+    categoria: data.categoria,
+    responsavel: data.responsavel,
+    areaPrincipal: data.areaPrincipal ?? 0,
+    areaComplementar: data.areaPiscina,
+  };
 
-  const valorObraEstimado = areaEquivalente * VALOR_BASE_POR_M2;
-  const inssEstimado = Math.max(0, valorObraEstimado * ALIQUOTA_INSS_MOCK);
+  if (rmtInput.areaPrincipal <= 0) {
+    throw new Error('Informe a área da construção principal.');
+  }
 
-  const percentualBase = (FATOR_SITUACAO_REDUCAO[data.situacao] ?? 0.3) * 100;
-  const percentualReducao = clampPercentual(percentualBase);
+  // Obra ainda em andamento (sem data de fim informada): usa o mês atual como referência.
+  // Se a obra ainda nem começou (data de início no futuro), usa a própria data de início
+  // como início e fim, para não gerar um período invertido.
+  const dataFimEfetiva = data.dataFim || maxISODate(data.dataInicio, hoje);
 
-  const economiaEstimada = inssEstimado * (percentualReducao / 100);
-  const valorAposReducao = Math.max(0, inssEstimado - economiaEstimada);
+  let rmtResult;
+  let fatorAjusteResult;
+  try {
+    rmtResult = calculateRMTIndireta(rmtInput);
+    fatorAjusteResult = calculateFatorAjuste({
+      rmt100: rmtResult.rmt100,
+      areaM2: rmtResult.areaTotal,
+      dataInicio: data.dataInicio,
+      dataFim: dataFimEfetiva,
+      responsavel: data.responsavel as Responsavel,
+      dataCalculo: hoje,
+      honorarios: null,
+    });
+  } catch {
+    // Erros internos (ex: mês fora da tabela de Selic mantida no projeto) não devem
+    // vazar detalhes técnicos para quem está preenchendo o formulário público.
+    throw new Error(
+      'Não conseguimos calcular automaticamente para o período informado (a obra pode estar fora do intervalo de datas que a calculadora cobre hoje).'
+    );
+  }
 
   return {
-    inssEstimado: Number(inssEstimado.toFixed(2)),
-    economiaEstimada: Number(economiaEstimada.toFixed(2)),
-    percentualReducao: Number(percentualReducao.toFixed(1)),
-    valorAposReducao: Number(valorAposReducao.toFixed(2)),
+    inssEstimado: fatorAjusteResult.totalSemFator,
+    economiaEstimada: fatorAjusteResult.reducao,
+    percentualReducao: fatorAjusteResult.reducaoPercentual,
+    valorAposReducao: fatorAjusteResult.totalComFator,
     mensagem:
-      'Esta é uma estimativa inicial e provisória, calculada por um motor mock. Ela não substitui uma análise técnica e tributária da documentação da obra.',
+      'Esta é uma estimativa inicial, calculada com as mesmas mecânicas oficiais do INSS de obra (Fator de Ajuste, Selic, CPP, MAED) a partir da área e destinação informadas. Ela não substitui uma análise técnica e tributária da documentação da obra, que depende da RMT real apurada com as tabelas oficiais.',
     isEstimativaProvisoria: true,
   };
 }

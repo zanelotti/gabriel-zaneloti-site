@@ -73,6 +73,10 @@ export function AreasStep({ data, errors, onChange }: AreasStepProps) {
         </div>
       </div>
 
+      <p className="text-xs text-navy-400">
+        Considere a área da piscina apenas se ela já estiver incluída no projeto/execução da obra.
+      </p>
+
       <div>
         <label htmlFor="observacoes" className="field-label">
           Observações <span className="font-normal text-navy-400">— opcional</span>
