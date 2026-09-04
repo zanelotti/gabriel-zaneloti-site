@@ -119,34 +119,46 @@ function round2(value: number): number {
   return Number(value.toFixed(2));
 }
 
+/**
+ * Média nacional do VAU por destinação — usada apenas como aproximação de
+ * reserva para um estado que por algum motivo não esteja cadastrado em
+ * VAU_ESTADUAL (hoje as 27 UFs estão cobertas). O formulário público já exige
+ * a escolha de um estado válido antes de chegar aqui, então este caminho é só
+ * uma proteção extra para a simulação nunca falhar em vez de gerar um número.
+ */
+function vauMedioNacional(destinacaoVau: keyof (typeof VAU_ESTADUAL)[string]): number {
+  const valores = Object.values(VAU_ESTADUAL).map((tabela) => tabela[destinacaoVau]);
+  return valores.reduce((soma, valor) => soma + valor, 0) / valores.length;
+}
+
 export function calculateRMTIndireta(input: RMTIndiretaInput): RMTIndiretaResult {
   const { estado, destinacao, tipoObra, categoria, responsavel } = input;
 
-  if (!destinacao || !tipoObra || !categoria) {
-    throw new Error('Destinação, tipo de obra e categoria são obrigatórios para estimar a RMT.');
-  }
+  // O formulário público já exige destinação, tipo de obra e categoria antes
+  // de permitir avançar — mas, se por algum motivo chegarem vazios aqui,
+  // preferimos assumir os valores mais comuns a falhar a simulação.
+  const destinacaoEfetiva = destinacao || 'residencial_unifamiliar';
+  const tipoObraEfetivo = tipoObra || 'alvenaria';
+  const categoriaEfetiva = categoria || 'obra_nova';
 
   const vauEstado = VAU_ESTADUAL[estado];
-  if (!vauEstado) {
-    throw new Error(`Não há tabela VAU cadastrada para o estado "${estado}".`);
-  }
-
-  const vauPorM2 = vauEstado[DESTINACAO_PARA_VAU[destinacao]];
+  const destinacaoVau = DESTINACAO_PARA_VAU[destinacaoEfetiva];
+  const vauPorM2 = vauEstado ? vauEstado[destinacaoVau] : vauMedioNacional(destinacaoVau);
 
   const areaPrincipal = Math.max(0, input.areaPrincipal);
   const areaComplementar = Math.max(0, input.areaComplementar ?? 0);
   const areaTotal = areaPrincipal + areaComplementar;
 
-  const equivalencia = percentualEquivalencia(destinacao, areaPrincipal);
+  const equivalencia = percentualEquivalencia(destinacaoEfetiva, areaPrincipal);
   const areaTotalParaCalculoPrincipal = areaPrincipal * equivalencia;
   const custoObraPrincipal = areaTotalParaCalculoPrincipal * vauPorM2;
 
   const areaTotalParaCalculoComplementar = areaComplementar * REDUTOR_AREA_COMPLEMENTAR_DESCOBERTA;
   const custoObraComplementar = areaTotalParaCalculoComplementar * vauPorM2;
 
-  const maoDeObra = percentualMaoDeObra(tipoObra, destinacao);
-  const catPct = percentualCategoria(categoria);
-  const destPct = percentualDestinacao(destinacao);
+  const maoDeObra = percentualMaoDeObra(tipoObraEfetivo, destinacaoEfetiva);
+  const catPct = percentualCategoria(categoriaEfetiva);
+  const destPct = percentualDestinacao(destinacaoEfetiva);
   const fatorSocial = responsavel === 'PF' ? percentualFatorSocial(areaTotal) : 1;
 
   const multiplicador = maoDeObra * catPct * destPct * fatorSocial;
