@@ -46,6 +46,17 @@ const MAED_MENSAL = 100;
  */
 const TAXA_SEM_FATOR = 0.368;
 
+/**
+ * Teto de segurança para o número de competências em um único cálculo (66 anos).
+ * A tabela de Selic mensal cobre desde 08/1986 — mais que suficiente para
+ * qualquer obra real, mesmo "construída há muitos anos". Este teto existe só
+ * para nunca deixar o cálculo rodar por muito tempo (ou travar a tela) caso
+ * alguém digite uma data claramente absurda (ex: ano trocado por engano).
+ * Nesse caso, falha rápido com uma mensagem clara em vez de percorrer
+ * milhares de meses.
+ */
+const MAX_COMPETENCIAS = 800;
+
 /** Lista as competências ("AAAA-MM"), inclusive, entre início e fim. */
 function listarCompetencias(inicio: string, fim: string): string[] {
   const competencias: string[] = [];
@@ -53,6 +64,9 @@ function listarCompetencias(inicio: string, fim: string): string[] {
   const fimKey = toCompetenciaKey(fim);
 
   while (compareCompetencia(cursor, fimKey) <= 0) {
+    if (competencias.length >= MAX_COMPETENCIAS) {
+      throw new Error('Período entre a data de início e a data de fim é longo demais para calcular.');
+    }
     competencias.push(cursor);
     cursor = addMonths(cursor, 1);
   }
