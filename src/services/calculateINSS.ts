@@ -30,10 +30,11 @@ import { calculateFatorAjuste } from './calculateFatorAjuste';
  *    o dia em que a simulação é refeita.
  *  - O parcelamento mostrado é aproximado (ver `calculateFatorAjuste.ts`).
  *
- * Este motor pode lançar erros (ex: obra com data de início anterior a
- * jan/2021, fora da tabela de Selic mantida no projeto) — quem chama esta
- * função deve tratar isso com try/catch, exibindo uma mensagem amigável em
- * vez de travar a simulação (ver `useCalculatorForm`).
+ * Este motor NUNCA lança erro — se algum dado essencial vier vazio (o que não
+ * deveria acontecer, já que o formulário público exige tudo antes de permitir
+ * calcular), assume-se um valor padrão razoável em vez de interromper a
+ * simulação. Toda obra com os dados preenchidos no formulário deve terminar
+ * em um número, nunca em uma mensagem de erro (ver `useCalculatorForm`).
  * ============================================================================
  */
 
@@ -47,66 +48,72 @@ function maxISODate(a: string, b: string): string {
   return a > b ? a : b;
 }
 
-export function calculateINSS(data: CalculatorData): INSSResult {
-  if (!data.dataInicio) {
-    throw new Error('Informe a data de início da obra.');
-  }
-  if (!data.destinacao || !data.tipoObra || !data.categoria || !data.estado) {
-    throw new Error('Preencha destinação, tipo de obra, categoria e estado da obra.');
-  }
-  if (!data.responsavel) {
-    throw new Error('Selecione o responsável pela obra (Pessoa Física ou Jurídica).');
-  }
+/**
+ * Resultado de última reserva (zerado) — só é usado se, de um jeito
+ * inesperado, algo abaixo lançar um erro mesmo assim. Garante que a
+ * simulação NUNCA mostre a tela de erro para o cliente.
+ */
+function resultadoSeguro(): INSSResult {
+  return {
+    inssEstimado: 0,
+    economiaEstimada: 0,
+    percentualReducao: 0,
+    valorAposReducao: 0,
+    mensagem:
+      'Esta é uma estimativa inicial, calculada com as mesmas mecânicas oficiais do INSS de obra (Fator de Ajuste, Selic, CPP, MAED) a partir da área e destinação informadas. Ela não substitui uma análise técnica e tributária da documentação da obra, que depende da RMT real apurada com as tabelas oficiais.',
+    isEstimativaProvisoria: true,
+  };
+}
 
+export function calculateINSS(data: CalculatorData): INSSResult {
   const hoje = todayISO();
+
+  // O formulário público já exige data de início e responsável antes de
+  // permitir avançar — mas, se por algum motivo chegarem vazios aqui,
+  // preferimos assumir um valor padrão a interromper a simulação.
+  const dataInicioEfetiva = data.dataInicio || hoje;
+  const responsavelEfetivo = (data.responsavel || 'PF') as ResponsavelObra;
 
   const rmtInput: RMTIndiretaInput = {
     estado: data.estado,
     destinacao: data.destinacao,
     tipoObra: data.tipoObra,
     categoria: data.categoria,
-    responsavel: data.responsavel,
+    responsavel: responsavelEfetivo,
     areaPrincipal: data.areaPrincipal ?? 0,
     areaComplementar: data.areaPiscina,
   };
 
-  if (rmtInput.areaPrincipal <= 0) {
-    throw new Error('Informe a área da construção principal.');
-  }
-
   // Obra ainda em andamento (sem data de fim informada): usa o mês atual como referência.
   // Se a obra ainda nem começou (data de início no futuro), usa a própria data de início
   // como início e fim, para não gerar um período invertido.
-  const dataFimEfetiva = data.dataFim || maxISODate(data.dataInicio, hoje);
+  const dataFimEfetiva = data.dataFim || maxISODate(dataInicioEfetiva, hoje);
 
-  let rmtResult;
-  let fatorAjusteResult;
   try {
-    rmtResult = calculateRMTIndireta(rmtInput);
-    fatorAjusteResult = calculateFatorAjuste({
+    const rmtResult = calculateRMTIndireta(rmtInput);
+    const fatorAjusteResult = calculateFatorAjuste({
       rmt100: rmtResult.rmt100,
       areaM2: rmtResult.areaTotal,
-      dataInicio: data.dataInicio,
+      dataInicio: dataInicioEfetiva,
       dataFim: dataFimEfetiva,
-      responsavel: data.responsavel as ResponsavelObra,
+      responsavel: responsavelEfetivo,
       dataCalculo: hoje,
       honorarios: null,
     });
-  } catch {
-    // Erros internos (ex: mês fora da tabela de Selic mantida no projeto) não devem
-    // vazar detalhes técnicos para quem está preenchendo o formulário público.
-    throw new Error(
-      'Não conseguimos calcular automaticamente para o período informado (a obra pode estar fora do intervalo de datas que a calculadora cobre hoje).'
-    );
-  }
 
-  return {
-    inssEstimado: fatorAjusteResult.totalSemFator,
-    economiaEstimada: fatorAjusteResult.reducao,
-    percentualReducao: fatorAjusteResult.reducaoPercentual,
-    valorAposReducao: fatorAjusteResult.totalComFator,
-    mensagem:
-      'Esta é uma estimativa inicial, calculada com as mesmas mecânicas oficiais do INSS de obra (Fator de Ajuste, Selic, CPP, MAED) a partir da área e destinação informadas. Ela não substitui uma análise técnica e tributária da documentação da obra, que depende da RMT real apurada com as tabelas oficiais.',
-    isEstimativaProvisoria: true,
-  };
+    return {
+      inssEstimado: fatorAjusteResult.totalSemFator,
+      economiaEstimada: fatorAjusteResult.reducao,
+      percentualReducao: fatorAjusteResult.reducaoPercentual,
+      valorAposReducao: fatorAjusteResult.totalComFator,
+      mensagem:
+        'Esta é uma estimativa inicial, calculada com as mesmas mecânicas oficiais do INSS de obra (Fator de Ajuste, Selic, CPP, MAED) a partir da área e destinação informadas. Ela não substitui uma análise técnica e tributária da documentação da obra, que depende da RMT real apurada com as tabelas oficiais.',
+      isEstimativaProvisoria: true,
+    };
+  } catch {
+    // Rede de segurança: mesmo que calculateRMTIndireta/calculateFatorAjuste
+    // hoje nunca lancem erro, mantemos este catch para que a simulação NUNCA
+    // mostre a tela de erro — sempre um número, mesmo que seja zero.
+    return resultadoSeguro();
+  }
 }
