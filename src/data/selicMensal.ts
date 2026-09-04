@@ -525,8 +525,18 @@ export const SELIC_MENSAL: Record<string, number> = {
  */
 export function toCompetenciaKey(input: string | Date): string {
   if (input instanceof Date) {
-    const year = String(input.getFullYear()).padStart(4, '0');
-    const month = String(input.getMonth() + 1).padStart(2, '0');
+    // IMPORTANTE: usa os getters UTC (getUTCFullYear/getUTCMonth), não os
+    // getters locais (getFullYear/getMonth). O único lugar que constrói um
+    // Date aqui é `addMonths`, sempre via `Date.UTC(...)` — em qualquer fuso
+    // horário atrás de UTC (ex: Brasil, UTC-3, o fuso real dos usuários do
+    // site), os getters locais podem "voltar" a meia-noite UTC do dia 1 para
+    // o dia anterior no horário local, devolvendo o MÊS ERRADO (ex: sempre
+    // o mês anterior) e quebrando silenciosamente todo o avanço de
+    // competência — foi exatamente isso que produzia contagens de meses
+    // completamente erradas (e "economias" negativas sem sentido) para
+    // qualquer pessoa acessando de fora do UTC.
+    const year = String(input.getUTCFullYear()).padStart(4, '0');
+    const month = String(input.getUTCMonth() + 1).padStart(2, '0');
     return `${year}-${month}`;
   }
   // Aceita "AAAA-MM" diretamente, ou "AAAA-MM-DD" (de um <input type="date">).
