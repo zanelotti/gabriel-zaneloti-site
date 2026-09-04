@@ -26,9 +26,19 @@ import { addMonths, calcularSelicAcumulada, compareCompetencia, toCompetenciaKey
  * o comparativo "sem Fator de Ajuste" — nesse cenário, apenas a MAED
  * permanece fixa; os demais componentes escalam com a RMT maior.
  *
+ * DECADÊNCIA (5 anos — art. 173, I, do CTN): só entram na cobrança (e no
+ * comparativo) as competências dos últimos 5 anos-calendário até a data do
+ * cálculo — a Receita Federal não pode mais cobrar competências mais antigas
+ * que isso (ver `competenciaDecaida`). Sem esse limite, uma obra antiga (ex:
+ * há 15+ anos) acumulava MAED por todos os meses desde o início, o que podia
+ * superar de longe o comparativo "sem Fator de Ajuste" e gerar uma "economia"
+ * negativa sem sentido — exatamente competências que já decaíram e não
+ * deveriam entrar na conta.
+ *
  * VALIDADO contra os 3 exemplos reais fornecidos pelo Gabriel: a linha de
  * 10/2021 do primeiro relatório (Selic 57,53%, CPP R$157,34, total R$379,33)
- * é reproduzida exatamente por este motor.
+ * é reproduzida exatamente por este motor (obras dentro do prazo decadencial,
+ * onde a decadência não altera nenhum dos números).
  * ============================================================================
  */
 
@@ -36,6 +46,35 @@ const ALIQUOTA_CPP = 0.2;
 const MULTA_DIARIA_PCT = 0.33;
 const MULTA_TETO_PCT = 20;
 const MAED_MENSAL = 100;
+
+/**
+ * Prazo decadencial das contribuições previdenciárias de obra (art. 173, I,
+ * do CTN, aplicado pela Receita Federal ao INSS de obra): o Fisco perde o
+ * direito de cobrar uma competência depois de 5 anos completos — na prática,
+ * "obras com mais de 5 anos não estão sujeitas à cobrança das contribuições
+ * sociais" (gov.br/receitafederal — Construção Civil/Sero/Decadência).
+ * Sem esse limite, uma obra muito antiga (ex: iniciada décadas atrás e ainda
+ * sem DCTFWeb) acumula MAED (R$100/mês) indefinidamente, o que produzia
+ * resultados sem sentido (economia negativa, redução de milhares de %) —
+ * exatamente o tipo de competência que já decaiu e não pode mais ser cobrada.
+ */
+const DECADENCIA_ANOS = 5;
+
+/** Ano ("AAAA") de uma chave "AAAA-MM" ou de uma data ISO "AAAA-MM-DD". */
+function anoDe(data: string): number {
+  return Number(data.slice(0, 4));
+}
+
+/**
+ * Uma competência decai (deixa de ser cobrável) quando já se passaram mais de
+ * 5 anos completos entre o ano da competência e o ano do cálculo — a mesma
+ * contagem por ano-calendário usada pela Receita Federal nos exemplos de
+ * decadência proporcional (ex: obra de 2017 a 2021 calculada em 2025: só as
+ * competências de 2020 e 2021, dentro dos últimos 5 anos, seguem cobráveis).
+ */
+function competenciaDecaida(competencia: string, dataCalculo: string): boolean {
+  return anoDe(dataCalculo) - anoDe(competencia) > DECADENCIA_ANOS;
+}
 
 /**
  * Taxa de referência fixa para o cenário "sem Fator de Ajuste": totalSemFator = RMT (100%) × 36,8%.
@@ -134,13 +173,28 @@ function somarTotal(linhas: FatorAjusteMonthRow[]): number {
 export function calculateFatorAjuste(input: FatorAjusteInput): FatorAjusteResult {
   // listarCompetencias já trata datas fora de ordem (inverte internamente) e
   // sempre devolve pelo menos 1 competência — nunca uma lista vazia.
-  const competencias = listarCompetencias(input.dataInicio, input.dataFim);
+  const todasCompetencias = listarCompetencias(input.dataInicio, input.dataFim);
+  const numeroMesesTotal = todasCompetencias.length;
+
+  // A RMT total é rateada por TODOS os meses da obra (isso não muda com a
+  // decadência — é só como o valor mensal "atual" é reconstituído). Só a
+  // COBRANÇA de cada competência (a soma que vira totalComFator) respeita a
+  // decadência de 5 anos: competências mais antigas que isso não entram na
+  // conta, porque não podem mais ser cobradas.
+  const competencias = todasCompetencias.filter((c) => !competenciaDecaida(c, input.dataCalculo));
   const numeroMeses = competencias.length;
+
+  // Fração da obra ainda dentro do prazo decadencial — usada também para
+  // escalar o comparativo "sem Fator de Ajuste" (totalSemFator), do mesmo
+  // jeito que a Receita Federal calcula a decadência proporcional (meses não
+  // decaídos ÷ meses totais), para que as duas pontas da comparação sempre
+  // considerem a mesma janela de competências realmente cobráveis.
+  const fracaoCobravel = numeroMesesTotal > 0 ? numeroMeses / numeroMesesTotal : 0;
 
   const percentualFator: 50 | 70 = input.areaM2 <= 350 ? 50 : 70;
   const rmtAjustada = input.rmt100 * (percentualFator / 100);
 
-  const remAtualComFator = rmtAjustada / numeroMeses;
+  const remAtualComFator = rmtAjustada / numeroMesesTotal;
 
   const referencia = toCompetenciaKey(input.dataCalculo);
   const dataCalculoDate = new Date(`${input.dataCalculo}T00:00:00Z`);
@@ -150,7 +204,7 @@ export function calculateFatorAjuste(input: FatorAjusteInput): FatorAjusteResult
   );
 
   const totalComFator = somarTotal(linhasComFator);
-  const totalSemFator = round2(input.rmt100 * TAXA_SEM_FATOR);
+  const totalSemFator = round2(input.rmt100 * TAXA_SEM_FATOR * fracaoCobravel);
   const reducao = round2(totalSemFator - totalComFator);
   const reducaoPercentual = totalSemFator > 0 ? Number(((reducao / totalSemFator) * 100).toFixed(2)) : 0;
 
