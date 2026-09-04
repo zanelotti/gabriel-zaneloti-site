@@ -73,7 +73,7 @@ export function Calculator() {
                   Voltar
                 </button>
                 <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? 'Calculando...' : 'Calcular minha simulação'}
+                  {isSubmitting ? 'Calculando...' : 'Calcular'}
                 </button>
               </div>
             </form>
