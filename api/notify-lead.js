@@ -1,15 +1,24 @@
 /**
  * ============================================================================
- *  FUNÇÃO SERVERLESS (Vercel) — NOTIFICAÇÃO POR E-MAIL DE NOVO LEAD
+ *  FUNÇÃO SERVERLESS (Vercel) — NOTIFICAÇÃO + REGISTRO DE NOVO LEAD
  * ============================================================================
  * Chamada pelo frontend (`leadService.ts`) toda vez que alguém termina uma
- * simulação no site. Envia um e-mail para o Gabriel com os dados preenchidos,
- * usando a API da Resend (https://resend.com).
+ * simulação no site. Faz duas coisas, em paralelo, cada uma independente da
+ * outra (uma pode falhar sem afetar a outra):
+ *   1. Envia um e-mail para o Gabriel com os dados preenchidos, usando a API
+ *      da Resend (https://resend.com).
+ *   2. Grava o lead numa tabela do Supabase (https://supabase.com), para
+ *      consulta posterior (histórico completo, buscas, filtros).
  *
  * CONFIGURAÇÃO NECESSÁRIA (variáveis de ambiente no projeto Vercel):
- *   - RESEND_API_KEY          (obrigatória) — chave da conta Resend.
- *   - LEAD_NOTIFICATION_EMAIL (opcional)    — e-mail que recebe as notificações.
- *                                             Se não for definida, usa o padrão abaixo.
+ *   - RESEND_API_KEY           (obrigatória p/ e-mail)  — chave da conta Resend.
+ *   - LEAD_NOTIFICATION_EMAIL  (opcional)               — e-mail que recebe as notificações.
+ *                                                          Se não for definida, usa o padrão abaixo.
+ *   - SUPABASE_URL             (obrigatória p/ registro) — Project URL do Supabase.
+ *   - SUPABASE_SERVICE_ROLE_KEY(obrigatória p/ registro) — chave "service_role" do Supabase.
+ *
+ * Se uma das duas integrações ainda não estiver configurada, essa parte é
+ * simplesmente pulada (sem erro) — a outra continua funcionando normalmente.
  *
  * Esta função NUNCA deve derrubar a captura do lead no site: qualquer erro
  * aqui é só registrado no log da Vercel (Vercel → projeto → Logs) — o
@@ -190,45 +199,79 @@ function buildEmailHtml(lead) {
     </div>`;
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+/** Converte o lead (camelCase, como chega do frontend) para as colunas snake_case da tabela `leads` do Supabase. */
+function toSupabaseRow(lead) {
+  return {
+    id: lead.id || undefined,
+    nome: lead.nome ?? null,
+    whatsapp: lead.whatsapp ?? null,
+    data_inicio: lead.dataInicio || null,
+    data_fim: lead.dataFim || null,
+    responsavel: lead.responsavel ?? null,
+    tipo_obra: lead.tipoObra ?? null,
+    situacao: lead.situacao ?? null,
+    categoria: lead.categoria ?? null,
+    estado: lead.estado ?? null,
+    destinacao: lead.destinacao ?? null,
+    area_principal: lead.areaPrincipal ?? null,
+    area_piscina: lead.areaPiscina ?? null,
+    observacoes: lead.observacoes || null,
+    inss_estimado: lead.inssEstimado ?? null,
+    economia_estimada: lead.economiaEstimada ?? null,
+    percentual_reducao: lead.percentualReducao ?? null,
+    valor_apos_reducao: lead.valorAposReducao ?? null,
+    created_at: lead.createdAt || new Date().toISOString(),
+  };
+}
 
-  if (req.method === 'OPTIONS') {
-    res.status(204).end();
-    return;
+/**
+ * Grava o lead na tabela `leads` do Supabase, via API REST (PostgREST),
+ * usando a chave service_role (só existe aqui, do lado do servidor — nunca
+ * é exposta ao navegador do visitante).
+ */
+async function saveToSupabase(lead) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    console.error('[notify-lead] SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY não configuradas no projeto Vercel.');
+    return { ok: false, reason: 'db_not_configured' };
   }
 
-  if (req.method !== 'POST') {
-    res.status(405).json({ ok: false, reason: 'method_not_allowed' });
-    return;
-  }
+  try {
+    const response = await fetch(`${url.replace(/\/$/, '')}/rest/v1/leads`, {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(toSupabaseRow(lead)),
+    });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[notify-lead] Falha ao gravar no Supabase:', response.status, errorText);
+      return { ok: false, reason: 'db_save_failed' };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    console.error('[notify-lead] Erro inesperado ao gravar no Supabase:', error);
+    return { ok: false, reason: 'db_exception' };
+  }
+}
+
+/** Envia o e-mail de notificação via Resend. Retorna sempre um resultado, nunca lança. */
+async function sendEmail(lead) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    // Configuração ainda não feita — não é um erro do visitante, só ainda não
-    // foi conectado. Registra no log para o Gabriel/eu percebermos.
     console.error('[notify-lead] RESEND_API_KEY não configurada no projeto Vercel.');
-    res.status(200).json({ ok: false, reason: 'email_not_configured' });
-    return;
+    return { ok: false, reason: 'email_not_configured' };
   }
 
   const toEmail = process.env.LEAD_NOTIFICATION_EMAIL || DEFAULT_NOTIFICATION_EMAIL;
-
-  let lead = req.body;
-  if (typeof lead === 'string') {
-    try {
-      lead = JSON.parse(lead);
-    } catch {
-      res.status(400).json({ ok: false, reason: 'invalid_body' });
-      return;
-    }
-  }
-  if (!lead || typeof lead !== 'object') {
-    res.status(400).json({ ok: false, reason: 'invalid_body' });
-    return;
-  }
 
   try {
     const resendResponse = await fetch('https://api.resend.com/emails', {
@@ -249,13 +292,48 @@ export default async function handler(req, res) {
     if (!resendResponse.ok) {
       const errorText = await resendResponse.text();
       console.error('[notify-lead] Falha ao enviar via Resend:', resendResponse.status, errorText);
-      res.status(200).json({ ok: false, reason: 'send_failed' });
-      return;
+      return { ok: false, reason: 'send_failed' };
     }
 
-    res.status(200).json({ ok: true });
+    return { ok: true };
   } catch (error) {
     console.error('[notify-lead] Erro inesperado ao enviar e-mail:', error);
-    res.status(200).json({ ok: false, reason: 'exception' });
+    return { ok: false, reason: 'exception' };
   }
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    res.status(405).json({ ok: false, reason: 'method_not_allowed' });
+    return;
+  }
+
+  let lead = req.body;
+  if (typeof lead === 'string') {
+    try {
+      lead = JSON.parse(lead);
+    } catch {
+      res.status(400).json({ ok: false, reason: 'invalid_body' });
+      return;
+    }
+  }
+  if (!lead || typeof lead !== 'object') {
+    res.status(400).json({ ok: false, reason: 'invalid_body' });
+    return;
+  }
+
+  // As duas integrações rodam em paralelo e são independentes: uma falhar
+  // (ou ainda não estar configurada) não afeta a outra.
+  const [email, db] = await Promise.all([sendEmail(lead), saveToSupabase(lead)]);
+
+  res.status(200).json({ ok: email.ok || db.ok, email, db });
 }
