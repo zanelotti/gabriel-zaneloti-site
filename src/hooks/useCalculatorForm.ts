@@ -77,6 +77,11 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
 
     setIsSubmitting(true);
     setCalcError(null);
+    // Cede o controle ao navegador por um instante antes do cálculo (síncrono e,
+    // em geral, quase instantâneo) para garantir que o texto "Calculando..." do
+    // botão apareça na tela antes de qualquer processamento — evita a sensação
+    // de "travamento" em conexões/dispositivos mais lentos.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     try {
       let calcResult: INSSResult | null = null;
       try {
