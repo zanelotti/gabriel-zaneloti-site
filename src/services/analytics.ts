@@ -75,19 +75,26 @@ export function initAnalytics(): void {
 
   // Meta Pixel — loader padrão fornecido pela Meta.
   if (META_PIXEL_ID) {
+    type FbqFn = ((...args: unknown[]) => void) & {
+      callMethod?: (...args: unknown[]) => void;
+      queue?: unknown[];
+      loaded?: boolean;
+      version?: string;
+    };
+
     const win = window as typeof window & {
-      fbq: ((...args: unknown[]) => void) & { callMethod?: (...args: unknown[]) => void; queue?: unknown[]; loaded?: boolean; version?: string };
+      fbq: FbqFn;
       _fbq?: unknown;
     };
 
     if (!win.fbq) {
-      const fbqFn = function fbq(...args: unknown[]) {
+      const fbqFn: FbqFn = function fbq(...args: unknown[]) {
         if (fbqFn.callMethod) {
           fbqFn.callMethod(...args);
         } else {
           fbqFn.queue!.push(args);
         }
-      } as typeof win.fbq;
+      } as FbqFn;
       fbqFn.queue = [];
       fbqFn.loaded = true;
       fbqFn.version = '2.0';
