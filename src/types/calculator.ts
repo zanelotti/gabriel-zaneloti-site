@@ -1,3 +1,5 @@
+import type { FatorAjusteMonthRow, ParcelamentoEstimado } from './fatorAjuste';
+
 /**
  * Tipos relacionados ao formulário/estado da calculadora de simulação de INSS de obra.
  */
@@ -64,6 +66,24 @@ export const INITIAL_CALCULATOR_DATA: CalculatorData = {
   observacoes: '',
 };
 
+/**
+ * Detalhamento interno do cálculo (linha a linha, honorários, parcelamento etc.).
+ * Usado SOMENTE no e-mail de notificação que o Gabriel recebe por trás dos
+ * bastidores — nunca é exibido na UI pública da calculadora (o `ResultCard`
+ * não lê este campo, só os 4 números-resumo do `INSSResult`).
+ */
+export interface INSSDetalheInterno {
+  rmt100: number;
+  percentualFator: 50 | 70;
+  areaM2: number;
+  numeroMeses: number;
+  linhasComFator: FatorAjusteMonthRow[];
+  /** Honorários = 12% da economia estimada (regra padrão para leads do simulador público). */
+  honorarios: number;
+  reducaoLiquida: number;
+  parcelamento: ParcelamentoEstimado;
+}
+
 /** Resultado retornado pelo motor de cálculo (calculateINSS). */
 export interface INSSResult {
   inssEstimado: number;
@@ -73,6 +93,11 @@ export interface INSSResult {
   mensagem: string;
   /** Sinaliza que este resultado vem de um motor provisório/mock — não é um cálculo tributário oficial. */
   isEstimativaProvisoria: true;
+  /**
+   * Detalhamento interno (uso exclusivo do Gabriel, via e-mail) — ausente
+   * quando o resultado vem do caminho de segurança (`resultadoSeguro`).
+   */
+  detalheInterno?: INSSDetalheInterno;
 }
 
 export type CalculatorStepIndex = 1 | 2 | 3;
