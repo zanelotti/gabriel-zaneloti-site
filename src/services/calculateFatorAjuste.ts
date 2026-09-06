@@ -26,6 +26,14 @@ import { addMonths, calcularSelicAcumulada, compareCompetencia, toCompetenciaKey
  * o comparativo "sem Fator de Ajuste" — nesse cenário, apenas a MAED
  * permanece fixa; os demais componentes escalam com a RMT maior.
  *
+ * COMPETÊNCIA EM DIA (vencimento ainda não chegado): os passos 3, 5, 6 e 7
+ * acima só valem para uma competência já vencida (dataCalculo depois do dia
+ * 20 do mês seguinte). Para o mês em curso na data do cálculo — ou qualquer
+ * mês futuro, em obras "do presente para o futuro" — não há atraso, então não
+ * há correção monetária (REM.ORIG = REM.ATUAL), multa, juros de mora nem MAED:
+ * só a CPP do mês (ver `diasDeAtraso` e o retorno antecipado em
+ * `calcularLinhaMensal`).
+ *
  * DECADÊNCIA (5 anos — art. 173, I, do CTN): só entram na cobrança (e no
  * comparativo) as competências dos últimos 5 anos-calendário até a data do
  * cálculo — a Receita Federal não pode mais cobrar competências mais antigas
@@ -131,17 +139,46 @@ function dataVencimento(competencia: string): Date {
   return new Date(Date.UTC(year, month, 20));
 }
 
-function calcularMultaPct(competencia: string, dataCalculo: Date): number {
+/**
+ * Dias entre o vencimento de uma competência (dia 20 do mês seguinte) e a
+ * data do cálculo — nunca negativo. Zero significa que o vencimento ainda não
+ * chegou (ou é hoje mesmo): a declaração ainda está em dia.
+ */
+function diasDeAtraso(competencia: string, dataCalculo: Date): number {
   const vencimento = dataVencimento(competencia);
-  const diasAtraso = Math.max(0, Math.floor((dataCalculo.getTime() - vencimento.getTime()) / 86_400_000));
-  return Math.min(MULTA_TETO_PCT, Number((diasAtraso * MULTA_DIARIA_PCT).toFixed(2)));
+  return Math.max(0, Math.floor((dataCalculo.getTime() - vencimento.getTime()) / 86_400_000));
 }
 
 function calcularLinhaMensal(competencia: string, remAtual: number, referencia: string, dataCalculo: Date): FatorAjusteMonthRow {
+  const diasAtraso = diasDeAtraso(competencia, dataCalculo);
+
+  // Competência ainda dentro do prazo: o vencimento (dia 20 do mês seguinte à
+  // competência) ainda não chegou (ou é hoje mesmo). Uma declaração em dia não
+  // gera nenhuma correção monetária, multa, juros de mora ou MAED — só a CPP
+  // do mês, calculada direto sobre a REM. ATUAL (sem desconto de Selic, já que
+  // não há atraso a corrigir). Isso vale tanto para o mês em curso na data do
+  // cálculo quanto para meses futuros de uma obra "do presente para o futuro"
+  // (ex: data de fim ainda não alcançada).
+  if (diasAtraso === 0) {
+    const cpp = round2(remAtual * ALIQUOTA_CPP);
+    return {
+      competencia,
+      remAtual: round2(remAtual),
+      remOrig: round2(remAtual),
+      cpp,
+      multaPct: 0,
+      multa: 0,
+      selicPct: 0,
+      mora: 0,
+      maed: 0,
+      total: cpp,
+    };
+  }
+
   const selicPct = calcularSelicAcumulada(competencia, referencia);
   const remOrig = remAtual / (1 + selicPct / 100);
   const cpp = round2(remOrig * ALIQUOTA_CPP);
-  const multaPct = calcularMultaPct(competencia, dataCalculo);
+  const multaPct = Math.min(MULTA_TETO_PCT, Number((diasAtraso * MULTA_DIARIA_PCT).toFixed(2)));
   const multa = round2(cpp * (multaPct / 100));
   const mora = round2(cpp * (selicPct / 100));
   const maed = MAED_MENSAL;
