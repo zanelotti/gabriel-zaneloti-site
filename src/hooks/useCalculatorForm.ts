@@ -103,6 +103,7 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
         economiaEstimada: calcResult?.economiaEstimada ?? null,
         percentualReducao: calcResult?.percentualReducao ?? null,
         valorAposReducao: calcResult?.valorAposReducao ?? null,
+        detalheInterno: calcResult?.detalheInterno ?? null,
       });
 
       trackEvent('calculator_completed', {
