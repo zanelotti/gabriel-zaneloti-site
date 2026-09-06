@@ -94,6 +94,19 @@ function formatPercent(value) {
   return `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
 }
 
+/** Percentual com sempre 2 casas decimais (ex: 57,53%) — usado na tabela mensal, onde a precisão importa. */
+function formatPercentPrecise(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'Não calculado';
+  return `${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+}
+
+/** Converte a chave de competência "AAAA-MM" para o rótulo "MM/AAAA". */
+function competenciaLabel(competencia) {
+  const [year, month] = String(competencia).split('-');
+  if (!year || !month) return String(competencia ?? '');
+  return `${month}/${year}`;
+}
+
 function formatDateBR(isoDate) {
   if (!isoDate) return 'Não informado';
   const [year, month, day] = String(isoDate).split('-');
@@ -123,6 +136,98 @@ function buildWhatsAppLink(lead) {
   const numero = digits.length <= 11 ? `55${digits}` : digits;
   const texto = `Olá, ${lead.nome || ''}! Vi que você simulou a redução do INSS da sua obra no meu site.`;
   return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+}
+
+/**
+ * Renderiza o detalhamento interno do cálculo (lançamentos mensais + honorários
+ * de 12% sobre a economia + redução líquida), no mesmo formato dos relatórios
+ * internos do Gabriel (`/calculo.html`). Só aparece para quem recebe este
+ * e-mail — nunca é exibido para o visitante do site, que só vê os 4 números
+ * resumidos no resultado da calculadora pública.
+ */
+function buildDetalheInternoHtml(lead) {
+  const detalhe = lead.detalheInterno;
+  if (!detalhe || !Array.isArray(detalhe.linhasComFator) || detalhe.linhasComFator.length === 0) {
+    return '';
+  }
+
+  const linhasHtml = detalhe.linhasComFator
+    .map(
+      (linha, index) => `
+        <tr style="background:${index % 2 === 0 ? '#ffffff' : '#f9fafb'};">
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#111827;white-space:nowrap;">${escapeHtml(competenciaLabel(linha.competencia))}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151;white-space:nowrap;">${formatCurrency(linha.remAtual)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151;white-space:nowrap;">${formatCurrency(linha.remOrig)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151;white-space:nowrap;">${formatCurrency(linha.cpp)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151;white-space:nowrap;">${formatCurrency(linha.multa)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151;white-space:nowrap;">${formatPercentPrecise(linha.selicPct)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151;white-space:nowrap;">${formatCurrency(linha.mora)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;color:#374151;white-space:nowrap;">${formatCurrency(linha.maed)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-weight:700;color:#111827;white-space:nowrap;">${formatCurrency(linha.total)}</td>
+        </tr>`
+    )
+    .join('');
+
+  const primeiraCompetencia = competenciaLabel(detalhe.linhasComFator[0].competencia);
+  const ultimaCompetencia = competenciaLabel(detalhe.linhasComFator[detalhe.linhasComFator.length - 1].competencia);
+
+  return `
+    <div style="margin:28px 0 0;padding-top:20px;border-top:2px dashed #d1d5db;">
+      <p style="margin:0 0 4px;display:inline-block;background:#111827;color:#ffffff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:4px;">Uso interno — só você vê isso</p>
+      <h3 style="margin:10px 0 4px;font-size:16px;color:#111827;">Detalhamento do cálculo (Fator de Ajuste)</h3>
+      <p style="margin:0 0 14px;color:#6b7280;font-size:13px;">
+        Área ${formatArea(detalhe.areaM2)} · Fator de Ajuste ${escapeHtml(String(detalhe.percentualFator))}% da RMT ·
+        RMT 100% ${formatCurrency(detalhe.rmt100)} · Período com DCTFweb: ${escapeHtml(primeiraCompetencia)} até ${escapeHtml(ultimaCompetencia)}
+        (${escapeHtml(String(detalhe.numeroMeses))} meses cobráveis)
+      </p>
+      <div style="overflow-x:auto;">
+        <table role="presentation" width="100%" style="border-collapse:collapse;font-size:12px;min-width:560px;">
+          <thead>
+            <tr style="background:#111827;color:#ffffff;text-align:left;">
+              <th style="padding:6px 8px;font-weight:700;">Mês/Ano</th>
+              <th style="padding:6px 8px;font-weight:700;">Rem. Atual</th>
+              <th style="padding:6px 8px;font-weight:700;">Rem. Orig.</th>
+              <th style="padding:6px 8px;font-weight:700;">CPP</th>
+              <th style="padding:6px 8px;font-weight:700;">Multa</th>
+              <th style="padding:6px 8px;font-weight:700;">Selic</th>
+              <th style="padding:6px 8px;font-weight:700;">Mora</th>
+              <th style="padding:6px 8px;font-weight:700;">MAED</th>
+              <th style="padding:6px 8px;font-weight:700;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linhasHtml}
+          </tbody>
+          <tfoot>
+            <tr style="background:#1f2937;color:#ffffff;font-weight:700;">
+              <td style="padding:6px 8px;" colspan="8">TOTAL (com Fator de Ajuste)</td>
+              <td style="padding:6px 8px;">${formatCurrency(lead.valorAposReducao)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <table role="presentation" width="100%" style="border-collapse:collapse;margin:16px 0 0;">
+        <tr>
+          <td style="padding:10px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px 0 0 8px;">
+            <div style="font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:.03em;">Honorários (12% da economia)</div>
+            <div style="font-size:18px;font-weight:700;color:#7f1d1d;">${formatCurrency(detalhe.honorarios)}</div>
+          </td>
+          <td style="padding:10px 16px;background:#fef2f2;border:1px solid #fecaca;border-left:none;border-radius:0 8px 8px 0;">
+            <div style="font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:.03em;">Redução líquida (para o cliente)</div>
+            <div style="font-size:18px;font-weight:700;color:#7f1d1d;">${formatCurrency(detalhe.reducaoLiquida)}</div>
+          </td>
+        </tr>
+      </table>
+
+      <p style="margin:10px 0 0;color:#6b7280;font-size:13px;">
+        Parcelamento estimado: ${escapeHtml(String(detalhe.parcelamento.numeroParcelas))}x de ${formatCurrency(detalhe.parcelamento.valorParcela)}.
+      </p>
+      <p style="margin:10px 0 0;color:#9ca3af;font-size:11px;">
+        Cálculos com base no desconto de 50% da multa da MAED, para pagamentos em até 30 dias. Este detalhamento é só
+        para uso interno — nunca aparece para quem preenche a calculadora no site.
+      </p>
+    </div>`;
 }
 
 function buildEmailHtml(lead) {
@@ -196,6 +301,7 @@ function buildEmailHtml(lead) {
           : ''
       }
       <p style="margin:24px 0 0;color:#9ca3af;font-size:12px;">Simulação recebida em ${new Date(lead.createdAt || Date.now()).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (horário de Brasília).</p>
+      ${buildDetalheInternoHtml(lead)}
     </div>`;
 }
 
