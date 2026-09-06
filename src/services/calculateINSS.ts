@@ -48,6 +48,10 @@ function maxISODate(a: string, b: string): string {
   return a > b ? a : b;
 }
 
+function round2(value: number): number {
+  return Number(value.toFixed(2));
+}
+
 /**
  * Resultado de última reserva (zerado) — só é usado se, de um jeito
  * inesperado, algo abaixo lançar um erro mesmo assim. Garante que a
@@ -101,6 +105,11 @@ export function calculateINSS(data: CalculatorData): INSSResult {
       honorarios: null,
     });
 
+    // Honorários (uso exclusivamente interno, no e-mail que o Gabriel recebe):
+    // 12% sobre a economia estimada, nunca mostrados ao visitante do site.
+    const honorarios = round2(fatorAjusteResult.reducao * 0.12);
+    const reducaoLiquida = round2(fatorAjusteResult.reducao - honorarios);
+
     return {
       inssEstimado: fatorAjusteResult.totalSemFator,
       economiaEstimada: fatorAjusteResult.reducao,
@@ -109,6 +118,16 @@ export function calculateINSS(data: CalculatorData): INSSResult {
       mensagem:
         'Esta é uma estimativa inicial, calculada com as mesmas mecânicas oficiais do INSS de obra (Fator de Ajuste, Selic, CPP, MAED) a partir da área e destinação informadas. Ela não substitui uma análise técnica e tributária da documentação da obra, que depende da RMT real apurada com as tabelas oficiais.',
       isEstimativaProvisoria: true,
+      detalheInterno: {
+        rmt100: fatorAjusteResult.rmt100,
+        percentualFator: fatorAjusteResult.percentualFator,
+        areaM2: fatorAjusteResult.areaM2,
+        numeroMeses: fatorAjusteResult.numeroMeses,
+        linhasComFator: fatorAjusteResult.linhasComFator,
+        honorarios,
+        reducaoLiquida,
+        parcelamento: fatorAjusteResult.parcelamento,
+      },
     };
   } catch {
     // Rede de segurança: mesmo que calculateRMTIndireta/calculateFatorAjuste
