@@ -149,12 +149,19 @@ export function calculateRMTIndireta(input: RMTIndiretaInput): RMTIndiretaResult
   const areaComplementar = Math.max(0, input.areaComplementar ?? 0);
   const areaTotal = areaPrincipal + areaComplementar;
 
+  // A Sero (e a planilha do Gabriel) arredondam a centavos a cada etapa —
+  // área para cálculo, custo da obra, RMT por parcela — em vez de carregar a
+  // precisão flutuante inteira até o final. Reproduzimos o mesmo arredondamento
+  // por etapa aqui; sem isso, o resultado final fica alguns centavos abaixo do
+  // valor real (conferido contra um relatório real do Gabriel: área 241,87 m²,
+  // SP, residencial unifamiliar, alvenaria, obra nova, PF → RMT 100% deve bater
+  // em R$56.084,85, não R$56.084,10).
   const equivalencia = percentualEquivalencia(destinacaoEfetiva, areaPrincipal);
-  const areaTotalParaCalculoPrincipal = areaPrincipal * equivalencia;
-  const custoObraPrincipal = areaTotalParaCalculoPrincipal * vauPorM2;
+  const areaTotalParaCalculoPrincipal = round2(areaPrincipal * equivalencia);
+  const custoObraPrincipal = round2(areaTotalParaCalculoPrincipal * vauPorM2);
 
-  const areaTotalParaCalculoComplementar = areaComplementar * REDUTOR_AREA_COMPLEMENTAR_DESCOBERTA;
-  const custoObraComplementar = areaTotalParaCalculoComplementar * vauPorM2;
+  const areaTotalParaCalculoComplementar = round2(areaComplementar * REDUTOR_AREA_COMPLEMENTAR_DESCOBERTA);
+  const custoObraComplementar = round2(areaTotalParaCalculoComplementar * vauPorM2);
 
   const maoDeObra = percentualMaoDeObra(tipoObraEfetivo, destinacaoEfetiva);
   const catPct = percentualCategoria(categoriaEfetiva);
@@ -163,8 +170,8 @@ export function calculateRMTIndireta(input: RMTIndiretaInput): RMTIndiretaResult
 
   const multiplicador = maoDeObra * catPct * destPct * fatorSocial;
 
-  const rmtPrincipal = custoObraPrincipal * multiplicador;
-  const rmtComplementar = custoObraComplementar * multiplicador;
+  const rmtPrincipal = round2(custoObraPrincipal * multiplicador);
+  const rmtComplementar = round2(custoObraComplementar * multiplicador);
 
   return {
     rmt100: round2(rmtPrincipal + rmtComplementar),
@@ -172,10 +179,10 @@ export function calculateRMTIndireta(input: RMTIndiretaInput): RMTIndiretaResult
     detalhes: {
       vauPorM2,
       percentualEquivalencia: equivalencia,
-      areaTotalParaCalculoPrincipal: round2(areaTotalParaCalculoPrincipal),
-      custoObraPrincipal: round2(custoObraPrincipal),
-      areaTotalParaCalculoComplementar: round2(areaTotalParaCalculoComplementar),
-      custoObraComplementar: round2(custoObraComplementar),
+      areaTotalParaCalculoPrincipal,
+      custoObraPrincipal,
+      areaTotalParaCalculoComplementar,
+      custoObraComplementar,
       percentualMaoDeObra: maoDeObra,
       percentualCategoria: catPct,
       percentualDestinacao: destPct,
