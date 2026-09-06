@@ -1,6 +1,7 @@
 import type {
   CategoriaObra,
   Destinacao,
+  INSSDetalheInterno,
   Responsavel,
   SituacaoObra,
   TipoObra,
@@ -31,6 +32,12 @@ export interface Lead {
   economiaEstimada: number | null;
   percentualReducao: number | null;
   valorAposReducao: number | null;
+  /**
+   * Detalhamento interno do cálculo (linhas mensais, honorários 12%, redução
+   * líquida etc.) — usado só no e-mail de notificação do Gabriel, nunca
+   * exibido na UI pública. null quando não foi possível gerar a estimativa.
+   */
+  detalheInterno: INSSDetalheInterno | null;
   createdAt: string;
 }
 
