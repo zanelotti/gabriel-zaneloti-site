@@ -7,9 +7,22 @@
  * este serviço passará a disparar os eventos automaticamente para as
  * plataformas configuradas.
  *
- *   VITE_GA4_MEASUREMENT_ID=       (ex: G-XXXXXXXXXX)
- *   VITE_GOOGLE_ADS_CONVERSION_ID= (ex: AW-XXXXXXXXX)
- *   VITE_META_PIXEL_ID=            (ex: 000000000000000)
+ *   VITE_GA4_MEASUREMENT_ID=              (ex: G-XXXXXXXXXX)
+ *   VITE_GOOGLE_ADS_CONVERSION_ID=         (ex: AW-XXXXXXXXX)
+ *   VITE_GOOGLE_ADS_LEAD_LABEL=            (rótulo da ação de conversão "Envio de simulação")
+ *   VITE_GOOGLE_ADS_WHATSAPP_LABEL=        (opcional — rótulo da ação de conversão "Clique no WhatsApp")
+ *   VITE_META_PIXEL_ID=                    (ex: 000000000000000)
+ *
+ * IMPORTANTE sobre o Google Ads: uma simples chamada de evento com o ID de
+ * conversão (AW-XXXXXXXXX) NÃO é suficiente para o Google Ads contabilizar
+ * uma conversão — é preciso o par "ID/RÓTULO" de uma ação de conversão
+ * criada dentro da conta do Google Ads (Ferramentas e configurações →
+ * Conversões → Nova ação de conversão → Site). Sem o rótulo, o evento chega
+ * ao Google Ads mas não é registrado como conversão em lugar nenhum do
+ * painel. Por isso os eventos de conversão (`calculator_completed` e,
+ * opcionalmente, `whatsapp_clicked`) só são enviados ao Google Ads quando o
+ * rótulo correspondente está configurado — os demais eventos (ex:
+ * `calculator_started`) continuam indo só para o GA4, que não exige rótulo.
  * ============================================================================
  */
 
@@ -28,7 +41,15 @@ export interface AnalyticsEventPayload {
 
 const GA4_ID = import.meta.env.VITE_GA4_MEASUREMENT_ID as string | undefined;
 const GOOGLE_ADS_ID = import.meta.env.VITE_GOOGLE_ADS_CONVERSION_ID as string | undefined;
+const GOOGLE_ADS_LEAD_LABEL = import.meta.env.VITE_GOOGLE_ADS_LEAD_LABEL as string | undefined;
+const GOOGLE_ADS_WHATSAPP_LABEL = import.meta.env.VITE_GOOGLE_ADS_WHATSAPP_LABEL as string | undefined;
 const META_PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID as string | undefined;
+
+/** Mapa evento → rótulo da ação de conversão correspondente no Google Ads (quando configurado). */
+const GOOGLE_ADS_CONVERSION_LABEL_BY_EVENT: Partial<Record<AnalyticsEventName, string | undefined>> = {
+  calculator_completed: GOOGLE_ADS_LEAD_LABEL,
+  whatsapp_clicked: GOOGLE_ADS_WHATSAPP_LABEL,
+};
 
 declare global {
   interface Window {
@@ -124,8 +145,13 @@ export function trackEvent(name: AnalyticsEventName, payload: AnalyticsEventPayl
     window.gtag('event', name, payload);
   }
 
-  if (GOOGLE_ADS_ID && typeof window.gtag === 'function') {
-    window.gtag('event', name, { ...payload, send_to: GOOGLE_ADS_ID });
+  // Google Ads só contabiliza como conversão o evento padrão "conversion" enviado
+  // com "send_to: ID/RÓTULO" — nunca um evento nomeado livremente. Por isso, só
+  // disparamos esse evento quando existe um rótulo configurado para este evento
+  // (ver GOOGLE_ADS_CONVERSION_LABEL_BY_EVENT no topo do arquivo).
+  const conversionLabel = GOOGLE_ADS_CONVERSION_LABEL_BY_EVENT[name];
+  if (GOOGLE_ADS_ID && conversionLabel && typeof window.gtag === 'function') {
+    window.gtag('event', 'conversion', { ...payload, send_to: `${GOOGLE_ADS_ID}/${conversionLabel}` });
   }
 
   if (META_PIXEL_ID && typeof window.fbq === 'function') {
