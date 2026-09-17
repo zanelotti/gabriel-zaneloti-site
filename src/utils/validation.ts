@@ -86,7 +86,7 @@ export function validateStep2(
 
 /** Etapa 3 — Áreas e observações. */
 export function validateStep3(
-  data: Pick<CalculatorData, 'areaPrincipal' | 'areaPiscina'>
+  data: Pick<CalculatorData, 'areaPrincipal' | 'areaPiscina' | 'aceitaTermos'>
 ): FormErrors<CalculatorData> {
   const errors: FormErrors<CalculatorData> = {};
 
@@ -98,6 +98,10 @@ export function validateStep3(
 
   if (data.areaPiscina !== null && !Number.isNaN(data.areaPiscina) && data.areaPiscina < 0) {
     errors.areaPiscina = 'A área da piscina não pode ser negativa.';
+  }
+
+  if (!data.aceitaTermos) {
+    errors.aceitaTermos = 'É necessário concordar com a Política de Privacidade para continuar.';
   }
 
   return errors;
