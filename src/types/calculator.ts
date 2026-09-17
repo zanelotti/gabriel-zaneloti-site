@@ -48,6 +48,8 @@ export interface CalculatorData {
   areaPrincipal: number | null;
   areaPiscina: number | null;
   observacoes: string;
+  /** Confirmação de leitura/aceite da Política de Privacidade — exigida para enviar a simulação (LGPD). */
+  aceitaTermos: boolean;
 }
 
 export const INITIAL_CALCULATOR_DATA: CalculatorData = {
@@ -64,6 +66,7 @@ export const INITIAL_CALCULATOR_DATA: CalculatorData = {
   areaPrincipal: null,
   areaPiscina: null,
   observacoes: '',
+  aceitaTermos: false,
 };
 
 /**
