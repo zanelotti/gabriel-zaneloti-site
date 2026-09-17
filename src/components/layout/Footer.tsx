@@ -39,9 +39,16 @@ export function Footer() {
 
           <div>
             <p className="text-sm font-semibold text-white">Institucional</p>
-            {/* Espaço reservado para inclusão futura da Política de Privacidade e dos Termos de Uso */}
-            <p className="mt-3 text-sm text-navy-500">Política de Privacidade (em breve)</p>
-            <p className="mt-1 text-sm text-navy-500">Termos de Uso (em breve)</p>
+            <p className="mt-3 text-sm">
+              <a href="/privacidade.html" className="hover:text-accent-400">
+                Política de Privacidade
+              </a>
+            </p>
+            <p className="mt-1 text-sm">
+              <a href="/termos.html" className="hover:text-accent-400">
+                Termos de Uso
+              </a>
+            </p>
           </div>
         </div>
 
