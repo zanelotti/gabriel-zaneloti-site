@@ -100,10 +100,30 @@ class LocalStorageLeadAdapter implements LeadStorageAdapter {
 
 const activeAdapter: LeadStorageAdapter = new LocalStorageLeadAdapter();
 
+/**
+ * Avisa o Gabriel por e-mail (via função serverless `/api/notify-lead`) toda
+ * vez que uma simulação é concluída. É só um "extra" sobre a captura do
+ * lead — nunca deve impedir nem atrasar o fluxo de quem está simulando, por
+ * isso roda em paralelo (fire-and-forget) e engole qualquer erro/timeout.
+ */
+function notifyByEmail(lead: Lead): void {
+  if (typeof fetch === 'undefined') return;
+  fetch('/api/notify-lead', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(lead),
+  }).catch(() => {
+    // Falha de rede, função ainda não configurada etc. — não é responsabilidade
+    // do visitante do site, e não deve gerar nenhum erro visível para ele.
+  });
+}
+
 export const leadService = {
   /** Cria e persiste um novo lead a partir dos dados da simulação + resultado. */
   async createLead(input: NewLeadInput): Promise<Lead> {
-    return activeAdapter.create(input);
+    const lead = await activeAdapter.create(input);
+    notifyByEmail(lead);
+    return lead;
   },
 
   /** Lista os leads já armazenados (útil para depuração/administração local). */
