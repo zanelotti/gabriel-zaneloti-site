@@ -27,17 +27,15 @@ export function About() {
         </div>
 
         <div className="rounded-xl2 bg-navy-900 p-8 text-center shadow-card animate-fade-in">
-          <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full border-4 border-accent-400/40 bg-navy-800">
-            {/* Espaço reservado para a fotografia profissional de Gabriel Zaneloti */}
-            <svg viewBox="0 0 24 24" fill="none" className="h-16 w-16 text-navy-500" aria-hidden="true">
-              <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.6" />
-              <path
-                d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
+          <div className="mx-auto h-40 w-40 overflow-hidden rounded-full border-4 border-accent-400/40 bg-navy-800">
+            <img
+              src="/gabriel-zaneloti.jpg"
+              alt="Gabriel Zaneloti, planejador tributário"
+              width={160}
+              height={160}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
           </div>
 
           <h3 className="mt-5 text-xl font-bold text-white">Gabriel Zaneloti</h3>
