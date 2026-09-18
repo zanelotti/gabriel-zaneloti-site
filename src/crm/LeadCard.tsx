@@ -17,26 +17,30 @@ function timeAgo(iso: string): string {
 }
 
 export function LeadCard({ lead, onClick }: LeadCardProps) {
+  const detalhes = [lead.estado, lead.tipoObra].filter(Boolean).join(' · ');
+
   return (
     <button
       onClick={onClick}
-      className="w-full rounded-xl border border-navy-100 bg-white p-4 text-left shadow-soft transition-shadow hover:shadow-card"
+      className="w-full rounded-xl border border-navy-100 bg-white p-3 text-left shadow-soft transition-shadow hover:shadow-card"
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="font-semibold text-navy-900">{lead.nome || 'Sem nome'}</p>
-        <span className="shrink-0 text-xs font-medium text-navy-400">{timeAgo(lead.createdAt)}</span>
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-sm font-semibold text-navy-900" title={lead.nome || 'Sem nome'}>
+          {lead.nome || 'Sem nome'}
+        </p>
+        <span className="shrink-0 text-[11px] font-medium text-navy-400">{timeAgo(lead.createdAt)}</span>
       </div>
-      <p className="mt-0.5 text-sm text-navy-500">{lead.whatsapp || 'Sem WhatsApp'}</p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-navy-400">
-        {lead.estado && <span>{lead.estado}</span>}
-        {lead.tipoObra && <span className="capitalize">{lead.tipoObra}</span>}
-      </div>
+      <p className="mt-1 truncate text-xs text-navy-500" title={detalhes ? `${lead.whatsapp} · ${detalhes}` : lead.whatsapp}>
+        <span>{lead.whatsapp || 'Sem WhatsApp'}</span>
+        {detalhes && <span className="capitalize text-navy-400"> · {detalhes}</span>}
+      </p>
 
       {lead.economiaEstimada !== null && (
-        <p className="mt-2 text-sm font-bold text-accent-600">
-          {formatCurrency(lead.economiaEstimada)} <span className="font-medium text-navy-400">estimado</span>
-        </p>
+        <div className="mt-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-navy-400">Economia estimada</p>
+          <p className="truncate text-sm font-bold text-accent-600">{formatCurrency(lead.economiaEstimada)}</p>
+        </div>
       )}
     </button>
   );
