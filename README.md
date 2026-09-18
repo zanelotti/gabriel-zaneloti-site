@@ -131,11 +131,27 @@ Os eventos já disparados pelo site, via `trackEvent()`:
 
 Todo o conteúdo institucional (textos, serviços, FAQ, número de economia acumulada, dados de contato) foi extraído do site atual, https://www.gabrielzaneloti.com.br/, e reorganizado em uma estrutura mais moderna. Nenhuma informação sobre certificações, clientes ou depoimentos foi inventada — os espaços para fotografia profissional, política de privacidade e termos de uso estão reservados no layout, prontos para receber o conteúdo real quando disponível.
 
+## CRM interno (`/crm.html`)
+
+Página separada do site público (não linkada, `noindex`), protegida por login (Supabase Auth — e-mail/senha, criado manualmente em Authentication → Users no painel do Supabase). Mostra:
+
+- **Quadro** — os leads em colunas por etapa do funil: `Novo → Contatado → Proposta enviada → Decidindo → Fechado / Perdido`. Clique num lead pra ver os detalhes da simulação, mudar a etapa, escrever anotações e (quando fechado) registrar o valor fechado.
+- **Dashboard** — funil de conversão, leads por mês, por estado e por tipo de obra, taxa de conversão e valor total fechado.
+
+**Como funciona por baixo:** o site público continua gravando cada simulação na tabela `leads` do Supabase através da função serverless `/api/notify-lead.js` (chave `service_role`, ignora RLS). O CRM lê e atualiza essa mesma tabela pelo navegador, usando a chave `anon` — protegida por Row Level Security (só usuário autenticado lê/edita) e pelo login do Supabase Auth.
+
+**Configuração** (variáveis de ambiente, no Vercel e/ou `.env` local):
+
+- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — seguras para o navegador (protegidas por RLS + login).
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — já existiam (usadas por `/api/notify-lead.js`).
+
+O SQL de criação da tabela `leads` (colunas, índices, trigger de `updated_at` e as policies de RLS) está documentado em `supabase_setup.sql`, na raiz do projeto — rode uma vez no SQL Editor do Supabase.
+
 ## Pendências propositalmente deixadas para você
 
 - [x] Fórmula real do Fator de Ajuste — implementada em `/calculo.html` (ferramenta interna); o simulador público continua com a estimativa (mock), de propósito
-- [ ] Fotografia profissional de Gabriel Zaneloti (seção "Sobre")
+- [x] Fotografia profissional de Gabriel Zaneloti (seção "Sobre")
 - [ ] Política de Privacidade e Termos de Uso (links já reservados no rodapé)
-- [ ] Backend/CRM real para leads (Supabase, API própria, webhook...)
+- [x] Backend/CRM real para leads — Supabase + `/crm.html` (quadro por etapa do funil + dashboard com gráficos)
 - [ ] IDs de GA4 / Google Ads / Meta Pixel (variáveis de ambiente no Vercel)
 - [ ] Domínio e deploy (Vercel, Netlify ou similar)

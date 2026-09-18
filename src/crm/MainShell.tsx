@@ -1,0 +1,79 @@
+import { useEffect, useState } from 'react';
+import { crmAuth, crmLeadService } from '@/services/crmService';
+import type { Lead } from '@/types/lead';
+import { BoardView } from './BoardView';
+import { DashboardView } from './DashboardView';
+
+type Tab = 'quadro' | 'dashboard';
+
+export function MainShell() {
+  const [tab, setTab] = useState<Tab>('quadro');
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = async () => {
+    setError(null);
+    try {
+      const data = await crmLeadService.listLeads();
+      setLeads(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao carregar os leads.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    reload();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-navy-50">
+      <header className="sticky top-0 z-10 border-b border-navy-100 bg-white">
+        <div className="container-page flex flex-wrap items-center justify-between gap-4 py-4">
+          <div>
+            <h1 className="text-lg font-bold text-navy-900">CRM — Gabriel Zaneloti</h1>
+            <p className="text-xs font-medium text-navy-400">{leads.length} leads no total</p>
+          </div>
+
+          <nav className="flex items-center gap-2">
+            <button
+              onClick={() => setTab('quadro')}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                tab === 'quadro' ? 'bg-navy-900 text-white' : 'text-navy-500 hover:bg-navy-100'
+              }`}
+            >
+              Quadro
+            </button>
+            <button
+              onClick={() => setTab('dashboard')}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                tab === 'dashboard' ? 'bg-navy-900 text-white' : 'text-navy-500 hover:bg-navy-100'
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => crmAuth.signOut()}
+              className="ml-2 rounded-full px-4 py-2 text-sm font-semibold text-navy-400 hover:bg-navy-100"
+            >
+              Sair
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      <main className="container-page py-8">
+        {loading && <p className="text-sm font-medium text-navy-400">Carregando leads…</p>}
+
+        {error && (
+          <div className="rounded-xl2 border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        )}
+
+        {!loading && !error && tab === 'quadro' && <BoardView leads={leads} onChange={reload} />}
+        {!loading && !error && tab === 'dashboard' && <DashboardView leads={leads} />}
+      </main>
+    </div>
+  );
+}

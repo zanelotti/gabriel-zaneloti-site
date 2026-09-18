@@ -18,6 +18,7 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
         // Ferramenta interna (uso do Gabriel) — não linkada no site público, sem indexação.
         calculo: path.resolve(__dirname, 'calculo.html'),
+        crm: path.resolve(__dirname, 'crm.html'),
         privacidade: path.resolve(__dirname, 'privacidade.html'),
         termos: path.resolve(__dirname, 'termos.html'),
       },
