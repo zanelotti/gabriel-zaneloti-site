@@ -1,9 +1,16 @@
+import type { DragEvent } from 'react';
 import type { Lead } from '@/types/lead';
 import { formatCurrency } from '@/utils/formatters';
 
 interface LeadCardProps {
   lead: Lead;
   onClick: () => void;
+  /** Chamado quando o usuário começa a arrastar este card (drag-and-drop entre colunas). */
+  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  /** Chamado quando o arraste termina (com ou sem soltar num alvo válido). */
+  onDragEnd: () => void;
+  /** true enquanto este card específico está sendo arrastado — usado para reduzir sua opacidade. */
+  isDragging: boolean;
 }
 
 function timeAgo(iso: string): string {
@@ -16,13 +23,18 @@ function timeAgo(iso: string): string {
   return diffMonths === 1 ? 'há 1 mês' : `há ${diffMonths} meses`;
 }
 
-export function LeadCard({ lead, onClick }: LeadCardProps) {
+export function LeadCard({ lead, onClick, onDragStart, onDragEnd, isDragging }: LeadCardProps) {
   const detalhes = [lead.estado, lead.tipoObra].filter(Boolean).join(' · ');
 
   return (
     <button
       onClick={onClick}
-      className="w-full rounded-xl border border-navy-100 bg-white p-3 text-left shadow-soft transition-shadow hover:shadow-card"
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={`w-full cursor-grab rounded-xl border border-navy-100 bg-white p-3 text-left shadow-soft transition-shadow hover:shadow-card active:cursor-grabbing ${
+        isDragging ? 'opacity-40' : ''
+      }`}
     >
       <div className="flex items-center justify-between gap-2">
         <p className="truncate text-sm font-semibold text-navy-900" title={lead.nome || 'Sem nome'}>
