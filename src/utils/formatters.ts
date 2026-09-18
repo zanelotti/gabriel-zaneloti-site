@@ -33,43 +33,49 @@ export function onlyDigits(value: string): string {
   return value.replace(/\D/g, '');
 }
 
-/** Formata uma data ISO (yyyy-mm-dd) para o formato brasileiro dd/mm/aaaa. Retorna '-' se vazio/inválido. */
+/**
+ * Formata uma data ISO (yyyy-mm-dd, ou só yyyy-mm) para o formato brasileiro
+ * mm/aaaa — usado nos campos de início/fim de obra, que só coletam mês e ano
+ * (o "dia" armazenado internamente, sempre 01, não tem significado e por isso
+ * nunca é exibido). Retorna 'Não informado' se vazio/inválido.
+ */
 export function formatDateBR(isoDate: string): string {
   if (!isoDate) return 'Não informado';
-  const [year, month, day] = isoDate.split('-');
-  if (!year || !month || !day) return 'Não informado';
-  return `${day}/${month}/${year}`;
+  const [year, month] = isoDate.split('-');
+  if (!year || !month) return 'Não informado';
+  return `${month}/${year}`;
 }
 
-/** Converte uma data ISO (yyyy-mm-dd) para dd/mm/aaaa, sem texto de fallback (usado em campos editáveis). */
-export function isoToDateBRInput(isoDate: string): string {
+/** Converte uma data ISO (yyyy-mm-dd ou yyyy-mm) para mm/aaaa, sem texto de fallback (usado em campos editáveis). */
+export function isoToMonthBRInput(isoDate: string): string {
   if (!isoDate) return '';
-  const [year, month, day] = isoDate.split('-');
-  if (!year || !month || !day) return '';
-  return `${day}/${month}/${year}`;
+  const [year, month] = isoDate.split('-');
+  if (!year || !month) return '';
+  return `${month}/${year}`;
 }
 
-/** Aplica a máscara dd/mm/aaaa enquanto o usuário digita (só dígitos, insere as barras). */
-export function maskDateBR(rawValue: string): string {
-  const digits = rawValue.replace(/\D/g, '').slice(0, 8);
+/** Aplica a máscara mm/aaaa enquanto o usuário digita (só dígitos, insere a barra). */
+export function maskMonthBR(rawValue: string): string {
+  const digits = rawValue.replace(/\D/g, '').slice(0, 6);
   if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 }
 
-/** Converte "dd/mm/aaaa" (completo e válido) para ISO "yyyy-mm-dd". Retorna null se incompleta/inválida. */
-export function parseDateBRToISO(value: string): string | null {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+/**
+ * Converte "mm/aaaa" (completo e válido) para ISO "yyyy-mm-01" — o dia é
+ * sempre fixado em 01, já que o restante do sistema (cálculo de competências,
+ * decadência etc.) trabalha com datas ISO completas, mas só o mês/ano
+ * importam de fato para a obra. Retorna null se incompleta/inválida.
+ */
+export function parseMonthBRToISO(value: string): string | null {
+  const match = /^(\d{2})\/(\d{4})$/.exec(value);
   if (!match) return null;
-  const [, dayStr, monthStr, yearStr] = match;
-  const day = Number(dayStr);
+  const [, monthStr, yearStr] = match;
   const month = Number(monthStr);
   const year = Number(yearStr);
   if (month < 1 || month > 12) return null;
-  const daysInMonth = new Date(year, month, 0).getDate();
-  if (day < 1 || day > daysInMonth) return null;
   if (year < 1900 || year > 2100) return null;
-  return `${yearStr}-${monthStr}-${dayStr}`;
+  return `${yearStr}-${monthStr}-01`;
 }
 
 /** Formata uma área em m², com até 2 casas decimais quando necessário. */

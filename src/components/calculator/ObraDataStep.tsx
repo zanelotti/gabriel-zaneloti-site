@@ -8,7 +8,7 @@ import type {
   TipoObra,
 } from '@/types/calculator';
 import { BRAZILIAN_STATES } from '@/data/states';
-import { DateField } from '../ui/DateField';
+import { MonthField } from '../ui/MonthField';
 import { CalculatorStep } from './CalculatorStep';
 
 interface ObraDataStepProps {
@@ -60,17 +60,17 @@ export function ObraDataStep({ data, errors, onChange }: ObraDataStepProps) {
   return (
     <CalculatorStep title="Dados da obra" description="Conte um pouco mais sobre a sua construção.">
       <div className="grid gap-5 sm:grid-cols-2">
-        <DateField
+        <MonthField
           id="dataInicio"
-          label="Data de início da obra"
+          label="Mês/ano de início da obra"
           value={data.dataInicio}
           onChange={(value) => onChange('dataInicio', value)}
           error={errors.dataInicio}
         />
 
-        <DateField
+        <MonthField
           id="dataFim"
-          label="Data de fim da obra"
+          label="Mês/ano de fim da obra"
           value={data.dataFim}
           onChange={(value) => onChange('dataFim', value)}
           error={errors.dataFim}

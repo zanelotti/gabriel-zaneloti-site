@@ -128,14 +128,14 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
         <>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <StatCard label="INSS estimado antes da análise" value={result.inssEstimado} format="currency" tone="neutral" />
-            <StatCard label="Economia estimada" value={result.economiaEstimada} format="currency" tone="highlight" />
-            <StatCard label="Redução estimada" value={result.percentualReducao} format="percent" tone="highlight" />
             <StatCard
               label="Valor estimado após redução"
               value={result.valorAposReducao}
               format="currency"
               tone="neutral"
             />
+            <StatCard label="Redução estimada" value={result.percentualReducao} format="percent" tone="highlight" />
+            <StatCard label="Economia estimada" value={result.economiaEstimada} format="currency" tone="highlight" />
           </div>
 
           {calculoAjustadoEsocial && (
