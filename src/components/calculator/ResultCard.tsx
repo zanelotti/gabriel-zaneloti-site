@@ -154,12 +154,14 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
 
       <div className="mt-8 rounded-xl2 border border-navy-100 bg-white p-6 text-center sm:text-left">
         <h4 className="text-lg font-bold text-navy-900">
-          {exigeAnaliseManual ? 'Vamos analisar sua obra com atenção' : 'Existe possibilidade de reduzir esse valor?'}
+          {exigeAnaliseManual
+            ? 'Vamos analisar sua obra com atenção'
+            : 'Vamos confirmar essa economia com uma análise completa?'}
         </h4>
         <p className="mt-2 text-sm text-navy-500">
           {exigeAnaliseManual
             ? 'Obras iniciadas antes de outubro de 2021 têm regras próprias de apuração — fale comigo para uma simulação precisa, sem compromisso.'
-            : 'Uma análise especializada pode identificar possibilidades legais de redução aplicáveis às características da sua obra.'}
+            : 'Uma análise especializada confirma o valor exato dessa economia e pode identificar reduções adicionais aplicáveis às características da sua obra.'}
         </p>
         <a
           href={whatsappUrl}
