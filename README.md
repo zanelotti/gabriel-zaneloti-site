@@ -109,15 +109,17 @@ Nenhum componente React precisa ser alterado.
 
 ## Analytics (GA4 / Google Ads / Meta Pixel / Google Tag Manager)
 
-Nenhum ID fictício foi inserido no código. Para ativar:
+**GA4 / Google Ads / Meta Pixel** — nenhum ID fictício foi inserido no código. Para ativar:
 
 1. No painel do Vercel, vá em **Project Settings → Environment Variables**.
-2. Adicione as variáveis que você usa: `VITE_GA4_MEASUREMENT_ID` (GA4), `VITE_GOOGLE_ADS_CONVERSION_ID` (pixel/conversão do Google Ads — o gtag.js é compartilhado entre GA4 e Google Ads), `VITE_META_PIXEL_ID` (Meta/Facebook Pixel) e/ou `VITE_GTM_CONTAINER_ID` (Google Tag Manager, ex: `GTM-XXXXXXX`).
+2. Adicione as variáveis que você usa: `VITE_GA4_MEASUREMENT_ID` (GA4), `VITE_GOOGLE_ADS_CONVERSION_ID` (pixel/conversão do Google Ads — o gtag.js é compartilhado entre GA4 e Google Ads) e/ou `VITE_META_PIXEL_ID` (Meta/Facebook Pixel).
 3. Clique em **Redeploy** (ou faça um novo commit) para a variável entrar em vigor.
 
-Você não precisa editar `index.html` nem adicionar nenhum script manualmente: `src/services/analytics.ts` já injeta o gtag.js, o Meta Pixel e/ou o Tag Manager automaticamente assim que a respectiva variável de ambiente existe — se a variável não estiver definida, o script correspondente simplesmente não carrega.
+Você não precisa editar `index.html` nem adicionar nenhum script manualmente para essas três: `src/services/analytics.ts` já injeta o gtag.js e/ou o Meta Pixel automaticamente assim que a respectiva variável de ambiente existe — se a variável não estiver definida, o script correspondente simplesmente não carrega.
 
-Se você configurar o `VITE_GTM_CONTAINER_ID`, todos os eventos listados abaixo (via `trackEvent()`) também são enviados ao `dataLayer` do Tag Manager — dá para criar tags e gatilhos novos direto no painel do GTM, filtrando pelo nome do evento, sem precisar mexer em código nem fazer um novo deploy a cada tag nova.
+**Google Tag Manager** — funciona diferente das três acima: em vez de variável de ambiente, o snippet oficial do Google (o mesmo que o painel do GTM manda "colar em todas as páginas do seu site") está fixo diretamente no `<head>` e logo após a abertura do `<body>` de cada arquivo `.html` do projeto (`index.html`, `calculo.html`, `crm.html`, `privacidade.html` e `termos.html`) — container atual: `GTM-NFSNQBZL`. Para trocar de container no futuro, é só buscar por `GTM-` nesses 5 arquivos e substituir o ID nos dois lugares de cada um (a versão do `<head>` e a `src` do `<iframe>` do `<noscript>`).
+
+Todos os eventos disparados pelo site (via `trackEvent()`, listados abaixo) já são enviados automaticamente ao `dataLayer` do Tag Manager — dá para criar tags e gatilhos novos direto no painel do GTM, filtrando pelo nome do evento, sem precisar mexer em código.
 
 Os eventos já disparados pelo site, via `trackEvent()`:
 
