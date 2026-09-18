@@ -44,6 +44,16 @@ function StatCard({ label, value, format, tone }: StatCardProps) {
   );
 }
 
+/** Variante do StatCard para um valor textual (ex: "Não aplicável"), sem contador animado. */
+function TextStatCard({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="rounded-xl2 border border-navy-100 bg-white p-5 text-center sm:text-left">
+      <p className="text-xs font-semibold uppercase tracking-wide text-navy-500">{label}</p>
+      <p className="mt-2 text-2xl font-extrabold text-navy-400 sm:text-3xl">{text}</p>
+    </div>
+  );
+}
+
 function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -91,14 +101,22 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
 
   const whatsappUrl = generateWhatsAppMessage(data, result);
 
+  // O Fator de Ajuste (a redução calculada abaixo) só se aplica a obras de
+  // Pessoa Física (IN RFB nº 2.021/2021, art. 33) — para Pessoa Jurídica ele
+  // simplesmente não existe; a economia de uma PJ vem de outras frentes
+  // (contabilidade regular, CPRB/Simples Nacional, créditos abatíveis etc.),
+  // que dependem de muitas variáveis da empresa e por isso não são calculadas
+  // automaticamente aqui. Essa checagem tem prioridade sobre as outras porque,
+  // sendo PJ, o Fator de Ajuste não se aplica independentemente da data da obra.
+  const fatorAjusteNaoAplicavel = data.responsavel === 'PJ';
   // Obra iniciada em 2020 ou antes: apuração pelo GFIP, mais complexa e sujeita
   // a decadência caso a caso — não exibimos o cálculo automático de redução
   // para o visitante, só o valor de INSS devido (sem desconto) e o convite
   // para falar direto com o Gabriel.
-  const exigeAnaliseManual = result.regimeApuracao === 'gfip_anterior_2021';
+  const exigeAnaliseManual = !fatorAjusteNaoAplicavel && result.regimeApuracao === 'gfip_anterior_2021';
   // Obra iniciada entre 01/2021 e 09/2021: o cálculo abaixo já foi deslocado
   // internamente para a competência 10/2021 (eSocial) — ver calculateINSS.ts.
-  const calculoAjustadoEsocial = result.regimeApuracao === 'esocial_ajustado';
+  const calculoAjustadoEsocial = !fatorAjusteNaoAplicavel && result.regimeApuracao === 'esocial_ajustado';
 
   return (
     <div id="resultado-simulacao" className="animate-fade-in-up scroll-mt-24">
@@ -108,7 +126,25 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
 
       <DataSummary data={data} />
 
-      {exigeAnaliseManual ? (
+      {fatorAjusteNaoAplicavel ? (
+        <>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <StatCard
+              label="INSS pela aferição indireta"
+              value={result.inssEstimado}
+              format="currency"
+              tone="neutral"
+            />
+            <TextStatCard label="INSS pelo fator de ajuste" text="Não aplicável" />
+          </div>
+          <p className="mt-5 rounded-xl bg-navy-50 p-4 text-sm leading-relaxed text-navy-600">
+            <strong className="text-navy-800">O Fator de Ajuste só se aplica a obras de Pessoa Física.</strong> Para
+            Pessoa Jurídica, existem outras formas legais de buscar economia — como contabilidade regular, desoneração
+            da folha (CPRB), Simples Nacional ou créditos abatíveis — mas isso depende de muitas variáveis específicas
+            da sua empresa. Fale comigo no WhatsApp para analisarmos o seu caso.
+          </p>
+        </>
+      ) : exigeAnaliseManual ? (
         <>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <StatCard
@@ -154,14 +190,18 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
 
       <div className="mt-8 rounded-xl2 border border-navy-100 bg-white p-6 text-center sm:text-left">
         <h4 className="text-lg font-bold text-navy-900">
-          {exigeAnaliseManual
-            ? 'Vamos analisar sua obra com atenção'
-            : 'Vamos confirmar essa economia com uma análise completa?'}
+          {fatorAjusteNaoAplicavel
+            ? 'Vamos identificar a melhor estratégia para sua empresa?'
+            : exigeAnaliseManual
+              ? 'Vamos analisar sua obra com atenção'
+              : 'Vamos confirmar essa economia com uma análise completa?'}
         </h4>
         <p className="mt-2 text-sm text-navy-500">
-          {exigeAnaliseManual
-            ? 'Obras iniciadas antes de outubro de 2021 têm regras próprias de apuração — fale comigo para uma simulação precisa, sem compromisso.'
-            : 'Uma análise especializada confirma o valor exato dessa economia e pode identificar reduções adicionais aplicáveis às características da sua obra.'}
+          {fatorAjusteNaoAplicavel
+            ? 'Cada empresa tem particularidades (regime tributário, CNAE, contabilidade) que mudam completamente a estratégia de redução — por isso essa análise é feita diretamente comigo, sem compromisso.'
+            : exigeAnaliseManual
+              ? 'Obras iniciadas antes de outubro de 2021 têm regras próprias de apuração — fale comigo para uma simulação precisa, sem compromisso.'
+              : 'Uma análise especializada confirma o valor exato dessa economia e pode identificar reduções adicionais aplicáveis às características da sua obra.'}
         </p>
         <a
           href={whatsappUrl}
@@ -170,7 +210,7 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
           className="btn-primary mt-5 w-full sm:w-auto"
           onClick={() => trackEvent('whatsapp_clicked', { origem: 'resultado' })}
         >
-          {exigeAnaliseManual ? 'Falar com Gabriel no WhatsApp' : 'Quero analisar minha obra no WhatsApp'}
+          {fatorAjusteNaoAplicavel || exigeAnaliseManual ? 'Falar com Gabriel no WhatsApp' : 'Quero analisar minha obra no WhatsApp'}
         </a>
       </div>
 

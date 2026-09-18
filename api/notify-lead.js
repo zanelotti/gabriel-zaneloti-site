@@ -255,9 +255,16 @@ function determinarRegimeApuracao(dataInicio) {
 
 function buildEmailHtml(lead) {
   const regimeApuracao = determinarRegimeApuracao(lead.dataInicio);
+  // Fator de Ajuste (IN RFB nº 2.021/2021, art. 33) só se aplica a Pessoa
+  // Física — mesma regra usada no ResultCard.tsx do site.
+  const isPJ = lead.responsavel === 'PJ';
+
+  const avisoPJ = isPJ
+    ? '<p style="margin:0 0 16px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;font-size:13px;">⚠️ Obra de Pessoa Jurídica — o Fator de Ajuste (a redução calculada abaixo) NÃO se aplica, só vale para Pessoa Física. No site, este lead viu apenas o "INSS pela aferição indireta" e "Não aplicável" no Fator de Ajuste, com o convite para falar no WhatsApp. Os valores de economia/redução do detalhamento abaixo são só o cálculo de referência (como se fosse PF) — não use como proposta para este cliente; a economia real de uma PJ vem de outras frentes (contabilidade regular, CPRB/Simples Nacional, créditos abatíveis etc.).</p>'
+    : '';
 
   const avisoGfipAnterior =
-    regimeApuracao === 'gfip_anterior_2021'
+    !isPJ && regimeApuracao === 'gfip_anterior_2021'
       ? '<p style="margin:0 0 16px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;font-size:13px;">⚠️ Obra iniciada antes de 10/2021 — apuração pelo GFIP, mais complexa e sujeita a decadência caso a caso. No site, este lead viu apenas o valor de INSS devido (sem desconto) e o convite para falar no WhatsApp, sem cálculo de redução automático.</p>'
       : '';
 
@@ -321,6 +328,7 @@ function buildEmailHtml(lead) {
     <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#111827;">
       <h2 style="margin:0 0 4px;font-size:20px;">Nova simulação no site 🎯</h2>
       <p style="margin:0 0 20px;color:#6b7280;font-size:14px;">${escapeHtml(lead.nome || 'Alguém')} acabou de preencher a calculadora de INSS de obras.</p>
+      ${avisoPJ}
       ${avisoGfipAnterior}
       ${linhaResultado}
       <table role="presentation" width="100%" style="border-collapse:collapse;margin-bottom:20px;">
