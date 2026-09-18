@@ -12,6 +12,7 @@
  *   VITE_GOOGLE_ADS_LEAD_LABEL=            (rótulo da ação de conversão "Envio de simulação")
  *   VITE_GOOGLE_ADS_WHATSAPP_LABEL=        (opcional — rótulo da ação de conversão "Clique no WhatsApp")
  *   VITE_META_PIXEL_ID=                    (ex: 000000000000000)
+ *   VITE_GTM_CONTAINER_ID=                 (ex: GTM-XXXXXXX — Google Tag Manager)
  *
  * IMPORTANTE sobre o Google Ads: uma simples chamada de evento com o ID de
  * conversão (AW-XXXXXXXXX) NÃO é suficiente para o Google Ads contabilizar
@@ -44,6 +45,7 @@ const GOOGLE_ADS_ID = import.meta.env.VITE_GOOGLE_ADS_CONVERSION_ID as string | 
 const GOOGLE_ADS_LEAD_LABEL = import.meta.env.VITE_GOOGLE_ADS_LEAD_LABEL as string | undefined;
 const GOOGLE_ADS_WHATSAPP_LABEL = import.meta.env.VITE_GOOGLE_ADS_WHATSAPP_LABEL as string | undefined;
 const META_PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID as string | undefined;
+const GTM_CONTAINER_ID = import.meta.env.VITE_GTM_CONTAINER_ID as string | undefined;
 
 /** Mapa evento → rótulo da ação de conversão correspondente no Google Ads (quando configurado). */
 const GOOGLE_ADS_CONVERSION_LABEL_BY_EVENT: Partial<Record<AnalyticsEventName, string | undefined>> = {
@@ -131,6 +133,19 @@ export function initAnalytics(): void {
     window.fbq?.('init', META_PIXEL_ID);
     window.fbq?.('track', 'PageView');
   }
+
+  // Google Tag Manager — container próprio do Gabriel, para gerenciar tags
+  // adicionais (ou as mesmas de cima) direto pelo painel do Tag Manager, sem
+  // depender de um novo deploy do site a cada mudança.
+  if (GTM_CONTAINER_ID) {
+    window.dataLayer = window.dataLayer ?? [];
+    window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
+
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtm.js?id=${GTM_CONTAINER_ID}`;
+    document.head.appendChild(script);
+  }
 }
 
 /**
@@ -156,6 +171,14 @@ export function trackEvent(name: AnalyticsEventName, payload: AnalyticsEventPayl
 
   if (META_PIXEL_ID && typeof window.fbq === 'function') {
     window.fbq('trackCustom', name, payload);
+  }
+
+  // Alimenta o dataLayer do Tag Manager com o mesmo evento — assim dá para
+  // criar gatilhos no painel do GTM (por nome de evento) sem precisar mexer
+  // em código para cada tag nova.
+  if (GTM_CONTAINER_ID) {
+    window.dataLayer = window.dataLayer ?? [];
+    window.dataLayer.push({ event: name, ...payload });
   }
 
   if (import.meta.env.DEV) {

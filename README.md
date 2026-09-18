@@ -107,15 +107,17 @@ Para conectar Supabase, uma API própria, um CRM ou um webhook:
 
 Nenhum componente React precisa ser alterado.
 
-## Analytics (GA4 / Google Ads / Meta Pixel)
+## Analytics (GA4 / Google Ads / Meta Pixel / Google Tag Manager)
 
 Nenhum ID fictício foi inserido no código. Para ativar:
 
 1. No painel do Vercel, vá em **Project Settings → Environment Variables**.
-2. Adicione as variáveis que você usa: `VITE_GA4_MEASUREMENT_ID` (GA4), `VITE_GOOGLE_ADS_CONVERSION_ID` (pixel/conversão do Google Ads — o gtag.js é compartilhado entre GA4 e Google Ads) e/ou `VITE_META_PIXEL_ID` (Meta/Facebook Pixel).
+2. Adicione as variáveis que você usa: `VITE_GA4_MEASUREMENT_ID` (GA4), `VITE_GOOGLE_ADS_CONVERSION_ID` (pixel/conversão do Google Ads — o gtag.js é compartilhado entre GA4 e Google Ads), `VITE_META_PIXEL_ID` (Meta/Facebook Pixel) e/ou `VITE_GTM_CONTAINER_ID` (Google Tag Manager, ex: `GTM-XXXXXXX`).
 3. Clique em **Redeploy** (ou faça um novo commit) para a variável entrar em vigor.
 
-Você não precisa editar `index.html` nem adicionar nenhum script manualmente: `src/services/analytics.ts` já injeta o gtag.js e/ou o Meta Pixel automaticamente assim que a respectiva variável de ambiente existe — se a variável não estiver definida, o script correspondente simplesmente não carrega.
+Você não precisa editar `index.html` nem adicionar nenhum script manualmente: `src/services/analytics.ts` já injeta o gtag.js, o Meta Pixel e/ou o Tag Manager automaticamente assim que a respectiva variável de ambiente existe — se a variável não estiver definida, o script correspondente simplesmente não carrega.
+
+Se você configurar o `VITE_GTM_CONTAINER_ID`, todos os eventos listados abaixo (via `trackEvent()`) também são enviados ao `dataLayer` do Tag Manager — dá para criar tags e gatilhos novos direto no painel do GTM, filtrando pelo nome do evento, sem precisar mexer em código nem fazer um novo deploy a cada tag nova.
 
 Os eventos já disparados pelo site, via `trackEvent()`:
 
@@ -153,5 +155,5 @@ O SQL de criação da tabela `leads` (colunas, índices, trigger de `updated_at`
 - [x] Fotografia profissional de Gabriel Zaneloti (seção "Sobre")
 - [ ] Política de Privacidade e Termos de Uso (links já reservados no rodapé)
 - [x] Backend/CRM real para leads — Supabase + `/crm.html` (quadro por etapa do funil + dashboard com gráficos)
-- [ ] IDs de GA4 / Google Ads / Meta Pixel (variáveis de ambiente no Vercel)
+- [ ] IDs de GA4 / Google Ads / Meta Pixel / Google Tag Manager (variáveis de ambiente no Vercel)
 - [ ] Domínio e deploy (Vercel, Netlify ou similar)
