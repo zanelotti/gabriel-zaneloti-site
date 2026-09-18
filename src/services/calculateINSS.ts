@@ -1,4 +1,4 @@
-import type { CalculatorData, INSSResult } from '@/types/calculator';
+import type { CalculatorData, INSSResult, RegimeApuracao } from '@/types/calculator';
 import type { RMTIndiretaInput } from '@/types/rmtIndireta';
 import type { ResponsavelObra } from '@/types/fatorAjuste';
 import { calculateRMTIndireta } from './calculateRMTIndireta';
@@ -53,11 +53,32 @@ function round2(value: number): number {
 }
 
 /**
+ * eSocial x GFIP (Manual do Sero / IN RFB nº 2.021/2021): o eSocial só se
+ * tornou obrigatório para o envio de informações da obra a partir da
+ * competência 10/2021 — antes disso, a apuração era feita pelo GFIP.
+ *
+ * Prática do Gabriel: para obras iniciadas entre 01/2021 e 09/2021, ele
+ * desloca o início do CÁLCULO para 10/2021, de forma a poder tramitar tudo
+ * já dentro do eSocial (em vez de misturar GFIP + eSocial). Para obras de
+ * 2020 para trás, a apuração pelo GFIP é mais complexa (depende de análise
+ * caso a caso) e por isso não é exibido cálculo automático ao visitante.
+ */
+const CORTE_ESOCIAL = '2021-10-01';
+const INICIO_JANELA_AJUSTE = '2021-01-01';
+
+/** Determina o regime de apuração a partir da data REAL de início da obra. */
+function determinarRegimeApuracao(dataInicio: string): RegimeApuracao {
+  if (dataInicio >= CORTE_ESOCIAL) return 'esocial';
+  if (dataInicio >= INICIO_JANELA_AJUSTE) return 'esocial_ajustado';
+  return 'gfip_anterior_2021';
+}
+
+/**
  * Resultado de última reserva (zerado) — só é usado se, de um jeito
  * inesperado, algo abaixo lançar um erro mesmo assim. Garante que a
  * simulação NUNCA mostre a tela de erro para o cliente.
  */
-function resultadoSeguro(): INSSResult {
+function resultadoSeguro(regimeApuracao: RegimeApuracao): INSSResult {
   return {
     inssEstimado: 0,
     economiaEstimada: 0,
@@ -66,6 +87,7 @@ function resultadoSeguro(): INSSResult {
     mensagem:
       'Esta é uma estimativa inicial, calculada com as mesmas mecânicas oficiais do INSS de obra (Fator de Ajuste, Selic, CPP, MAED) a partir da área e destinação informadas. Ela não substitui uma análise técnica e tributária da documentação da obra, que depende da RMT real apurada com as tabelas oficiais.',
     isEstimativaProvisoria: true,
+    regimeApuracao,
   };
 }
 
@@ -77,6 +99,7 @@ export function calculateINSS(data: CalculatorData): INSSResult {
   // preferimos assumir um valor padrão a interromper a simulação.
   const dataInicioEfetiva = data.dataInicio || hoje;
   const responsavelEfetivo = (data.responsavel || 'PF') as ResponsavelObra;
+  const regimeApuracao = determinarRegimeApuracao(dataInicioEfetiva);
 
   const rmtInput: RMTIndiretaInput = {
     estado: data.estado,
@@ -93,13 +116,21 @@ export function calculateINSS(data: CalculatorData): INSSResult {
   // como início e fim, para não gerar um período invertido.
   const dataFimEfetiva = data.dataFim || maxISODate(dataInicioEfetiva, hoje);
 
+  // Obra iniciada entre 01/2021 e 09/2021 (antes do eSocial ser obrigatório
+  // para obras): desloca a competência de início do CÁLCULO para 10/2021,
+  // prática do Gabriel para tramitar tudo já pelo eSocial. A data real de
+  // início (dataInicioEfetiva) continua sendo usada em todo o resto — resumo,
+  // CRM e e-mail — só a competência usada no motor de cálculo é que muda.
+  const dataInicioCalculo = regimeApuracao === 'esocial_ajustado' ? CORTE_ESOCIAL : dataInicioEfetiva;
+  const dataFimCalculo = maxISODate(dataInicioCalculo, dataFimEfetiva);
+
   try {
     const rmtResult = calculateRMTIndireta(rmtInput);
     const fatorAjusteResult = calculateFatorAjuste({
       rmt100: rmtResult.rmt100,
       areaM2: rmtResult.areaTotal,
-      dataInicio: dataInicioEfetiva,
-      dataFim: dataFimEfetiva,
+      dataInicio: dataInicioCalculo,
+      dataFim: dataFimCalculo,
       responsavel: responsavelEfetivo,
       dataCalculo: hoje,
       honorarios: null,
@@ -118,6 +149,7 @@ export function calculateINSS(data: CalculatorData): INSSResult {
       mensagem:
         'Esta é uma estimativa inicial, calculada com as mesmas mecânicas oficiais do INSS de obra (Fator de Ajuste, Selic, CPP, MAED) a partir da área e destinação informadas. Ela não substitui uma análise técnica e tributária da documentação da obra, que depende da RMT real apurada com as tabelas oficiais.',
       isEstimativaProvisoria: true,
+      regimeApuracao,
       detalheInterno: {
         rmt100: fatorAjusteResult.rmt100,
         percentualFator: fatorAjusteResult.percentualFator,
@@ -127,12 +159,13 @@ export function calculateINSS(data: CalculatorData): INSSResult {
         honorarios,
         reducaoLiquida,
         parcelamento: fatorAjusteResult.parcelamento,
+        dataInicioAjustada: regimeApuracao === 'esocial_ajustado' ? dataInicioCalculo : undefined,
       },
     };
   } catch {
     // Rede de segurança: mesmo que calculateRMTIndireta/calculateFatorAjuste
     // hoje nunca lancem erro, mantemos este catch para que a simulação NUNCA
     // mostre a tela de erro — sempre um número, mesmo que seja zero.
-    return resultadoSeguro();
+    return resultadoSeguro(regimeApuracao);
   }
 }

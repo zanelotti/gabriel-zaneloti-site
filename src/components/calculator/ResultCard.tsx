@@ -1,9 +1,17 @@
 import { useEffect } from 'react';
 import type { CalculatorData, INSSResult } from '@/types/calculator';
 import { useCountUp } from '@/hooks/useCountUp';
-import { formatCurrency, formatPercent } from '@/utils/formatters';
+import { formatArea, formatCurrency, formatDateBR, formatPercent } from '@/utils/formatters';
 import { generateWhatsAppMessage } from '@/services/whatsapp';
 import { trackEvent } from '@/services/analytics';
+import {
+  CATEGORIA_LABEL,
+  DESTINACAO_LABEL,
+  RESPONSAVEL_LABEL,
+  SITUACAO_LABEL,
+  TIPO_OBRA_LABEL,
+  estadoLabel,
+} from '@/utils/labels';
 
 interface ResultCardProps {
   data: CalculatorData;
@@ -36,6 +44,44 @@ function StatCard({ label, value, format, tone }: StatCardProps) {
   );
 }
 
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-navy-400">{label}</p>
+      <p className="mt-0.5 text-sm font-medium text-navy-800">{value}</p>
+    </div>
+  );
+}
+
+/** Resumo (somente leitura) dos dados que o próprio lead preencheu na calculadora. */
+function DataSummary({ data }: { data: CalculatorData }) {
+  return (
+    <div className="mt-6 rounded-xl2 border border-navy-100 bg-navy-50/60 p-5">
+      <p className="section-eyebrow">Resumo da sua simulação</p>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <SummaryItem label="Nome" value={data.nome || 'Não informado'} />
+        <SummaryItem label="WhatsApp" value={data.whatsapp || 'Não informado'} />
+        <SummaryItem label="Responsável" value={RESPONSAVEL_LABEL[data.responsavel] ?? 'Não informado'} />
+        <SummaryItem label="Início da obra" value={formatDateBR(data.dataInicio)} />
+        <SummaryItem label="Fim da obra" value={data.dataFim ? formatDateBR(data.dataFim) : 'Obra em andamento'} />
+        <SummaryItem label="Situação da obra" value={SITUACAO_LABEL[data.situacao] ?? 'Não informado'} />
+        <SummaryItem label="Categoria da obra" value={CATEGORIA_LABEL[data.categoria] ?? 'Não informado'} />
+        <SummaryItem label="Tipo construtivo" value={TIPO_OBRA_LABEL[data.tipoObra] ?? 'Não informado'} />
+        <SummaryItem label="Destinação" value={DESTINACAO_LABEL[data.destinacao] ?? 'Não informado'} />
+        <SummaryItem label="Estado" value={estadoLabel(data.estado)} />
+        <SummaryItem label="Área principal" value={formatArea(data.areaPrincipal)} />
+        <SummaryItem label="Área complementar (piscina etc.)" value={formatArea(data.areaPiscina)} />
+      </div>
+      {data.observacoes && (
+        <div className="mt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-navy-400">Observações</p>
+          <p className="mt-0.5 text-sm text-navy-700">{data.observacoes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Tela de resultado exibida após o envio da etapa 3 da calculadora. */
 export function ResultCard({ data, result, onReset }: ResultCardProps) {
   useEffect(() => {
@@ -45,32 +91,75 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
 
   const whatsappUrl = generateWhatsAppMessage(data, result);
 
+  // Obra iniciada em 2020 ou antes: apuração pelo GFIP, mais complexa e sujeita
+  // a decadência caso a caso — não exibimos o cálculo automático de redução
+  // para o visitante, só o valor de INSS devido (sem desconto) e o convite
+  // para falar direto com o Gabriel.
+  const exigeAnaliseManual = result.regimeApuracao === 'gfip_anterior_2021';
+  // Obra iniciada entre 01/2021 e 09/2021: o cálculo abaixo já foi deslocado
+  // internamente para a competência 10/2021 (eSocial) — ver calculateINSS.ts.
+  const calculoAjustadoEsocial = result.regimeApuracao === 'esocial_ajustado';
+
   return (
     <div id="resultado-simulacao" className="animate-fade-in-up scroll-mt-24">
-      <h3 className="text-xl font-bold text-navy-900 sm:text-2xl">Veja uma estimativa do seu INSS de obra</h3>
+      <h3 className="text-xl font-bold text-navy-900 sm:text-2xl">
+        {exigeAnaliseManual ? 'Recebemos os dados da sua obra' : 'Veja uma estimativa do seu INSS de obra'}
+      </h3>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <StatCard label="INSS estimado antes da análise" value={result.inssEstimado} format="currency" tone="neutral" />
-        <StatCard label="Economia estimada" value={result.economiaEstimada} format="currency" tone="highlight" />
-        <StatCard label="Redução estimada" value={result.percentualReducao} format="percent" tone="highlight" />
-        <StatCard
-          label="Valor estimado após redução"
-          value={result.valorAposReducao}
-          format="currency"
-          tone="neutral"
-        />
-      </div>
+      <DataSummary data={data} />
 
-      <p className="mt-5 rounded-xl bg-navy-50 p-4 text-sm leading-relaxed text-navy-600">
-        <strong className="text-navy-800">Importante:</strong> este resultado é uma estimativa inicial e não
-        substitui uma análise técnica e tributária da documentação da obra.
-      </p>
+      {exigeAnaliseManual ? (
+        <>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <StatCard
+              label="INSS devido estimado (sem redução)"
+              value={result.inssEstimado}
+              format="currency"
+              tone="neutral"
+            />
+          </div>
+          <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm leading-relaxed text-navy-600">
+            <strong className="text-navy-800">Sua obra começou antes de outubro de 2021</strong> — período em que a
+            apuração seguia regras diferentes (GFIP) e o cálculo de possíveis reduções é mais complexo, exigindo uma
+            análise manual detalhada. Fale comigo no WhatsApp para simularmos o valor completo com precisão.
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <StatCard label="INSS estimado antes da análise" value={result.inssEstimado} format="currency" tone="neutral" />
+            <StatCard label="Economia estimada" value={result.economiaEstimada} format="currency" tone="highlight" />
+            <StatCard label="Redução estimada" value={result.percentualReducao} format="percent" tone="highlight" />
+            <StatCard
+              label="Valor estimado após redução"
+              value={result.valorAposReducao}
+              format="currency"
+              tone="neutral"
+            />
+          </div>
+
+          {calculoAjustadoEsocial && (
+            <p className="mt-4 rounded-xl bg-navy-50 p-4 text-xs leading-relaxed text-navy-500">
+              Sua obra começou entre janeiro e setembro de 2021: o cálculo acima já considera a obrigatoriedade do
+              eSocial a partir de outubro de 2021 para obras desse período.
+            </p>
+          )}
+
+          <p className="mt-5 rounded-xl bg-navy-50 p-4 text-sm leading-relaxed text-navy-600">
+            <strong className="text-navy-800">Importante:</strong> este resultado é uma estimativa inicial e não
+            substitui uma análise técnica e tributária da documentação da obra.
+          </p>
+        </>
+      )}
 
       <div className="mt-8 rounded-xl2 border border-navy-100 bg-white p-6 text-center sm:text-left">
-        <h4 className="text-lg font-bold text-navy-900">Existe possibilidade de reduzir esse valor?</h4>
+        <h4 className="text-lg font-bold text-navy-900">
+          {exigeAnaliseManual ? 'Vamos analisar sua obra com atenção' : 'Existe possibilidade de reduzir esse valor?'}
+        </h4>
         <p className="mt-2 text-sm text-navy-500">
-          Uma análise especializada pode identificar possibilidades legais de redução aplicáveis às características
-          da sua obra.
+          {exigeAnaliseManual
+            ? 'Obras iniciadas antes de outubro de 2021 têm regras próprias de apuração — fale comigo para uma simulação precisa, sem compromisso.'
+            : 'Uma análise especializada pode identificar possibilidades legais de redução aplicáveis às características da sua obra.'}
         </p>
         <a
           href={whatsappUrl}
@@ -79,7 +168,7 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
           className="btn-primary mt-5 w-full sm:w-auto"
           onClick={() => trackEvent('whatsapp_clicked', { origem: 'resultado' })}
         >
-          Quero analisar minha obra no WhatsApp
+          {exigeAnaliseManual ? 'Falar com Gabriel no WhatsApp' : 'Quero analisar minha obra no WhatsApp'}
         </a>
       </div>
 

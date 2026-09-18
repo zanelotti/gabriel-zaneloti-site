@@ -171,6 +171,15 @@ function buildDetalheInternoHtml(lead) {
   const primeiraCompetencia = competenciaLabel(detalhe.linhasComFator[0].competencia);
   const ultimaCompetencia = competenciaLabel(detalhe.linhasComFator[detalhe.linhasComFator.length - 1].competencia);
 
+  const avisoEsocialAjustado = detalhe.dataInicioAjustada
+    ? `
+      <p style="margin:0 0 14px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;color:#92400e;font-size:12px;">
+        ⚠️ Obra iniciada antes de 10/2021 (eSocial só obrigatório a partir dessa competência) — cálculo deslocado
+        automaticamente para começar em <strong>${escapeHtml(competenciaLabel(detalhe.dataInicioAjustada))}</strong>,
+        para tramitar tudo pelo eSocial. A data real de início informada pelo cliente está na tabela acima.
+      </p>`
+    : '';
+
   return `
     <div style="margin:28px 0 0;padding-top:20px;border-top:2px dashed #d1d5db;">
       <p style="margin:0 0 4px;display:inline-block;background:#111827;color:#ffffff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:4px;">Uso interno — só você vê isso</p>
@@ -180,6 +189,7 @@ function buildDetalheInternoHtml(lead) {
         RMT 100% ${formatCurrency(detalhe.rmt100)} · Período com DCTFweb: ${escapeHtml(primeiraCompetencia)} até ${escapeHtml(ultimaCompetencia)}
         (${escapeHtml(String(detalhe.numeroMeses))} meses cobráveis)
       </p>
+      ${avisoEsocialAjustado}
       <div style="overflow-x:auto;">
         <table role="presentation" width="100%" style="border-collapse:collapse;font-size:12px;min-width:560px;">
           <thead>
@@ -230,7 +240,27 @@ function buildDetalheInternoHtml(lead) {
     </div>`;
 }
 
+/**
+ * eSocial x GFIP: mesma regra usada no motor do site (src/services/calculateINSS.ts,
+ * constantes CORTE_ESOCIAL/INICIO_JANELA_AJUSTE) — mantenha as duas em sincronia se
+ * a data de corte mudar. Duplicada aqui porque esta função roda em runtime Node.js
+ * separado (Vercel serverless), sem acesso ao build do frontend.
+ */
+function determinarRegimeApuracao(dataInicio) {
+  if (!dataInicio) return 'esocial';
+  if (dataInicio >= '2021-10-01') return 'esocial';
+  if (dataInicio >= '2021-01-01') return 'esocial_ajustado';
+  return 'gfip_anterior_2021';
+}
+
 function buildEmailHtml(lead) {
+  const regimeApuracao = determinarRegimeApuracao(lead.dataInicio);
+
+  const avisoGfipAnterior =
+    regimeApuracao === 'gfip_anterior_2021'
+      ? '<p style="margin:0 0 16px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;font-size:13px;">⚠️ Obra iniciada antes de 10/2021 — apuração pelo GFIP, mais complexa e sujeita a decadência caso a caso. No site, este lead viu apenas o valor de INSS devido (sem desconto) e o convite para falar no WhatsApp, sem cálculo de redução automático.</p>'
+      : '';
+
   const linhaResultado =
     lead.inssEstimado === null
       ? '<p style="margin:0 0 16px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;">Não foi possível gerar uma estimativa automática para os dados informados — vale entrar em contato para entender o caso.</p>'
@@ -291,6 +321,7 @@ function buildEmailHtml(lead) {
     <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#111827;">
       <h2 style="margin:0 0 4px;font-size:20px;">Nova simulação no site 🎯</h2>
       <p style="margin:0 0 20px;color:#6b7280;font-size:14px;">${escapeHtml(lead.nome || 'Alguém')} acabou de preencher a calculadora de INSS de obras.</p>
+      ${avisoGfipAnterior}
       ${linhaResultado}
       <table role="presentation" width="100%" style="border-collapse:collapse;margin-bottom:20px;">
         ${linhasHtml}

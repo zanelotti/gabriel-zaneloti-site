@@ -85,6 +85,12 @@ export interface INSSDetalheInterno {
   honorarios: number;
   reducaoLiquida: number;
   parcelamento: ParcelamentoEstimado;
+  /**
+   * Presente apenas quando `regimeApuracao === 'esocial_ajustado'`: a
+   * competência ("AAAA-MM-DD") efetivamente usada no cálculo (10/2021), para
+   * que o e-mail interno deixe claro que a data de início real foi deslocada.
+   */
+  dataInicioAjustada?: string;
 }
 
 /** Resultado retornado pelo motor de cálculo (calculateINSS). */
@@ -96,12 +102,30 @@ export interface INSSResult {
   mensagem: string;
   /** Sinaliza que este resultado vem de um motor provisório/mock — não é um cálculo tributário oficial. */
   isEstimativaProvisoria: true;
+  /** Regime de apuração aplicável, conforme a data real de início da obra (eSocial x GFIP). */
+  regimeApuracao: RegimeApuracao;
   /**
    * Detalhamento interno (uso exclusivo do Gabriel, via e-mail) — ausente
    * quando o resultado vem do caminho de segurança (`resultadoSeguro`).
    */
   detalheInterno?: INSSDetalheInterno;
 }
+
+/**
+ * Regime de apuração aplicável conforme a DATA REAL de início da obra —
+ * eSocial só passou a ser obrigatório para obras a partir da competência
+ * 10/2021; antes disso, a apuração era feita pelo GFIP:
+ *  - 'esocial'            → obra iniciada em 10/2021 ou depois (fluxo normal).
+ *  - 'esocial_ajustado'   → obra iniciada entre 01/2021 e 09/2021: o cálculo é
+ *    deslocado internamente para a competência 10/2021 (prática do Gabriel
+ *    para poder tramitar tudo já pelo eSocial), mas a data real de início
+ *    continua sendo a informada pelo cliente (usada no resumo/CRM/e-mail).
+ *  - 'gfip_anterior_2021' → obra iniciada em 2020 ou antes: apuração pelo
+ *    GFIP, mais complexa e sujeita a decadência caso a caso — não é exibido
+ *    cálculo automático de redução para o visitante, só o valor devido e um
+ *    convite para falar direto com o Gabriel.
+ */
+export type RegimeApuracao = 'esocial' | 'esocial_ajustado' | 'gfip_anterior_2021';
 
 export type CalculatorStepIndex = 1 | 2 | 3;
 
