@@ -49,6 +49,10 @@ export function validateStep2(
     errors.dataInicio = 'Informe a data de início da obra.';
   }
 
+  if (!data.dataFim) {
+    errors.dataFim = 'Informe a data de fim da obra, mesmo que seja uma estimativa.';
+  }
+
   if (data.dataInicio && data.dataFim) {
     const inicio = new Date(data.dataInicio);
     const fim = new Date(data.dataFim);

@@ -74,7 +74,7 @@ export function ObraDataStep({ data, errors, onChange }: ObraDataStepProps) {
           value={data.dataFim}
           onChange={(value) => onChange('dataFim', value)}
           error={errors.dataFim}
-          helperText="Deixe em branco se a obra ainda está em andamento."
+          helperText="Se a obra ainda estiver em andamento, informe a previsão de término."
         />
       </div>
 
