@@ -4,6 +4,8 @@ import { useCountUp } from '@/hooks/useCountUp';
 import { formatArea, formatCurrency, formatDateBR, formatPercent } from '@/utils/formatters';
 import { generateWhatsAppMessage } from '@/services/whatsapp';
 import { trackEvent } from '@/services/analytics';
+import { downloadLeadPdf } from '@/services/pdfReport';
+import { BeforeAfterBars } from './BeforeAfterBars';
 import {
   CATEGORIA_LABEL,
   DESTINACAO_LABEL,
@@ -174,6 +176,8 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
             <StatCard label="Economia estimada" value={result.economiaEstimada} format="currency" tone="highlight" />
           </div>
 
+          <BeforeAfterBars antes={result.inssEstimado} depois={result.valorAposReducao} />
+
           {calculoAjustadoEsocial && (
             <p className="mt-4 rounded-xl bg-navy-50 p-4 text-xs leading-relaxed text-navy-500">
               Sua obra começou entre janeiro e setembro de 2021: o cálculo acima já considera a obrigatoriedade do
@@ -214,9 +218,21 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
         </a>
       </div>
 
-      <button type="button" onClick={onReset} className="mt-5 text-sm font-semibold text-navy-500 underline">
-        Fazer uma nova simulação
-      </button>
+      <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+        <button
+          type="button"
+          onClick={() => {
+            trackEvent('pdf_baixado', { origem: 'resultado' });
+            void downloadLeadPdf(data, result);
+          }}
+          className="btn-outline w-full sm:w-auto"
+        >
+          Baixar diagnóstico em PDF
+        </button>
+        <button type="button" onClick={onReset} className="text-sm font-semibold text-navy-500 underline">
+          Fazer uma nova simulação
+        </button>
+      </div>
     </div>
   );
 }

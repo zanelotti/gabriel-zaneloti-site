@@ -20,9 +20,14 @@ export function About() {
             construção.
           </p>
 
-          <div className="mt-8">
-            <p className="text-3xl font-extrabold text-navy-900">+R$ 1 milhão</p>
-            <p className="text-sm font-semibold text-accent-600">já economizados por clientes</p>
+          <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3">
+            <div>
+              <p className="text-3xl font-extrabold text-navy-900">+R$ 1 milhão</p>
+              <p className="text-sm font-semibold text-accent-600">já economizados por clientes</p>
+            </div>
+            <a href="/sobre.html" className="text-sm font-semibold text-navy-600 underline hover:text-accent-600">
+              Conheça mais sobre mim →
+            </a>
           </div>
         </div>
 

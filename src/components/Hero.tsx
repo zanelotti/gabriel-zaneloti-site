@@ -1,4 +1,5 @@
 import { Container } from '@/components/ui/Container';
+import { RiskFreeBadge } from '@/components/ui/RiskFreeBadge';
 import { generateGenericWhatsAppLink } from '@/services/whatsapp';
 import { trackEvent } from '@/services/analytics';
 
@@ -54,6 +55,8 @@ export function Hero() {
               Falar com Gabriel
             </a>
           </div>
+
+          <RiskFreeBadge variant="dark" className="mt-6" />
         </div>
 
         <div className="relative animate-fade-in lg:justify-self-end">

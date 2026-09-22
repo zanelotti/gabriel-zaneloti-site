@@ -130,10 +130,18 @@ Os eventos já disparados pelo site, via `trackEvent()`:
 - `calculator_completed`
 - `whatsapp_clicked`
 - `faq_opened`
+- `pdf_baixado`
+
+## PDF de diagnóstico
+
+Dois PDFs diferentes, gerados com `pdf-lib` (biblioteca pura JS/TS, sem dependência nativa — funciona tanto no navegador quanto no servidor):
+
+- **Público** (`src/services/pdfReport.ts`) — botão "Baixar diagnóstico em PDF" no resultado da calculadora (`ResultCard.tsx`). Gerado no navegador do próprio lead, com o resumo da simulação. **Nunca contém honorários** — só lê os campos públicos de `INSSResult`, nunca `result.detalheInterno` (ver aviso no topo do arquivo).
+- **Interno** (função `buildInternalPdfBase64` em `api/notify-lead.js`) — o mesmo detalhamento mensal (Fator de Ajuste, honorários, redução líquida, parcelamento) que já ia no corpo do e-mail, agora também anexado como arquivo `.pdf` ao e-mail que o Gabriel recebe — para guardar junto com a documentação do cliente e usar nos lançamentos mensais, sem precisar copiar do corpo do e-mail. Se a geração falhar por qualquer motivo, o e-mail é enviado normalmente, só sem o anexo (nunca trava o envio).
 
 ## Conteúdo
 
-Todo o conteúdo institucional (textos, serviços, FAQ, número de economia acumulada, dados de contato) foi extraído do site atual, https://www.gabrielzaneloti.com.br/, e reorganizado em uma estrutura mais moderna. Nenhuma informação sobre certificações, clientes ou depoimentos foi inventada — os espaços para fotografia profissional, política de privacidade e termos de uso estão reservados no layout, prontos para receber o conteúdo real quando disponível.
+Todo o conteúdo institucional (textos, serviços, FAQ, número de economia acumulada, dados de contato) foi extraído do site atual, https://www.gabrielzaneloti.com.br/, e reorganizado em uma estrutura mais moderna. Nenhuma informação sobre certificações, clientes ou depoimentos foi inventada — os "Exemplos de simulação" da página inicial são ilustrativos (rotulados como tal), não depoimentos de clientes reais. A página `/sobre.html` reaproveita apenas conteúdo já existente no site (nenhuma credencial nova foi inventada) — envie mais detalhes reais (formação, tempo de atuação, registro profissional) se quiser enriquecê-la.
 
 ## CRM interno (`/crm.html`)
 
@@ -159,3 +167,5 @@ O SQL de criação da tabela `leads` (colunas, índices, trigger de `updated_at`
 - [x] Backend/CRM real para leads — Supabase + `/crm.html` (quadro por etapa do funil + dashboard com gráficos)
 - [ ] IDs de GA4 / Google Ads / Meta Pixel / Google Tag Manager (variáveis de ambiente no Vercel)
 - [ ] Domínio e deploy (Vercel, Netlify ou similar)
+- [ ] Depoimentos reais de clientes (opcional) — hoje a seção "Exemplos de simulação" é ilustrativa, de propósito; envie 2-3 casos reais (mesmo anonimizados) se quiser trocar
+- [ ] Mais detalhes reais para `/sobre.html` (formação, tempo de atuação, registro profissional) — a página já está no ar com o conteúdo real que já existia no site

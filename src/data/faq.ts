@@ -4,10 +4,38 @@ export interface FAQItem {
 }
 
 /**
- * Perguntas frequentes baseadas no conteúdo real de gabrielzaneloti.com.br.
- * Nenhuma afirmação jurídica/tributária foi criada sem fundamento no material de origem.
+ * Perguntas frequentes. As primeiras priorizam objeções comuns de quem está
+ * decidindo se fecha ou não (pagamento, garantia, prazo, abrangência); as
+ * seguintes são educativas sobre o processo, baseadas no conteúdo real de
+ * gabrielzaneloti.com.br. Nenhuma afirmação jurídica/tributária foi criada
+ * sem fundamento no material de origem.
  */
 export const FAQ_ITEMS: FAQItem[] = [
+  {
+    pergunta: 'Preciso pagar algo adiantado para começar?',
+    resposta:
+      'Não. O diagnóstico inicial é 100% gratuito e sem compromisso. Meu modelo é de êxito: você só paga honorários sobre a economia efetivamente comprovada na sua obra — se não houver economia, não há cobrança.',
+  },
+  {
+    pergunta: 'E se a análise não encontrar nenhuma redução possível?',
+    resposta:
+      'Então você não paga nada. Como o honorário é uma porcentagem sobre a economia comprovada, o risco financeiro da análise é meu, não seu.',
+  },
+  {
+    pergunta: 'Quanto tempo demora o processo?',
+    resposta:
+      'O prazo varia conforme a complexidade da obra, a documentação disponível e os trâmites junto à Receita Federal. Depois da análise inicial da sua obra, você recebe uma estimativa de prazo específica para o seu caso.',
+  },
+  {
+    pergunta: 'Atendem qualquer tipo de obra — residencial, comercial ou industrial?',
+    resposta:
+      'Sim. Atendo obras residenciais, comerciais e industriais, de pessoa física e jurídica, de qualquer estado do Brasil, de forma remota.',
+  },
+  {
+    pergunta: 'Eu preciso fazer alguma parte do processo sozinho?',
+    resposta:
+      'Cuido de todo o levantamento técnico e do trâmite junto à Receita Federal. Da sua parte, só preciso da documentação da obra (datas, área, notas fiscais e comprovantes de mão de obra, quando existirem) para iniciar a análise.',
+  },
   {
     pergunta: 'O que é o INSS de Obras?',
     resposta:
@@ -19,52 +47,28 @@ export const FAQ_ITEMS: FAQItem[] = [
       'A regularização passa pelo cadastro da obra no CNO (Cadastro Nacional de Obras) e pela aferição pelo SERO (Serviço Eletrônico para Aferição de Obras), etapas necessárias para apurar corretamente o INSS devido.',
   },
   {
-    pergunta: 'O que é o CNO?',
-    resposta:
-      'O CNO (Cadastro Nacional de Obras) é o cadastro que identifica a obra perante a Receita Federal. É a partir dele que a situação da construção é acompanhada e regularizada.',
-  },
-  {
-    pergunta: 'O que é o SERO?',
-    resposta:
-      'O SERO (Serviço Eletrônico para Aferição de Obras) é o processo pelo qual a Receita Federal afere o valor do INSS devido sobre a obra, com base na documentação e nas características informadas.',
-  },
-  {
-    pergunta: 'O que é o Fator de Ajuste?',
-    resposta:
-      'É uma metodologia, prevista na Instrução Normativa RFB nº 2021/2021, que permite ajustar os valores tributários reportados em um projeto de construção, podendo reduzir legalmente o INSS apurado sobre a obra.',
-  },
-  {
     pergunta: 'Como funciona a redução do INSS de obra?',
     resposta:
-      'A partir da análise das características e da documentação da sua obra, avaliamos a aplicação do Fator de Ajuste e de outras possibilidades legais previstas na legislação para reduzir o valor do INSS devido.',
+      'A partir da análise das características e da documentação da sua obra, avaliamos a aplicação do Fator de Ajuste (para pessoa física) e de outras possibilidades legais previstas na Instrução Normativa RFB nº 2021/2021 para reduzir o valor do INSS devido.',
   },
   {
-    pergunta: 'Minha obra precisa ser regularizada?',
+    pergunta: 'Minha obra precisa ser regularizada mesmo se eu não for vender ou financiar?',
     resposta:
-      'Todos os tipos de construção — residencial, comercial ou industrial — precisam ser regularizados. A ausência de regularização pode gerar multas, dificultar financiamentos e impedir a venda do imóvel.',
+      'Sim. Todos os tipos de construção precisam ser regularizados perante a Receita Federal. A ausência de regularização pode gerar multas e juros que crescem mês a mês, além de dificultar financiamentos e a venda do imóvel no futuro.',
   },
   {
     pergunta: 'O que é a CND de obra?',
     resposta:
-      'É a Certidão Negativa de Débitos relativa à obra, que atesta a inexistência de débitos previdenciários vinculados à construção. Costuma ser exigida em processos de venda, financiamento e regularização documental do imóvel.',
-  },
-  {
-    pergunta: 'Quais as consequências de não regularizar a obra junto ao SERO?',
-    resposta:
-      'A obra pode ficar sujeita a multas, dificuldades para obter financiamento, complicações na venda do imóvel e impedimentos legais até que a situação seja regularizada.',
-  },
-  {
-    pergunta: 'Atendem obras em outros estados, fora do Rio de Janeiro?',
-    resposta: 'Sim. O atendimento é feito para obras em qualquer lugar do Brasil, de forma remota.',
+      'É a Certidão Negativa de Débitos relativa à obra, que atesta a inexistência de débitos previdenciários vinculados à construção. Costuma ser exigida em processos de venda, financiamento e regularização documental do imóvel — e tem validade de 180 dias.',
   },
   {
     pergunta: 'Posso aplicar a redução sozinho?',
     resposta:
-      'É altamente recomendável buscar o apoio de um profissional especializado, já que a análise envolve documentação técnica e a legislação aplicável ao Fator de Ajuste.',
+      'É altamente recomendável buscar o apoio de um profissional especializado, já que a análise envolve documentação técnica e a legislação aplicável ao Fator de Ajuste e às demais possibilidades de redução.',
   },
   {
     pergunta: 'Quanto posso economizar no INSS da minha obra?',
     resposta:
-      'A economia varia conforme as características, a documentação e a situação de cada obra, podendo chegar a até 70% do valor do imposto. A simulação é o primeiro passo para ter uma estimativa inicial.',
+      'A economia varia conforme as características, a documentação e a situação de cada obra, podendo chegar a até 70% do valor do imposto. A simulação gratuita é o primeiro passo para ter uma estimativa inicial do seu caso.',
   },
 ];

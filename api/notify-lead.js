@@ -26,6 +26,8 @@
  * ============================================================================
  */
 
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+
 const DEFAULT_NOTIFICATION_EMAIL = 'comercial.mfzeng@gmail.com';
 
 const RESPONSAVEL_LABEL = {
@@ -240,6 +242,200 @@ function buildDetalheInternoHtml(lead) {
     </div>`;
 }
 
+function slugify(value) {
+  const base = String(value || 'lead')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  return base || 'lead';
+}
+
+/**
+ * ============================================================================
+ *  PDF INTERNO — detalhamento completo (Fator de Ajuste), anexado ao e-mail
+ * ============================================================================
+ * Mesmo conteúdo do bloco "uso interno" que já vai no CORPO do e-mail
+ * (`buildDetalheInternoHtml`), só que como arquivo PDF anexado — para o
+ * Gabriel guardar junto com a documentação do cliente e usar nos lançamentos
+ * mensais, sem precisar copiar do corpo do e-mail toda vez.
+ *
+ * Gerado com `pdf-lib` (mesma biblioteca usada no PDF público do site, em
+ * src/services/pdfReport.ts — aqui rodando em Node, no ambiente serverless da
+ * Vercel, já que este arquivo não tem acesso ao build do frontend). Página em
+ * formato paisagem para caber as 9 colunas da tabela mensal com folga.
+ *
+ * Nunca deve derrubar o envio do e-mail: qualquer erro aqui é só registrado
+ * no log e o e-mail segue sem anexo.
+ * ============================================================================
+ */
+const PDF_PAGE_WIDTH = 841.89; // A4 paisagem, em pontos
+const PDF_PAGE_HEIGHT = 595.28;
+const PDF_MARGIN = 40;
+const PDF_CONTENT_WIDTH = PDF_PAGE_WIDTH - PDF_MARGIN * 2;
+const PDF_NAVY = rgb(0.0588, 0.0863, 0.2196);
+const PDF_NAVY_LIGHT = rgb(0.4196, 0.4627, 0.6157);
+const PDF_RED = rgb(0.6, 0.09, 0.09);
+
+const PDF_TABLE_COLUMNS = [
+  { label: 'Mês/Ano', width: 70 },
+  { label: 'Rem. Atual', width: 90 },
+  { label: 'Rem. Orig.', width: 90 },
+  { label: 'CPP', width: 85 },
+  { label: 'Multa', width: 85 },
+  { label: 'Selic', width: 75 },
+  { label: 'Mora', width: 85 },
+  { label: 'MAED', width: 85 },
+  { label: 'Total', width: 96 },
+];
+
+async function buildInternalPdfBase64(lead) {
+  const detalhe = lead.detalheInterno;
+  if (!detalhe || !Array.isArray(detalhe.linhasComFator) || detalhe.linhasComFator.length === 0) {
+    return null;
+  }
+
+  try {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+    let page = doc.addPage([PDF_PAGE_WIDTH, PDF_PAGE_HEIGHT]);
+    let y = PDF_PAGE_HEIGHT - PDF_MARGIN;
+
+    const newPage = () => {
+      page = doc.addPage([PDF_PAGE_WIDTH, PDF_PAGE_HEIGHT]);
+      y = PDF_PAGE_HEIGHT - PDF_MARGIN;
+    };
+    /** Retorna true quando precisou pular de página (usado para redesenhar o cabeçalho da tabela). */
+    const ensureSpace = (height) => {
+      if (y - height < PDF_MARGIN) {
+        newPage();
+        return true;
+      }
+      return false;
+    };
+    const drawText = (text, x, size, opts = {}) => {
+      const { bold = false, color = PDF_NAVY } = opts;
+      page.drawText(String(text), { x, y: y - size, size, font: bold ? fontBold : font, color });
+    };
+
+    ensureSpace(20);
+    drawText('Detalhamento interno — Fator de Ajuste (uso exclusivo, não enviar ao cliente)', PDF_MARGIN, 13, {
+      bold: true,
+    });
+    y -= 20;
+
+    ensureSpace(14);
+    drawText(
+      `${lead.nome || 'Lead'} · Área ${formatArea(detalhe.areaM2)} · Fator de Ajuste ${detalhe.percentualFator}% da RMT · RMT 100% ${formatCurrency(detalhe.rmt100)}`,
+      PDF_MARGIN,
+      9,
+      { color: PDF_NAVY_LIGHT }
+    );
+    y -= 16;
+
+    if (detalhe.dataInicioAjustada) {
+      ensureSpace(14);
+      drawText(
+        `Obra iniciada antes de 10/2021 — cálculo deslocado para ${competenciaLabel(detalhe.dataInicioAjustada)} (eSocial).`,
+        PDF_MARGIN,
+        8,
+        { color: PDF_RED }
+      );
+      y -= 16;
+    }
+    y -= 6;
+
+    const drawTableHeader = () => {
+      ensureSpace(20);
+      let x = PDF_MARGIN;
+      for (const col of PDF_TABLE_COLUMNS) {
+        drawText(col.label, x, 9, { bold: true });
+        x += col.width;
+      }
+      y -= 14;
+      page.drawLine({
+        start: { x: PDF_MARGIN, y: y + 4 },
+        end: { x: PDF_MARGIN + PDF_CONTENT_WIDTH, y: y + 4 },
+        thickness: 0.75,
+        color: PDF_NAVY_LIGHT,
+      });
+      y -= 4;
+    };
+
+    drawTableHeader();
+
+    for (const linha of detalhe.linhasComFator) {
+      const brokePage = ensureSpace(16);
+      if (brokePage) drawTableHeader();
+      const cells = [
+        competenciaLabel(linha.competencia),
+        formatCurrency(linha.remAtual),
+        formatCurrency(linha.remOrig),
+        formatCurrency(linha.cpp),
+        formatCurrency(linha.multa),
+        formatPercentPrecise(linha.selicPct),
+        formatCurrency(linha.mora),
+        formatCurrency(linha.maed),
+        formatCurrency(linha.total),
+      ];
+      let x = PDF_MARGIN;
+      cells.forEach((cell, index) => {
+        drawText(cell, x, 8.5);
+        x += PDF_TABLE_COLUMNS[index].width;
+      });
+      y -= 14;
+    }
+
+    y -= 10; // respiro extra entre a última linha da tabela e o total, evita sobreposição visual
+    ensureSpace(24);
+    page.drawLine({
+      start: { x: PDF_MARGIN, y: y + 8 },
+      end: { x: PDF_MARGIN + PDF_CONTENT_WIDTH, y: y + 8 },
+      thickness: 0.75,
+      color: PDF_NAVY_LIGHT,
+    });
+    drawText('TOTAL (com Fator de Ajuste)', PDF_MARGIN, 9, { bold: true });
+    drawText(formatCurrency(lead.valorAposReducao), PDF_MARGIN + PDF_CONTENT_WIDTH - 96, 9, { bold: true });
+    y -= 30;
+
+    ensureSpace(60);
+    drawText(`Honorários (12% da economia): ${formatCurrency(detalhe.honorarios)}`, PDF_MARGIN, 10, {
+      bold: true,
+      color: PDF_RED,
+    });
+    y -= 16;
+    drawText(`Redução líquida (para o cliente): ${formatCurrency(detalhe.reducaoLiquida)}`, PDF_MARGIN, 10, {
+      bold: true,
+      color: PDF_RED,
+    });
+    y -= 16;
+    drawText(
+      `Parcelamento estimado: ${detalhe.parcelamento.numeroParcelas}x de ${formatCurrency(detalhe.parcelamento.valorParcela)}`,
+      PDF_MARGIN,
+      9,
+      { color: PDF_NAVY_LIGHT }
+    );
+    y -= 22;
+
+    ensureSpace(20);
+    drawText(
+      'Documento de uso interno — nunca enviado ao cliente. Cálculos com desconto de 50% da multa MAED (pagamentos em até 30 dias).',
+      PDF_MARGIN,
+      7.5,
+      { color: PDF_NAVY_LIGHT }
+    );
+
+    const bytes = await doc.save();
+    return Buffer.from(bytes).toString('base64');
+  } catch (error) {
+    console.error('[notify-lead] Falha ao gerar PDF interno (e-mail segue sem anexo):', error);
+    return null;
+  }
+}
+
 /**
  * eSocial x GFIP: mesma regra usada no motor do site (src/services/calculateINSS.ts,
  * constantes CORTE_ESOCIAL/INICIO_JANELA_AJUSTE) — mantenha as duas em sincronia se
@@ -419,6 +615,14 @@ async function sendEmail(lead) {
   const toEmail = process.env.LEAD_NOTIFICATION_EMAIL || DEFAULT_NOTIFICATION_EMAIL;
 
   try {
+    // Gera o PDF do detalhamento interno (se houver dados suficientes) para anexar ao
+    // e-mail — nunca deve impedir o envio: em caso de falha, retorna null e o e-mail
+    // segue normalmente, só sem o anexo (ver buildInternalPdfBase64).
+    const pdfBase64 = await buildInternalPdfBase64(lead);
+    const attachments = pdfBase64
+      ? [{ filename: `detalhamento-interno-${slugify(lead.nome)}.pdf`, content: pdfBase64 }]
+      : undefined;
+
     const resendResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -431,6 +635,7 @@ async function sendEmail(lead) {
         reply_to: toEmail,
         subject: `Nova simulação: ${lead.nome || 'Visitante do site'}`,
         html: buildEmailHtml(lead),
+        ...(attachments ? { attachments } : {}),
       }),
     });
 

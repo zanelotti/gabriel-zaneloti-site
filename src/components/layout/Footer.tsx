@@ -40,6 +40,11 @@ export function Footer() {
           <div>
             <p className="text-sm font-semibold text-white">Institucional</p>
             <p className="mt-3 text-sm">
+              <a href="/sobre.html" className="hover:text-accent-400">
+                Sobre o Gabriel
+              </a>
+            </p>
+            <p className="mt-1 text-sm">
               <a href="/privacidade.html" className="hover:text-accent-400">
                 Política de Privacidade
               </a>

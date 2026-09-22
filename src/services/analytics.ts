@@ -41,7 +41,8 @@ export type AnalyticsEventName =
   | 'calculator_step_2_completed'
   | 'calculator_completed'
   | 'whatsapp_clicked'
-  | 'faq_opened';
+  | 'faq_opened'
+  | 'pdf_baixado';
 
 export interface AnalyticsEventPayload {
   [key: string]: string | number | boolean | undefined;
