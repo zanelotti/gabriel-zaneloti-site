@@ -80,7 +80,8 @@ class PdfCursor {
     this.y = PAGE_HEIGHT - MARGIN;
   }
 
-  private ensureSpace(height: number) {
+  /** Público: usado também de fora da classe (ver montagem manual da grade de dados/cards de resultado). */
+  ensureSpace(height: number) {
     if (this.y - height < MARGIN) {
       this.page = this.doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
       this.y = PAGE_HEIGHT - MARGIN;
@@ -276,7 +277,10 @@ export async function generateLeadPdfBytes(data: CalculatorData, result: INSSRes
 /** Gera o PDF e dispara o download no navegador. */
 export async function downloadLeadPdf(data: CalculatorData, result: INSSResult): Promise<void> {
   const bytes = await generateLeadPdfBytes(data, result);
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+  // `bytes` vem tipado como Uint8Array<ArrayBufferLike> (pode incluir SharedArrayBuffer), que o TS não aceita
+  // direto como BlobPart — copiamos para um ArrayBuffer isolado antes de passar para o Blob.
+  const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
