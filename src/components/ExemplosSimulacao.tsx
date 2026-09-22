@@ -18,9 +18,14 @@ export function ExemplosSimulacao() {
           description="Exemplos ilustrativos, calculados pela mesma metodologia usada na sua simulação — não são depoimentos nem casos de clientes reais."
         />
 
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
           {EXEMPLOS_SIMULACAO.map((exemplo) => (
-            <div key={exemplo.id} className="card text-center sm:text-left">
+            <div
+              key={exemplo.id}
+              className={`card text-center sm:text-left ${
+                exemplo.reducaoPercentual >= 70 ? 'border-accent-400 bg-accent-50' : ''
+              }`}
+            >
               <p className="text-xs font-semibold uppercase tracking-wide text-navy-400">{exemplo.situacao}</p>
               <p className="mt-1 text-sm font-semibold text-navy-800">{exemplo.perfilObra}</p>
               <p className="mt-1 text-xs text-navy-400">{exemplo.area}</p>

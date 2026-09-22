@@ -69,6 +69,6 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     pergunta: 'Quanto posso economizar no INSS da minha obra?',
     resposta:
-      'A economia varia conforme as características, a documentação e a situação de cada obra, podendo chegar a até 70% do valor do imposto. A simulação gratuita é o primeiro passo para ter uma estimativa inicial do seu caso.',
+      'A economia varia conforme as características, a documentação e a situação de cada obra, podendo chegar a até 72% do valor do imposto — o percentual mais alto costuma acontecer quando há acompanhamento contínuo (DCTFWeb) desde o início da obra. A simulação gratuita é o primeiro passo para ter uma estimativa inicial do seu caso.',
   },
 ];

@@ -8,7 +8,7 @@ export const BENEFITS: BenefitItem[] = [
   {
     id: 'economia',
     titulo: 'Economia',
-    descricao: 'Identificação das possibilidades legais de redução, com economia de até 70% no valor do imposto.',
+    descricao: 'Identificação das possibilidades legais de redução, com economia de até 72% no valor do imposto.',
   },
   {
     id: 'seguranca',

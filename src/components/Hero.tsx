@@ -31,7 +31,7 @@ export function Hero() {
           </p>
 
           <div className="mt-8 inline-flex flex-col items-start gap-1.5 rounded-2xl border border-accent-400/30 bg-white/5 px-5 py-4">
-            <span className="text-2xl font-extrabold text-accent-300 sm:text-3xl">Economia de até 70%*</span>
+            <span className="text-2xl font-extrabold text-accent-300 sm:text-3xl">Economia de até 72%*</span>
             <span className="text-xs text-navy-200">
               *A economia varia conforme as características, documentação e situação de cada obra.
             </span>
