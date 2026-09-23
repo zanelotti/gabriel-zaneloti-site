@@ -59,7 +59,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     pergunta: 'O que é a CND de obra?',
     resposta:
-      'É a Certidão Negativa de Débitos relativa à obra, que atesta a inexistência de débitos previdenciários vinculados à construção. Costuma ser exigida em processos de venda, financiamento e regularização documental do imóvel — e tem validade de 180 dias.',
+      'É a Certidão Negativa de Débitos relativa à obra, que atesta a inexistência de débitos previdenciários vinculados à construção (ou, quando há parcelamento em dia, a CPEND). Costuma ser exigida em processos de venda, financiamento e regularização documental do imóvel, e não tem prazo de validade.',
   },
   {
     pergunta: 'Posso aplicar a redução sozinho?',

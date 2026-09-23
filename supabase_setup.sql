@@ -81,17 +81,23 @@ create policy "Authenticated users can delete leads"
   using (true);
 
 -- ============================================================================
--- Tabela `guia_leads` — contatos que baixaram o guia gratuito em PDF
--- ("5 erros que fazem construtoras pagarem mais INSS de obra"), captados
--- pela seção GuiaGratuito antes de fazerem uma simulação completa.
+-- Tabela `guia_leads` — contatos que baixaram algum dos guias gratuitos em
+-- PDF (hoje: "5 erros que fazem construtoras pagarem mais INSS de obra" e
+-- "O caminho da regularização da sua obra"), captados pelas seções
+-- GuiaGratuito / GuiaCaminho antes de fazerem uma simulação completa.
+-- O campo `material` diferencia de qual PDF veio cada contato.
 -- Gravada só pela função /api/notify-guia-lead.js (chave service_role).
 -- ============================================================================
 create table if not exists public.guia_leads (
   id text primary key,
   nome text,
   whatsapp text,
+  material text not null default 'guia-5-erros',
   created_at timestamptz not null default now()
 );
+
+-- Se a tabela `guia_leads` já existia antes deste campo ser adicionado, rode só esta linha:
+-- alter table public.guia_leads add column if not exists material text not null default 'guia-5-erros';
 
 create index if not exists guia_leads_created_at_idx on public.guia_leads (created_at desc);
 

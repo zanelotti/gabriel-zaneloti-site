@@ -20,6 +20,15 @@
 
 const DEFAULT_NOTIFICATION_EMAIL = 'comercial.mfzeng@gmail.com';
 
+const MATERIAIS = {
+  'guia-5-erros': '5 erros que fazem pessoas físicas pagarem mais INSS de obra',
+  'guia-caminho-regularizacao': 'O caminho da regularização da sua obra',
+};
+
+function materialLabel(material) {
+  return MATERIAIS[material] || MATERIAIS['guia-5-erros'];
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (ch) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
@@ -53,6 +62,7 @@ async function saveToSupabase(guiaLead) {
         id: generateId(),
         nome: guiaLead.nome ?? null,
         whatsapp: guiaLead.whatsapp ?? null,
+        material: guiaLead.material || 'guia-5-erros',
         created_at: new Date().toISOString(),
       }),
     });
@@ -80,6 +90,7 @@ async function sendEmail(guiaLead) {
   const toEmail = process.env.LEAD_NOTIFICATION_EMAIL || DEFAULT_NOTIFICATION_EMAIL;
   const nome = escapeHtml(guiaLead.nome || 'Sem nome');
   const whatsapp = escapeHtml(guiaLead.whatsapp || 'Sem WhatsApp');
+  const material = escapeHtml(materialLabel(guiaLead.material));
 
   try {
     const resendResponse = await fetch('https://api.resend.com/emails', {
@@ -95,7 +106,7 @@ async function sendEmail(guiaLead) {
         subject: `Novo download do guia gratuito: ${guiaLead.nome || 'Visitante do site'}`,
         html: `
           <div style="font-family:sans-serif;font-size:14px;color:#0f1638;">
-            <p><strong>${nome}</strong> baixou o guia gratuito "5 erros que fazem construtoras pagarem mais INSS de obra".</p>
+            <p><strong>${nome}</strong> baixou o guia gratuito "${material}".</p>
             <p>WhatsApp: ${whatsapp}</p>
             <p style="color:#7c8ab0;font-size:12px;">Este é um contato ainda sem simulação completa — considere fazer um follow-up.</p>
           </div>
