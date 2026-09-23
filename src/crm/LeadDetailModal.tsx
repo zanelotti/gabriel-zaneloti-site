@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Lead, LeadStatus } from '@/types/lead';
-import { LEAD_STATUS_LABEL, LEAD_STATUS_ORDER, SDR_ESTADO_LABEL } from '@/types/lead';
+import { LEAD_STATUS_LABEL, LEAD_STATUS_ORDER } from '@/types/lead';
 import { crmLeadService } from '@/services/crmService';
 import { formatArea, formatCurrency, formatDateBR } from '@/utils/formatters';
 import { STATUS_STYLES } from './statusStyles';
@@ -18,8 +18,6 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
   const [honorarios, setHonorarios] = useState(lead.honorarios?.toString() ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sdrSaving, setSdrSaving] = useState(false);
-  const [sdrError, setSdrError] = useState<string | null>(null);
 
   const parseValor = (raw: string): number | null => {
     const trimmed = raw.trim();
@@ -73,34 +71,6 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
 
   const whatsappDigits = lead.whatsapp.replace(/\D/g, '');
   const whatsappLink = whatsappDigits ? `https://wa.me/55${whatsappDigits}` : null;
-
-  const sdrVisivel = Boolean(lead.sdrAtivo) || (lead.sdrHistorico?.length ?? 0) > 0;
-
-  const handleRetomarSdr = async () => {
-    setSdrSaving(true);
-    setSdrError(null);
-    try {
-      await crmLeadService.retomarSdrPosHonorarios(lead.id);
-      onChange();
-    } catch (err) {
-      setSdrError(err instanceof Error ? err.message : 'Falha ao retomar o SDR.');
-    } finally {
-      setSdrSaving(false);
-    }
-  };
-
-  const handleTogglePausarSdr = async () => {
-    setSdrSaving(true);
-    setSdrError(null);
-    try {
-      await crmLeadService.setSdrAtivo(lead.id, !lead.sdrAtivo, lead.sdrAtivo ? 'pausado' : undefined);
-      onChange();
-    } catch (err) {
-      setSdrError(err instanceof Error ? err.message : 'Falha ao atualizar o SDR.');
-    } finally {
-      setSdrSaving(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-20 flex items-center justify-center bg-navy-950/60 p-4" onClick={onClose}>
@@ -159,72 +129,6 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
           <div className="mt-4">
             <p className="field-label">Observações do formulário</p>
             <p className="rounded-xl bg-navy-50 p-3 text-sm text-navy-700">{lead.observacoes}</p>
-          </div>
-        )}
-
-        {sdrVisivel && (
-          <div className="mt-5 rounded-xl border border-accent-300/50 bg-accent-50/40 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase text-accent-700">SDR automatizado (piloto)</p>
-                <p className="mt-0.5 text-sm font-medium text-navy-800">
-                  {lead.sdrAtivo ? 'Ativo' : 'Pausado'}
-                  {lead.sdrEstado ? ` — ${SDR_ESTADO_LABEL[lead.sdrEstado]}` : ''}
-                </p>
-                {lead.sdrProximoContato && (
-                  <p className="mt-0.5 text-xs text-navy-500">
-                    Próximo follow-up: {formatDateBR(lead.sdrProximoContato)}
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={handleTogglePausarSdr}
-                disabled={sdrSaving}
-                className="btn-outline shrink-0 text-xs disabled:opacity-50"
-              >
-                {lead.sdrAtivo ? 'Pausar SDR' : 'Reativar SDR'}
-              </button>
-            </div>
-
-            {lead.sdrEstado === 'aguardando_gabriel' && (
-              <button
-                type="button"
-                onClick={handleRetomarSdr}
-                disabled={sdrSaving}
-                className="btn-primary mt-3 w-full text-sm disabled:opacity-50"
-              >
-                {sdrSaving ? 'Retomando…' : 'Já informei os honorários — retomar SDR'}
-              </button>
-            )}
-
-            {sdrError && <p className="field-error mt-2">{sdrError}</p>}
-
-            {lead.sdrHistorico && lead.sdrHistorico.length > 0 && (
-              <div className="mt-3 max-h-48 space-y-2 overflow-y-auto rounded-lg bg-white/70 p-3">
-                {lead.sdrHistorico.map((entry, index) => (
-                  <div key={index} className="text-xs">
-                    <span
-                      className={`font-semibold ${
-                        entry.de === 'lead'
-                          ? 'text-navy-700'
-                          : entry.de === 'gabriel'
-                            ? 'text-amber-700'
-                            : entry.de === 'sistema'
-                              ? 'text-navy-400'
-                              : 'text-accent-700'
-                      }`}
-                    >
-                      {entry.de === 'bot' ? 'SDR' : entry.de === 'lead' ? lead.nome || 'Lead' : entry.de === 'gabriel' ? 'Gabriel' : 'Sistema'}
-                    </span>{' '}
-                    <span className="text-navy-400">
-                      {new Date(entry.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    <p className="text-navy-700">{entry.texto}</p>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
