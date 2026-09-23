@@ -5,9 +5,9 @@ interface RiskFreeBadgeProps {
 }
 
 /**
- * Selo "risco zero" — reforça visualmente o modelo comercial de 100% êxito
- * (diagnóstico gratuito + honorários só sobre a economia comprovada).
- * Reutilizado no Hero e na CTA final para aparecer perto de toda decisão de simular/agendar.
+ * Selo "risco zero" — reforça visualmente que o diagnóstico inicial é
+ * gratuito e sem compromisso. Reutilizado no Hero e na CTA final para
+ * aparecer perto de toda decisão de simular/agendar.
  */
 export function RiskFreeBadge({ variant = 'light', className = '' }: RiskFreeBadgeProps) {
   const tone =
@@ -28,7 +28,7 @@ export function RiskFreeBadge({ variant = 'light', className = '' }: RiskFreeBad
         Diagnóstico 100% gratuito
       </span>
       <span className="hidden text-navy-300 sm:inline">·</span>
-      <span className="text-sm font-semibold">Você só paga se economizar</span>
+      <span className="text-sm font-semibold">Sem compromisso — agende sua consultoria</span>
     </div>
   );
 }

@@ -67,8 +67,9 @@ export default function Sobre() {
           <div className="rounded-xl2 border border-accent-200 bg-accent-50 p-6">
             <p className="text-sm font-bold uppercase tracking-wide text-accent-700">Modelo de 100% êxito</p>
             <p className="mt-2 text-sm leading-relaxed text-navy-700">
-              O diagnóstico inicial é sempre gratuito e sem compromisso. Os honorários são cobrados apenas sobre a
-              economia efetivamente comprovada na sua obra — se não houver redução identificada, você não paga nada.
+              O diagnóstico inicial é sempre gratuito e sem compromisso. Quando há redução aplicável, o honorário é
+              uma porcentagem sobre a economia efetivamente comprovada; quando não há redução a aplicar, mas a obra
+              ainda precisa ser regularizada, cobro um valor mínimo, calculado conforme a complexidade do processo.
             </p>
           </div>
         </div>

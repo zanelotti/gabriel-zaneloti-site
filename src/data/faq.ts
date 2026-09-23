@@ -14,12 +14,12 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     pergunta: 'Preciso pagar algo adiantado para começar?',
     resposta:
-      'Não. O diagnóstico inicial é 100% gratuito e sem compromisso. Meu modelo é de êxito: você só paga honorários sobre a economia efetivamente comprovada na sua obra — se não houver economia, não há cobrança.',
+      'Não. O diagnóstico inicial é 100% gratuito e sem compromisso. Se você decidir seguir com a regularização, o honorário é uma porcentagem sobre a economia comprovada na sua obra — e, nos casos em que não há redução a aplicar, um valor mínimo, calculado conforme a complexidade do processo.',
   },
   {
     pergunta: 'E se a análise não encontrar nenhuma redução possível?',
     resposta:
-      'Então você não paga nada. Como o honorário é uma porcentagem sobre a economia comprovada, o risco financeiro da análise é meu, não seu.',
+      'O diagnóstico inicial continua sem custo algum. Se, mesmo sem redução identificada, você decidir seguir com a regularização da obra, o honorário nesse caso passa a ser um valor mínimo definido pela complexidade e pelas especificidades do processo — não uma porcentagem sobre economia, já que não haveria economia a considerar.',
   },
   {
     pergunta: 'Quanto tempo demora o processo?',

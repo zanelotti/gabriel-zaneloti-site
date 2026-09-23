@@ -60,7 +60,7 @@ export function PostSaleTimeline() {
         <TimelineStep
           numero={5}
           titulo="Obra regularizada"
-          descricao="Você recebe a confirmação da regularização — e só paga honorários sobre a economia efetivamente comprovada."
+          descricao="Você recebe a confirmação da regularização. O honorário é uma porcentagem sobre a economia comprovada — ou, quando não há redução a aplicar, um valor mínimo conforme a complexidade do processo."
           isLast
         />
       </ol>

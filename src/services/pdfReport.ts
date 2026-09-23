@@ -457,8 +457,9 @@ export async function generateLeadPdfBytes(data: CalculatorData, result: INSSRes
   cursor.spacer(6);
   cursor.paragraph(
     'Este resultado é uma estimativa inicial calculada com base nos dados informados e não substitui uma análise ' +
-      'técnica e tributária completa da documentação da obra. Os honorários (cobrados apenas sobre a economia ' +
-      'efetivamente comprovada) são apresentados em uma proposta específica, após conversa direta com o Gabriel.',
+      'técnica e tributária completa da documentação da obra. Os honorários (uma porcentagem sobre a economia ' +
+      'comprovada ou, quando não há redução a aplicar, um valor mínimo conforme a complexidade do processo) são ' +
+      'apresentados em uma proposta específica, após conversa direta com o Gabriel.',
     { size: 8, color: NAVY_300, gap: 2 }
   );
   cursor.spacer(4);
