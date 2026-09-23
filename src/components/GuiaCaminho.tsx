@@ -13,9 +13,10 @@ const CONTEUDO_PREVIA = [
 ];
 
 /**
- * Seção de captura do segundo material gratuito ("guia de processo"):
- * mesmo padrão de GuiaGratuito, mas focado em quem já entende que precisa
- * regularizar e quer saber exatamente como o processo funciona na prática.
+ * Seção de captura do guia gratuito em PDF (lead magnet): conteúdo
+ * educativo real, baseado no mesmo conteúdo técnico usado no restante do
+ * site, para quem ainda não está pronto para preencher a calculadora
+ * completa.
  */
 export function GuiaCaminho() {
   const [nome, setNome] = useState('');
@@ -42,24 +43,24 @@ export function GuiaCaminho() {
   };
 
   return (
-    <section className="scroll-mt-20 bg-navy-50 py-20 sm:py-28">
+    <section className="scroll-mt-20 bg-navy-950 py-20 sm:py-28">
       <Container className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
         <div>
-          <span className="inline-flex items-center rounded-full bg-navy-900/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-navy-700">
+          <span className="inline-flex items-center rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-accent-300">
             Guia gratuito · PDF
           </span>
-          <h2 className="mt-5 text-3xl font-extrabold leading-tight text-navy-950 sm:text-4xl">
+          <h2 className="mt-5 text-3xl font-extrabold leading-tight text-white sm:text-4xl">
             O caminho completo da regularização da sua obra
           </h2>
-          <p className="mt-4 max-w-lg text-navy-500">
+          <p className="mt-4 max-w-lg text-navy-100">
             Já sabe que precisa regularizar e quer entender exatamente como funciona? Baixe este guia e veja o
             passo a passo completo, do levantamento inicial até a certidão final.
           </p>
 
           <ul className="mt-6 space-y-2.5">
             {CONTEUDO_PREVIA.map((item) => (
-              <li key={item} className="flex items-start gap-2.5 text-sm text-navy-700">
-                <svg viewBox="0 0 16 16" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-accent-600" aria-hidden="true">
+              <li key={item} className="flex items-start gap-2.5 text-sm text-navy-100">
+                <svg viewBox="0 0 16 16" fill="none" className="mt-0.5 h-4 w-4 shrink-0 text-accent-400" aria-hidden="true">
                   <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 {item}
@@ -68,22 +69,22 @@ export function GuiaCaminho() {
           </ul>
         </div>
 
-        <div className="rounded-xl2 border border-navy-100 bg-white p-6 shadow-card sm:p-8">
+        <div className="rounded-xl2 border border-white/10 bg-white/[0.06] p-6 shadow-card backdrop-blur sm:p-8">
           {sent ? (
             <div className="text-center sm:text-left">
-              <h3 className="text-lg font-bold text-navy-900">Seu guia já está sendo baixado!</h3>
-              <p className="mt-2 text-sm text-navy-500">
+              <h3 className="text-lg font-bold text-white">Seu guia já está sendo baixado!</h3>
+              <p className="mt-2 text-sm text-navy-200">
                 Se o download não começou automaticamente, confira a barra de downloads do seu navegador.
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} noValidate>
-              <h3 className="text-lg font-bold text-navy-900">Baixe agora, sem custo</h3>
-              <p className="mt-1 text-sm text-navy-500">Só precisamos do seu nome e WhatsApp.</p>
+              <h3 className="text-lg font-bold text-white">Baixe agora, sem custo</h3>
+              <p className="mt-1 text-sm text-navy-200">Só precisamos do seu nome e WhatsApp.</p>
 
               <div className="mt-5 space-y-4">
                 <div>
-                  <label htmlFor="guia-caminho-nome" className="field-label text-navy-500">
+                  <label htmlFor="guia-caminho-nome" className="field-label text-navy-200">
                     Nome
                   </label>
                   <input
@@ -101,7 +102,7 @@ export function GuiaCaminho() {
                 </div>
 
                 <div>
-                  <label htmlFor="guia-caminho-whatsapp" className="field-label text-navy-500">
+                  <label htmlFor="guia-caminho-whatsapp" className="field-label text-navy-200">
                     WhatsApp com DDD
                   </label>
                   <input
@@ -123,7 +124,7 @@ export function GuiaCaminho() {
               <button type="submit" className="btn-primary mt-6 w-full">
                 Baixar guia gratuito em PDF
               </button>
-              <p className="mt-3 text-center text-[11px] text-navy-400">
+              <p className="mt-3 text-center text-[11px] text-navy-300">
                 Seus dados não são compartilhados. Você pode ser contatado pelo WhatsApp sobre este conteúdo.
               </p>
             </form>
