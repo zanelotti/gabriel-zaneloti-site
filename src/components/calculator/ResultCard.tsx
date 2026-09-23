@@ -6,6 +6,7 @@ import { generateWhatsAppMessage } from '@/services/whatsapp';
 import { trackEvent } from '@/services/analytics';
 import { downloadLeadPdf } from '@/services/pdfReport';
 import { BeforeAfterBars } from './BeforeAfterBars';
+import { PostSaleTimeline } from './PostSaleTimeline';
 import {
   CATEGORIA_LABEL,
   DESTINACAO_LABEL,
@@ -217,6 +218,8 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
           {fatorAjusteNaoAplicavel || exigeAnaliseManual ? 'Falar com Gabriel no WhatsApp' : 'Quero analisar minha obra no WhatsApp'}
         </a>
       </div>
+
+      <PostSaleTimeline />
 
       <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
         <button

@@ -79,3 +79,26 @@ create policy "Authenticated users can delete leads"
   on public.leads for delete
   to authenticated
   using (true);
+
+-- ============================================================================
+-- Tabela `guia_leads` — contatos que baixaram o guia gratuito em PDF
+-- ("5 erros que fazem construtoras pagarem mais INSS de obra"), captados
+-- pela seção GuiaGratuito antes de fazerem uma simulação completa.
+-- Gravada só pela função /api/notify-guia-lead.js (chave service_role).
+-- ============================================================================
+create table if not exists public.guia_leads (
+  id text primary key,
+  nome text,
+  whatsapp text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists guia_leads_created_at_idx on public.guia_leads (created_at desc);
+
+alter table public.guia_leads enable row level security;
+
+drop policy if exists "Authenticated users can read guia_leads" on public.guia_leads;
+create policy "Authenticated users can read guia_leads"
+  on public.guia_leads for select
+  to authenticated
+  using (true);

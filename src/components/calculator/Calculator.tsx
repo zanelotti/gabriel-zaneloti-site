@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { useCalculatorForm } from '@/hooks/useCalculatorForm';
@@ -9,10 +9,20 @@ import { LeadForm } from './LeadForm';
 import { ObraDataStep } from './ObraDataStep';
 import { AreasStep } from './AreasStep';
 import { ResultCard } from './ResultCard';
+import { CalculatingLoader } from './CalculatingLoader';
 
 export function Calculator() {
   const { data, step, errors, result, calcError, isSubmitting, updateField, goNext, goBack, submit, reset } =
     useCalculatorForm();
+
+  // Controla quando o ResultCard é de fato revelado: o cálculo em si é
+  // instantâneo, mas mostramos o CalculatingLoader por alguns instantes antes
+  // de revelar o resultado, para transmitir que uma análise real está
+  // acontecendo. Volta a false sempre que `result` é limpo (nova simulação).
+  const [revealResult, setRevealResult] = useState(false);
+  useEffect(() => {
+    if (!result) setRevealResult(false);
+  }, [result]);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -79,7 +89,9 @@ export function Calculator() {
             </form>
           )}
 
-          {result && <ResultCard data={data} result={result} onReset={reset} />}
+          {result && !revealResult && <CalculatingLoader onDone={() => setRevealResult(true)} />}
+
+          {result && revealResult && <ResultCard data={data} result={result} onReset={reset} />}
 
           {!result && calcError && (
             <div className="animate-fade-in-up text-center sm:text-left">

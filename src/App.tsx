@@ -9,6 +9,7 @@ import { About } from '@/components/About';
 import { Benefits } from '@/components/Benefits';
 import { ExemplosSimulacao } from '@/components/ExemplosSimulacao';
 import { Urgencia } from '@/components/Urgencia';
+import { GuiaGratuito } from '@/components/GuiaGratuito';
 import { FAQ } from '@/components/FAQ';
 import { CTA } from '@/components/CTA';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
@@ -27,6 +28,7 @@ function App() {
         <Benefits />
         <ExemplosSimulacao />
         <Urgencia />
+        <GuiaGratuito />
         <FAQ />
         <CTA />
       </main>

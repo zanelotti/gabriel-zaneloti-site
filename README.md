@@ -131,6 +131,7 @@ Os eventos já disparados pelo site, via `trackEvent()`:
 - `whatsapp_clicked`
 - `faq_opened`
 - `pdf_baixado`
+- `guia_gratuito_baixado`
 
 ## PDF de diagnóstico
 
@@ -138,6 +139,15 @@ Dois PDFs diferentes, gerados com `pdf-lib` (biblioteca pura JS/TS, sem dependê
 
 - **Público** (`src/services/pdfReport.ts`) — botão "Baixar diagnóstico em PDF" no resultado da calculadora (`ResultCard.tsx`). Gerado no navegador do próprio lead, com o resumo da simulação. **Nunca contém honorários** — só lê os campos públicos de `INSSResult`, nunca `result.detalheInterno` (ver aviso no topo do arquivo).
 - **Interno** (função `buildInternalPdfBase64` em `api/notify-lead.js`) — o mesmo detalhamento mensal (Fator de Ajuste, honorários, redução líquida, parcelamento) que já ia no corpo do e-mail, agora também anexado como arquivo `.pdf` ao e-mail que o Gabriel recebe — para guardar junto com a documentação do cliente e usar nos lançamentos mensais, sem precisar copiar do corpo do e-mail. Se a geração falhar por qualquer motivo, o e-mail é enviado normalmente, só sem o anexo (nunca trava o envio).
+
+## Guia gratuito (lead magnet)
+
+Seção `GuiaGratuito.tsx` (entre "Urgência" e "FAQ" na página inicial): captura nome + WhatsApp de visitantes que ainda não estão prontos para preencher a calculadora completa, em troca do PDF estático `public/guia-gratuito-inss-obra.pdf` ("5 erros que fazem construtoras pagarem mais INSS de obra" — conteúdo educativo real, baseado nos mesmos 12 gatilhos legais usados no resto do site).
+
+- O download do PDF acontece imediatamente ao enviar o formulário (`src/services/guiaLeadService.ts`) — nunca espera a rede.
+- Em paralelo, a função serverless `/api/notify-guia-lead.js` grava o contato na tabela `guia_leads` do Supabase (separada de `leads`, já que ainda não é uma simulação completa) e avisa o Gabriel por e-mail — mesmas variáveis de ambiente já usadas por `/api/notify-lead.js` (`RESEND_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`).
+- SQL da tabela `guia_leads` também está em `supabase_setup.sql`.
+- Para atualizar o conteúdo do PDF no futuro, edite o texto direto no arquivo estático em `public/` (ele não é gerado em tempo de execução, ao contrário dos PDFs de diagnóstico).
 
 ## Conteúdo
 

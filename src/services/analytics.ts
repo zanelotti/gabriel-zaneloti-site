@@ -42,7 +42,8 @@ export type AnalyticsEventName =
   | 'calculator_completed'
   | 'whatsapp_clicked'
   | 'faq_opened'
-  | 'pdf_baixado';
+  | 'pdf_baixado'
+  | 'guia_gratuito_baixado';
 
 export interface AnalyticsEventPayload {
   [key: string]: string | number | boolean | undefined;
