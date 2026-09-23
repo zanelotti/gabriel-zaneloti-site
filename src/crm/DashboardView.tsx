@@ -25,6 +25,7 @@ export function DashboardView({ leads }: DashboardViewProps) {
 
   const taxaConversao = total > 0 ? (fechados.length / total) * 100 : 0;
   const valorTotalFechado = fechados.reduce((sum, l) => sum + (l.valorFechado ?? 0), 0);
+  const honorariosTotais = fechados.reduce((sum, l) => sum + (l.honorarios ?? 0), 0);
 
   const agora = new Date();
   const inicioDoMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
@@ -100,6 +101,7 @@ export function DashboardView({ leads }: DashboardViewProps) {
           accent="accent"
         />
         <StatTile label="Valor fechado" value={formatCurrency(valorTotalFechado)} accent="accent" />
+        <StatTile label="Meus honorários" value={formatCurrency(honorariosTotais)} accent="accent" />
       </div>
 
       <div className="card">

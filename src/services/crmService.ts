@@ -36,6 +36,7 @@ interface LeadRow {
   status: LeadStatus;
   notas: string | null;
   valor_fechado: number | null;
+  honorarios: number | null;
   updated_at: string;
 }
 
@@ -64,6 +65,7 @@ function rowToLead(row: LeadRow): Lead {
     status: row.status ?? 'novo',
     notas: row.notas,
     valorFechado: row.valor_fechado,
+    honorarios: row.honorarios,
     updatedAt: row.updated_at,
   };
 }
@@ -139,6 +141,13 @@ export const crmLeadService = {
   async updateValorFechado(id: string, valorFechado: number | null): Promise<void> {
     const client = requireClient();
     const { error } = await client.from('leads').update({ valor_fechado: valorFechado }).eq('id', id);
+    if (error) throw error;
+  },
+
+  /** Define os honorários efetivamente cobrados nesse lead (uso interno do Gabriel). */
+  async updateHonorarios(id: string, honorarios: number | null): Promise<void> {
+    const client = requireClient();
+    const { error } = await client.from('leads').update({ honorarios }).eq('id', id);
     if (error) throw error;
   },
 

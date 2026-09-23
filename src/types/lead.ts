@@ -71,6 +71,8 @@ export interface Lead {
   status?: LeadStatus;
   notas?: string | null;
   valorFechado?: number | null;
+  /** Honorários efetivamente cobrados do cliente nesse lead (uso interno, nunca exibido ao cliente). */
+  honorarios?: number | null;
   updatedAt?: string;
 }
 

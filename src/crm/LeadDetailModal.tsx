@@ -15,8 +15,20 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
   const [status, setStatus] = useState<LeadStatus>(lead.status ?? 'novo');
   const [notas, setNotas] = useState(lead.notas ?? '');
   const [valorFechado, setValorFechado] = useState(lead.valorFechado?.toString() ?? '');
+  const [honorarios, setHonorarios] = useState(lead.honorarios?.toString() ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const parseValor = (raw: string): number | null => {
+    const trimmed = raw.trim();
+    if (trimmed === '') return null;
+    const numeric = Number(trimmed.replace(',', '.'));
+    return Number.isNaN(numeric) ? null : numeric;
+  };
+
+  const valorFechadoNumerico = parseValor(valorFechado);
+  const honorariosSugeridos =
+    valorFechadoNumerico !== null ? Math.round(valorFechadoNumerico * 0.12 * 100) / 100 : null;
 
   const handleSave = async () => {
     setSaving(true);
@@ -26,14 +38,14 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
       if (status !== (lead.status ?? 'novo')) tasks.push(crmLeadService.updateStatus(lead.id, status));
       if (notas !== (lead.notas ?? '')) tasks.push(crmLeadService.updateNotas(lead.id, notas));
 
-      const trimmedValor = valorFechado.trim();
-      let parsedValor: number | null = null;
-      if (trimmedValor !== '') {
-        const numeric = Number(trimmedValor.replace(',', '.'));
-        parsedValor = Number.isNaN(numeric) ? null : numeric;
-      }
+      const parsedValor = parseValor(valorFechado);
       if (parsedValor !== (lead.valorFechado ?? null)) {
         tasks.push(crmLeadService.updateValorFechado(lead.id, parsedValor));
+      }
+
+      const parsedHonorarios = parseValor(honorarios);
+      if (parsedHonorarios !== (lead.honorarios ?? null)) {
+        tasks.push(crmLeadService.updateHonorarios(lead.id, parsedHonorarios));
       }
 
       await Promise.all(tasks);
@@ -140,16 +152,38 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
         </div>
 
         {status === 'fechado' && (
-          <div className="mt-4">
-            <label className="field-label">Valor fechado (R$)</label>
-            <input
-              type="number"
-              step="0.01"
-              className="field-input"
-              placeholder="0,00"
-              value={valorFechado}
-              onChange={(event) => setValorFechado(event.target.value)}
-            />
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div>
+              <label className="field-label">Valor fechado (R$)</label>
+              <input
+                type="number"
+                step="0.01"
+                className="field-input"
+                placeholder="0,00"
+                value={valorFechado}
+                onChange={(event) => setValorFechado(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label">Meus honorários (R$)</label>
+              <input
+                type="number"
+                step="0.01"
+                className="field-input"
+                placeholder="0,00"
+                value={honorarios}
+                onChange={(event) => setHonorarios(event.target.value)}
+              />
+              {honorariosSugeridos !== null && (
+                <button
+                  type="button"
+                  onClick={() => setHonorarios(honorariosSugeridos.toString())}
+                  className="mt-1.5 text-xs font-medium text-accent-700 hover:underline"
+                >
+                  Usar sugestão (12%): {formatCurrency(honorariosSugeridos)}
+                </button>
+              )}
+            </div>
           </div>
         )}
 

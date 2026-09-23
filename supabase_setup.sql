@@ -29,8 +29,12 @@ create table if not exists public.leads (
     check (status in ('novo', 'contatado', 'proposta_enviada', 'decidindo', 'fechado', 'perdido')),
   notas text,
   valor_fechado numeric,
+  honorarios numeric,
   updated_at timestamptz not null default now()
 );
+
+-- Se a tabela `leads` já existia antes deste campo ser adicionado, rode só esta linha:
+-- alter table public.leads add column if not exists honorarios numeric;
 
 create index if not exists leads_status_idx on public.leads (status);
 create index if not exists leads_created_at_idx on public.leads (created_at desc);
