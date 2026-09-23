@@ -64,11 +64,11 @@ export default function Termos() {
         no topo desta página.
       </p>
 
-      <H2>7. Legislação aplicável</H2>
-      <p>Estes termos são regidos pela legislação brasileira.</p>
+      <H2>7. Disposições finais</H2>
+      <p>Estes termos seguem as normas brasileiras aplicáveis.</p>
 
       <p className="pt-4 text-xs text-navy-400">
-        Este texto tem caráter informativo geral e não substitui uma análise jurídica específica do seu
+        Este texto tem caráter informativo geral e não substitui uma análise técnica especializada do seu
         caso.
       </p>
     </LegalLayout>

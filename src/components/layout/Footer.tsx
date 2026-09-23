@@ -58,7 +58,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-navy-500">
-          © {year} Gabriel Zaneloti. Todos os direitos reservados.
+          © {year} Gabriel Zaneloti. Todo o conteúdo deste site é reservado.
         </div>
       </Container>
     </footer>

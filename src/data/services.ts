@@ -15,7 +15,7 @@ export const SERVICES: ServiceItem[] = [
     id: 'reducao-inss',
     titulo: 'Redução de INSS de Obras',
     descricao:
-      'Análise das possibilidades legais de redução do valor devido, com aplicação do Fator de Ajuste sobre o INSS da sua obra.',
+      'Análise das possibilidades de redução do valor devido, com aplicação do Fator de Ajuste sobre o INSS da sua obra.',
     icone: 'reducao',
   },
   {
@@ -52,7 +52,7 @@ export const SERVICES: ServiceItem[] = [
   {
     id: 'planejamento-tributario',
     titulo: 'Planejamento Tributário',
-    descricao: 'Planejamento adequado para reduzir custos dentro das possibilidades legais previstas em lei.',
+    descricao: 'Planejamento adequado para reduzir custos dentro das possibilidades previstas na Instrução Normativa RFB nº 2021/2021.',
     icone: 'planejamento',
   },
 ];

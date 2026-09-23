@@ -145,7 +145,7 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
           </div>
           <p className="mt-5 rounded-xl bg-navy-50 p-4 text-sm leading-relaxed text-navy-600">
             <strong className="text-navy-800">O Fator de Ajuste só se aplica a obras de Pessoa Física.</strong> Para
-            Pessoa Jurídica, existem outras formas legais de buscar economia — como contabilidade regular, desoneração
+            Pessoa Jurídica, existem outras formas de buscar economia — como contabilidade regular, desoneração
             da folha (CPRB), Simples Nacional ou créditos abatíveis — mas isso depende de muitas variáveis específicas
             da sua empresa. Fale comigo no WhatsApp para analisarmos o seu caso.
           </p>

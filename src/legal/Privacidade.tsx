@@ -13,8 +13,8 @@ export default function Privacidade() {
   return (
     <LegalLayout title="Política de Privacidade" updatedAt="17 de setembro de 2026">
       <p>
-        Esta Política de Privacidade explica quais dados este site coleta, para que servem e quais direitos
-        você tem sobre eles, em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 —
+        Esta Política de Privacidade explica quais dados este site coleta, para que servem e o que você pode
+        fazer em relação a eles, em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 —
         LGPD). Ao preencher o formulário de simulação ou entrar em contato pelos canais deste site, você
         declara estar ciente desta política.
       </p>
@@ -82,16 +82,16 @@ export default function Privacidade() {
         podendo ser excluídos a qualquer momento mediante solicitação (ver seção 7).
       </p>
 
-      <H2>7. Seus direitos como titular dos dados</H2>
+      <H2>7. O que você pode fazer com os seus dados</H2>
       <p>Nos termos da LGPD, você pode, a qualquer momento, solicitar:</p>
       <Ul>
         <li>Confirmação de que seus dados são tratados;</li>
         <li>Acesso, correção ou atualização dos seus dados;</li>
-        <li>Exclusão dos seus dados (exceto quando houver obrigação legal de retenção);</li>
+        <li>Exclusão dos seus dados (exceto quando houver necessidade de retenção prevista em norma aplicável);</li>
         <li>Revogação do consentimento dado anteriormente.</li>
       </Ul>
       <p>
-        Para exercer qualquer um desses direitos, entre em contato pelo e-mail{' '}
+        Para exercer qualquer uma dessas opções, entre em contato pelo e-mail{' '}
         <a href="mailto:comercial.mfzeng@gmail.com" className="font-semibold underline">
           comercial.mfzeng@gmail.com
         </a>
@@ -105,7 +105,7 @@ export default function Privacidade() {
       </p>
 
       <p className="pt-4 text-xs text-navy-400">
-        Este texto tem caráter informativo geral e não substitui uma análise jurídica específica do seu
+        Este texto tem caráter informativo geral e não substitui uma análise técnica especializada do seu
         caso.
       </p>
     </LegalLayout>

@@ -7,8 +7,8 @@ export interface FAQItem {
  * Perguntas frequentes. As primeiras priorizam objeções comuns de quem está
  * decidindo se fecha ou não (pagamento, garantia, prazo, abrangência); as
  * seguintes são educativas sobre o processo, baseadas no conteúdo real de
- * gabrielzaneloti.com.br. Nenhuma afirmação jurídica/tributária foi criada
- * sem fundamento no material de origem.
+ * gabrielzaneloti.com.br. Nenhuma afirmação foi criada sem fundamento no
+ * material de origem.
  */
 export const FAQ_ITEMS: FAQItem[] = [
   {
@@ -49,7 +49,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     pergunta: 'Como funciona a redução do INSS de obra?',
     resposta:
-      'A partir da análise das características e da documentação da sua obra, avaliamos a aplicação do Fator de Ajuste (para pessoa física) e de outras possibilidades legais previstas na Instrução Normativa RFB nº 2021/2021 para reduzir o valor do INSS devido.',
+      'A partir da análise das características e da documentação da sua obra, avaliamos a aplicação do Fator de Ajuste (para pessoa física) e de outras possibilidades previstas na Instrução Normativa RFB nº 2021/2021 para reduzir o valor do INSS devido.',
   },
   {
     pergunta: 'Minha obra precisa ser regularizada mesmo se eu não for vender ou financiar?',
@@ -64,7 +64,7 @@ export const FAQ_ITEMS: FAQItem[] = [
   {
     pergunta: 'Posso aplicar a redução sozinho?',
     resposta:
-      'É altamente recomendável buscar o apoio de um profissional especializado, já que a análise envolve documentação técnica e a legislação aplicável ao Fator de Ajuste e às demais possibilidades de redução.',
+      'É altamente recomendável buscar o apoio de um profissional especializado, já que a análise envolve documentação técnica e as regras aplicáveis ao Fator de Ajuste e às demais possibilidades de redução.',
   },
   {
     pergunta: 'Quanto posso economizar no INSS da minha obra?',

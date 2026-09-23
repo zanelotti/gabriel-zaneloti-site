@@ -15,7 +15,7 @@ const ERROS_PREVIA = [
 
 /**
  * Seção de captura do "guia gratuito" (lead magnet): conteúdo educativo real,
- * baseado nos mesmos fundamentos legais usados no restante do site, para
+ * baseado no mesmo conteúdo técnico usado no restante do site, para
  * quem ainda não está pronto para preencher a calculadora completa.
  */
 export function GuiaGratuito() {
@@ -53,8 +53,8 @@ export function GuiaGratuito() {
             5 erros que fazem pessoas físicas pagarem mais INSS de obra
           </h2>
           <p className="mt-4 max-w-lg text-navy-100">
-            Ainda não está pronto para simular sua obra? Baixe este material gratuito e descubra, com base na
-            legislação, os erros mais comuns que fazem obras pagarem mais INSS do que deveriam.
+            Ainda não está pronto para simular sua obra? Baixe este material gratuito e descubra, com base nas
+            normas da Receita Federal, os erros mais comuns que fazem obras pagarem mais INSS do que deveriam.
           </p>
 
           <ul className="mt-6 space-y-2.5">

@@ -18,7 +18,7 @@ export const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
   {
     numero: '03',
     titulo: 'Identificamos as possibilidades',
-    descricao: 'Verificamos as estratégias e possibilidades legais de redução aplicáveis ao seu caso.',
+    descricao: 'Verificamos as estratégias e possibilidades de redução aplicáveis ao seu caso.',
   },
   {
     numero: '04',

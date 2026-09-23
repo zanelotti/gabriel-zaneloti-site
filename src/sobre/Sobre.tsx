@@ -61,7 +61,7 @@ export default function Sobre() {
           <H2>Como funciona o meu trabalho</H2>
           <p className="text-base leading-relaxed text-navy-600">
             Analiso as características e a documentação da sua obra à luz da Instrução Normativa RFB nº 2021/2021,
-            identificando as possibilidades legais de redução aplicáveis ao seu caso, e conduzo todo o processo de
+            identificando as possibilidades de redução aplicáveis ao seu caso, e conduzo todo o processo de
             regularização junto ao CNO e ao SERO até a emissão da certidão.
           </p>
           <div className="rounded-xl2 border border-accent-200 bg-accent-50 p-6">
@@ -105,7 +105,7 @@ export default function Sobre() {
       </main>
 
       <footer className="border-t border-navy-100 py-8 text-center text-xs text-navy-400">
-        © {new Date().getFullYear()} Gabriel Zaneloti. Todos os direitos reservados.
+        © {new Date().getFullYear()} Gabriel Zaneloti. Todo o conteúdo deste site é reservado.
       </footer>
     </div>
   );

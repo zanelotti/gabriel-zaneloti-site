@@ -26,7 +26,7 @@ export function Hero() {
           </h1>
 
           <p className="mt-6 max-w-xl text-lg text-navy-100">
-            Analiso as características da sua obra e identifico oportunidades legais de redução do INSS, além de
+            Analiso as características da sua obra e identifico oportunidades de redução do INSS, além de
             cuidar do processo de regularização.
           </p>
 

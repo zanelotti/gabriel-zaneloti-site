@@ -272,7 +272,7 @@ function drawBarComparison(
   const barHeight = 10;
   const rows: Array<[string, number, ReturnType<typeof rgb>]> = [
     ['Valor presumido pela Receita Federal', antes, NAVY_300],
-    ['Valor estimado após a redução legal', depois, ACCENT_400],
+    ['Valor estimado após a redução', depois, ACCENT_400],
   ];
 
   let y = topY;
@@ -362,7 +362,7 @@ export async function generateLeadPdfBytes(data: CalculatorData, result: INSSRes
   if (fatorAjusteNaoAplicavel || exigeAnaliseManual) {
     const label = fatorAjusteNaoAplicavel ? 'INSS pela aferição indireta' : 'INSS devido estimado (sem redução)';
     const explicacao = fatorAjusteNaoAplicavel
-      ? 'O Fator de Ajuste (a redução legal aplicada nas obras de Pessoa Física) não se aplica a obras de Pessoa ' +
+      ? 'O Fator de Ajuste (a redução aplicada nas obras de Pessoa Física) não se aplica a obras de Pessoa ' +
         'Jurídica. Para PJ, a economia vem de outras frentes específicas da empresa — fale com o Gabriel para uma ' +
         'análise personalizada.'
       : 'Obra iniciada antes de outubro de 2021 — período apurado pelo GFIP, com regras próprias que exigem uma ' +
@@ -455,7 +455,7 @@ export async function generateLeadPdfBytes(data: CalculatorData, result: INSSRes
     cursor.y -= chartPanelHeight + 10;
 
     const rodape = wrapText(
-      'Seguindo a Instrução Normativa RFB nº 2021/2021, é possível reduzir legalmente o valor do INSS presumido pela Receita Federal para a sua obra.',
+      'Seguindo a Instrução Normativa RFB nº 2021/2021, é possível reduzir o valor do INSS presumido pela Receita Federal para a sua obra.',
       font,
       7.5,
       CONTENT_WIDTH

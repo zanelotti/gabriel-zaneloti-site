@@ -42,7 +42,7 @@ export function Urgencia() {
           />
           <UrgencyPoint
             titulo="Regularizar antes de ser fiscalizado evita multas maiores"
-            descricao="A legislação trata melhor quem regulariza por conta própria do que quem é autuado depois de uma fiscalização. Esperar aumenta o risco de a pendência virar um Auto de Infração, com cobrança mais pesada do que a regularização voluntária."
+            descricao="A Receita Federal trata melhor quem regulariza por conta própria do que quem é autuado depois de uma fiscalização. Esperar aumenta o risco de a pendência virar um Auto de Infração, com cobrança mais pesada do que a regularização voluntária."
           />
         </div>
       </Container>
