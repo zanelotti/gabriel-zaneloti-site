@@ -5,17 +5,46 @@ import { CalculoReport } from './CalculoReport';
 import { calculateFatorAjuste } from '@/services/calculateFatorAjuste';
 import type { FatorAjusteInput, FatorAjusteResult } from '@/types/fatorAjuste';
 
+/**
+ * eSocial só passou a ser obrigatório para o envio de informações da obra a
+ * partir da competência 10/2021 — antes disso, a apuração era pelo GFIP.
+ * Mesma regra já aplicada no simulador público (`calculateINSS.ts`): se a
+ * obra começou antes de 10/2021, o CÁLCULO considera o início a partir de
+ * 10/2021, para poder tramitar tudo já pelo eSocial. A data real de início
+ * informada no formulário não muda — só a competência usada no motor de
+ * cálculo.
+ */
+const CORTE_ESOCIAL = '2021-10-01';
+
+/** Maior das duas datas ISO ("AAAA-MM-DD"), como string. */
+function maxISODate(a: string, b: string): string {
+  return a > b ? a : b;
+}
+
 export default function App() {
   const [result, setResult] = useState<FatorAjusteResult | null>(null);
   const [error, setError] = useState('');
+  const [dataInicioReal, setDataInicioReal] = useState('');
+  const [dataInicioAjustada, setDataInicioAjustada] = useState<string | null>(null);
 
   const handleSubmit = (input: FatorAjusteInput) => {
     setError('');
     try {
-      const calculado = calculateFatorAjuste(input);
+      const dataInicioCalculo = maxISODate(input.dataInicio, CORTE_ESOCIAL);
+      const dataFimCalculo = maxISODate(dataInicioCalculo, input.dataFim);
+
+      const calculado = calculateFatorAjuste({
+        ...input,
+        dataInicio: dataInicioCalculo,
+        dataFim: dataFimCalculo,
+      });
+
+      setDataInicioReal(input.dataInicio);
+      setDataInicioAjustada(dataInicioCalculo !== input.dataInicio ? dataInicioCalculo : null);
       setResult(calculado);
     } catch (err) {
       setResult(null);
+      setDataInicioAjustada(null);
       setError(err instanceof Error ? err.message : 'Não foi possível calcular. Confira os dados informados.');
     }
   };
@@ -42,7 +71,13 @@ export default function App() {
             </p>
           )}
 
-          {result && <CalculoReport result={result} />}
+          {result && (
+            <CalculoReport
+              result={result}
+              dataInicioReal={dataInicioReal}
+              dataInicioAjustada={dataInicioAjustada}
+            />
+          )}
         </div>
       </div>
     </PasscodeGate>

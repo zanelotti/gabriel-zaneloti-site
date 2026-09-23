@@ -3,6 +3,14 @@ import { formatCurrency, formatPercentPrecise } from '@/utils/formatters';
 
 interface CalculoReportProps {
   result: FatorAjusteResult;
+  /** Data real de início da obra, informada no formulário (antes de qualquer ajuste). */
+  dataInicioReal?: string;
+  /**
+   * Preenchida quando a data real de início é anterior a 10/2021: mostra a
+   * competência (10/2021) que passou a ser usada no cálculo, já que o
+   * eSocial só é obrigatório para obras a partir dessa competência.
+   */
+  dataInicioAjustada?: string | null;
 }
 
 function competenciaLabel(competencia: string): string {
@@ -10,9 +18,18 @@ function competenciaLabel(competencia: string): string {
   return `${month}/${year}`;
 }
 
-export function CalculoReport({ result }: CalculoReportProps) {
+export function CalculoReport({ result, dataInicioReal, dataInicioAjustada }: CalculoReportProps) {
   return (
     <div className="mt-8 space-y-8">
+      {dataInicioAjustada && (
+        <div className="rounded-xl2 border border-accent-300 bg-accent-50 px-4 py-3 text-sm text-navy-800">
+          <strong>Início do cálculo ajustado para {competenciaLabel(dataInicioAjustada)}.</strong> A obra começou em{' '}
+          {dataInicioReal ? competenciaLabel(dataInicioReal) : 'uma competência anterior a 10/2021'}, mas o eSocial
+          só passou a ser obrigatório para obras a partir de 10/2021 (antes disso a apuração era pelo GFIP) — por
+          isso o cálculo considera a competência inicial 10/2021, para tramitar tudo já pelo eSocial.
+        </div>
+      )}
+
       <div className="card">
         <h2 className="text-lg font-bold text-navy-900">Dados iniciais</h2>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
