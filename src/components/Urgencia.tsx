@@ -41,8 +41,8 @@ export function Urgencia() {
             descricao="A DCTFWeb Aferição de Obras deve ser entregue enquanto a obra está em andamento. Deixar de entregá-la gera multa por atraso ou omissão — além de comprometer benefícios que dependem da entrega contínua, como o Fator de Ajuste."
           />
           <UrgencyPoint
-            titulo="Regularizar antes de ser fiscalizado evita multas maiores"
-            descricao="A Receita Federal trata melhor quem regulariza por conta própria do que quem é autuado depois de uma fiscalização. Esperar aumenta o risco de a pendência virar um Auto de Infração, com cobrança mais pesada do que a regularização voluntária."
+            titulo="Ser fiscalizado antes de regularizar pode multiplicar a dívida"
+            descricao="A Receita Federal trata melhor quem regulariza por conta própria do que quem é autuado depois de uma fiscalização. Se a pendência virar um Auto de Infração, a multa aplicada varia de 75% a 225% do valor do INSS devido — numa dívida de R$ 25.000, por exemplo, a multa sozinha pode ficar entre R$ 18.750 e R$ 56.250, além dos juros e da correção pela Selic."
           />
         </div>
       </Container>

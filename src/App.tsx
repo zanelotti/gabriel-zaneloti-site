@@ -7,7 +7,6 @@ import { Services } from '@/components/Services';
 import { Authority } from '@/components/Authority';
 import { About } from '@/components/About';
 import { Benefits } from '@/components/Benefits';
-import { ExemplosSimulacao } from '@/components/ExemplosSimulacao';
 import { Urgencia } from '@/components/Urgencia';
 import { GuiaGratuito } from '@/components/GuiaGratuito';
 import { FAQ } from '@/components/FAQ';
@@ -26,7 +25,6 @@ function App() {
         <Authority />
         <About />
         <Benefits />
-        <ExemplosSimulacao />
         <Urgencia />
         <GuiaGratuito />
         <FAQ />
