@@ -1,0 +1,43 @@
+name: Atualiza Selic mensal
+
+# Mantém src/data/selicMensal.ts em dia sozinho, sem precisar editar o
+# arquivo nem pedir pra alguém toda vez que o Bacen divulgar a Selic do mês.
+# Ver scripts/update-selic.mjs para a lógica.
+
+on:
+  schedule:
+    # O Bacen costuma publicar a Selic acumulada do mês fechado nos
+    # primeiros dias úteis do mês seguinte. Roda em alguns dias diferentes
+    # do começo do mês (8h UTC = 5h em Brasília) só por segurança — rodar
+    # de novo sem ter mês novo não faz nada (o script não altera o arquivo).
+    - cron: '0 8 1,3,5,8,12 * *'
+  # Permite rodar manualmente em Actions → Atualiza Selic mensal → Run workflow.
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update-selic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Busca a Selic mais recente no Bacen e atualiza a tabela
+        run: node scripts/update-selic.mjs
+
+      - name: Publica a mudança, se houver mês novo
+        run: |
+          if [ -n "$(git status --porcelain -- src/data/selicMensal.ts)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/data/selicMensal.ts
+            git commit -m "chore: atualiza Selic mensal (Bacen SGS 4390)"
+            git push
+          else
+            echo "Nenhuma taxa nova publicada pelo Bacen ainda — nada para publicar."
+          fi

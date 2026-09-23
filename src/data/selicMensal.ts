@@ -15,13 +15,13 @@
  * já que o cálculo de juros de mora precisa da taxa de cada mês entre a
  * competência e a data de apuração, não só dos últimos anos.
  *
- * COMO ATUALIZAR TODO MÊS:
- * Assim que a Receita/Bacen divulgar a taxa Selic do mês, adicione UMA linha
- * no final do objeto abaixo, no formato "AAAA-MM": taxa_do_mês_em_percentual.
- * Não é preciso recalcular nada — o resto do sistema usa isso automaticamente.
- *
- * Exemplo: se a Selic de outubro/2026 for divulgada como 1,05%, adicione:
- *   '2026-10': 1.05,
+ * ATUALIZAÇÃO: AUTOMÁTICA, todo mês.
+ * Um workflow do GitHub Actions (.github/workflows/update-selic.yml, rodando
+ * scripts/update-selic.mjs) confere a série 4390 do Bacen alguns dias por
+ * mês e, assim que sai um mês novo, acrescenta a linha sozinho e publica —
+ * não precisa mais editar este arquivo manualmente. Se algum dia precisar
+ * adicionar um mês à mão (ex: o workflow ficou fora do ar), o formato é
+ * "AAAA-MM": taxa_do_mês_em_percentual, ex: '2026-10': 1.05,
  *
  * Fonte destes valores: Banco Central do Brasil, Sistema Gerenciador de Séries
  * Temporais (SGS), série 4390 "Taxa de juros - Selic acumulada no mês (%)"

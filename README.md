@@ -94,7 +94,9 @@ O relatório mostra a tabela mês a mês (REM.ATUAL, REM.ORIG, CPP, MULTA, SELIC
 
 **Senha de acesso (opcional, não é segurança de verdade):** defina `VITE_CALCULO_PASSCODE` nas variáveis de ambiente do Vercel para pedir uma senha simples antes de mostrar a página — serve só para evitar que alguém tropece na página por acaso. Se não definir nada, a página fica aberta para quem tiver o link. Para proteção de verdade, use a **Proteção por Senha** do próprio Vercel (Project Settings → Deployment Protection, disponível nos planos pagos).
 
-**Manutenção da tabela de Selic:** `src/data/selicMensal.ts` tem as taxas mensais do Bacen até 08/2026. Quando esse período se esgotar, adicione os meses seguintes no mesmo objeto `SELIC_MENSAL` (formato `"AAAA-MM": taxa_do_mes_em_percentual`), consultando https://www.bcb.gov.br/controleinflacao/historicotaxasjuros. Se faltar um mês na tabela para uma competência que você tentar calcular, a ferramenta mostra um erro em vez de calcular errado.
+**Manutenção da tabela de Selic — agora automática:** `src/data/selicMensal.ts` tem as taxas mensais do Bacen (série SGS 4390). Um workflow do GitHub Actions (`.github/workflows/update-selic.yml`, script `scripts/update-selic.mjs`) confere a API do Bacen alguns dias por mês e, assim que a Receita/Bacen divulga a Selic de um mês novo, acrescenta a linha sozinho e publica direto no `main` — o deploy do Vercel acontece automaticamente depois, como em qualquer outro commit. Não precisa mais editar esse arquivo à mão nem pedir pra ninguém atualizar. Se faltar um mês na tabela para uma competência que você tentar calcular (ex: o workflow ficou fora do ar por algum motivo), a ferramenta mostra um erro em vez de calcular errado — nesse caso, rode `node scripts/update-selic.mjs` manualmente ou acesse Actions → "Atualiza Selic mensal" → Run workflow no GitHub.
+
+**Para essa automação funcionar**, o repositório no GitHub precisa permitir que as Actions escrevam de volta nele: Settings → Actions → General → Workflow permissions → marque **"Read and write permissions"** e salve. Isso só precisa ser feito uma vez.
 
 ## Conectando um backend real para os leads
 
