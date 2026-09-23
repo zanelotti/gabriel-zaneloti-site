@@ -50,7 +50,7 @@ export function GuiaGratuito() {
             Guia gratuito · PDF
           </span>
           <h2 className="mt-5 text-3xl font-extrabold leading-tight text-white sm:text-4xl">
-            5 erros que fazem construtoras pagarem mais INSS de obra
+            5 erros que fazem pessoas físicas pagarem mais INSS de obra
           </h2>
           <p className="mt-4 max-w-lg text-navy-100">
             Ainda não está pronto para simular sua obra? Baixe este material gratuito e descubra, com base na

@@ -142,7 +142,7 @@ Dois PDFs diferentes, gerados com `pdf-lib` (biblioteca pura JS/TS, sem dependê
 
 ## Guia gratuito (lead magnet)
 
-Seção `GuiaGratuito.tsx` (entre "Urgência" e "FAQ" na página inicial): captura nome + WhatsApp de visitantes que ainda não estão prontos para preencher a calculadora completa, em troca do PDF estático `public/guia-gratuito-inss-obra.pdf` ("5 erros que fazem construtoras pagarem mais INSS de obra" — conteúdo educativo real, baseado nos mesmos 12 gatilhos legais usados no resto do site).
+Seção `GuiaGratuito.tsx` (entre "Urgência" e "FAQ" na página inicial): captura nome + WhatsApp de visitantes que ainda não estão prontos para preencher a calculadora completa, em troca do PDF estático `public/guia-gratuito-inss-obra.pdf` ("5 erros que fazem pessoas físicas pagarem mais INSS de obra" — conteúdo educativo real, baseado nos mesmos 12 gatilhos legais usados no resto do site). Para regenerar o PDF depois de editar o conteúdo, o script fonte é `build_guia_pdf.mjs` (raiz do projeto, usa `pdf-lib`; não roda em tempo de execução no site).
 
 - O download do PDF acontece imediatamente ao enviar o formulário (`src/services/guiaLeadService.ts`) — nunca espera a rede.
 - Em paralelo, a função serverless `/api/notify-guia-lead.js` grava o contato na tabela `guia_leads` do Supabase (separada de `leads`, já que ainda não é uma simulação completa) e avisa o Gabriel por e-mail — mesmas variáveis de ambiente já usadas por `/api/notify-lead.js` (`RESEND_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`).

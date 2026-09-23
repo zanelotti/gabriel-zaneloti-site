@@ -17,9 +17,10 @@ function UrgencyPoint({ titulo, descricao }: UrgencyPointProps) {
 
 /**
  * Seção de urgência legítima — baseada em fatos reais do próprio mecanismo de
- * cálculo (correção pela Selic, decadência de 5 anos, validade da CND), sem
- * apelar para medo forçado. Objetivo: mostrar que esperar tem um custo real e
- * mensurável, não criar pressão artificial.
+ * cálculo e das obrigações acessórias da obra (correção pela Selic, multa por
+ * falta de entrega da DCTFWeb, tratamento mais brando para quem regulariza
+ * por conta própria), sem apelar para medo forçado. Objetivo: mostrar que
+ * esperar tem um custo real e mensurável, não criar pressão artificial.
  */
 export function Urgencia() {
   return (
@@ -32,16 +33,16 @@ export function Urgencia() {
 
         <div className="mt-12 grid gap-5 sm:grid-cols-3">
           <UrgencyPoint
-            titulo="A dívida é corrigida mês a mês"
+            titulo="A dívida é corrigida por juros e correção mês a mês"
             descricao="Enquanto a obra não é regularizada, o valor presumido pela Receita Federal é atualizado pela taxa Selic todo mês — quanto mais tempo passa, maior fica o débito a ser negociado."
           />
           <UrgencyPoint
-            titulo="A decadência de 5 anos continua contando"
-            descricao="A Receita Federal perde o direito de cobrar valores após 5 anos do fato gerador. Esse prazo não para — quanto antes analisamos sua obra, maiores as chances de aproveitar competências que ainda estão dentro dessa janela."
+            titulo="A falta de entrega da DCTFWeb gera multa"
+            descricao="A DCTFWeb Aferição de Obras deve ser entregue enquanto a obra está em andamento. Deixar de entregá-la gera multa por atraso ou omissão — além de comprometer benefícios que dependem da entrega contínua, como o Fator de Ajuste."
           />
           <UrgencyPoint
-            titulo="A CND vale só 180 dias"
-            descricao="Depois de obtida, a Certidão Negativa de Débitos da obra tem validade de 180 dias. Se você está planejando vender, financiar ou averbar o imóvel, o momento de regularizar é antes de precisar dela com urgência."
+            titulo="Regularizar antes de ser fiscalizado evita multas maiores"
+            descricao="A legislação trata melhor quem regulariza por conta própria do que quem é autuado depois de uma fiscalização. Esperar aumenta o risco de a pendência virar um Auto de Infração, com cobrança mais pesada do que a regularização voluntária."
           />
         </div>
       </Container>
