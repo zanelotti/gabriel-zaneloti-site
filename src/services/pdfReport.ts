@@ -9,9 +9,12 @@
  *
  * IMPORTANTE: este PDF é público — nunca deve conter honorários. Por isso a
  * função só lê os campos "seguros" de INSSResult (inssEstimado,
- * valorAposReducao, percentualReducao, economiaEstimada, regimeApuracao) e
- * NUNCA toca em `result.detalheInterno` (onde ficam honorários/parcelamento),
- * mesmo que esse campo esteja presente no objeto em memória.
+ * valorAposReducao, percentualReducao, economiaEstimada, regimeApuracao,
+ * parcelamento) e NUNCA toca em `result.detalheInterno` (onde ficam
+ * honorários e o detalhamento mês a mês), mesmo que esse campo esteja
+ * presente no objeto em memória. `result.parcelamento` é diferente: só traz
+ * parcela mínima/quantidade/valor (sem honorários), e é seguro para exibição
+ * pública.
  *
  * Usa a biblioteca `pdf-lib` (pura JS/TS, roda no navegador sem dependências
  * nativas). O equivalente para o PDF interno (anexado ao e-mail do Gabriel,
@@ -451,6 +454,38 @@ export async function generateLeadPdfBytes(data: CalculatorData, result: INSSRes
       cursor.y -= 10;
     });
     cursor.y -= 4;
+
+    // ---- Parcelamento (só quando há saldo em atraso a parcelar) ----
+    if (result.parcelamento?.aplicavel) {
+      const p = result.parcelamento;
+      const parcelamentoTexto =
+        'A parte desse valor referente às competências em atraso na entrega da DCTFWeb pode ser parcelada ' +
+        `em até 60 vezes, com parcela mínima de ${formatCurrency(p.parcelaMinima)}, por débito automático em ` +
+        `conta corrente. Na sua simulação, isso equivaleria a aproximadamente ${p.numeroParcelas}x de ` +
+        `${formatCurrency(p.valorParcela)}.`;
+      const parcelamentoLines = wrapText(parcelamentoTexto, font, 8.5, CONTENT_WIDTH - 24);
+      const parcelamentoPanelHeight = 34 + parcelamentoLines.length * 12;
+
+      cursor.ensureSpace(parcelamentoPanelHeight + 10);
+      cursor.panel(parcelamentoPanelHeight, { fill: ACCENT_50, border: ACCENT_200, borderWidth: 1 });
+      cursor.page.drawText('DÁ PARA PARCELAR', {
+        x: MARGIN + 14,
+        y: cursor.y - 16,
+        size: 9,
+        font: fontBold,
+        color: ACCENT_700,
+      });
+      parcelamentoLines.forEach((line, index) => {
+        cursor.page.drawText(line, {
+          x: MARGIN + 14,
+          y: cursor.y - 30 - index * 12,
+          size: 8.5,
+          font,
+          color: NAVY_900,
+        });
+      });
+      cursor.y -= parcelamentoPanelHeight + 14;
+    }
   }
 
   cursor.line();

@@ -109,6 +109,16 @@ export interface INSSResult {
    * quando o resultado vem do caminho de segurança (`resultadoSeguro`).
    */
   detalheInterno?: INSSDetalheInterno;
+  /**
+   * Parcelamento estimado do saldo em atraso — DIFERENTE de `detalheInterno`,
+   * este campo é seguro e pensado para ser exibido ao cliente (ResultCard e
+   * PDF público): não contém honorários nem o detalhamento mês a mês, só
+   * parcela mínima (R$200 PF / R$500 PJ), quantidade de parcelas (máx. 60) e
+   * valor de cada uma. Ausente quando não há saldo em atraso a parcelar, ou
+   * quando o Fator de Ajuste não se aplica (PJ) / o caso exige análise manual
+   * (obra iniciada antes de 10/2021).
+   */
+  parcelamento?: ParcelamentoEstimado;
 }
 
 /**

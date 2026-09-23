@@ -190,6 +190,19 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
             <strong className="text-navy-800">Importante:</strong> este resultado é uma estimativa inicial e não
             substitui uma análise técnica e tributária da documentação da obra.
           </p>
+
+          {result.parcelamento?.aplicavel && (
+            <p className="mt-4 rounded-xl border border-accent-200 bg-accent-50 p-4 text-sm leading-relaxed text-navy-700">
+              <strong className="text-navy-900">💳 Dá para parcelar.</strong> A parte desse valor referente às
+              competências em atraso na entrega da DCTFWeb pode ser parcelada em até <strong>60 vezes</strong>, com
+              parcela mínima de <strong>{formatCurrency(result.parcelamento.parcelaMinima)}</strong>, por débito
+              automático em conta corrente. Na sua simulação, isso equivaleria a aproximadamente{' '}
+              <strong>
+                {result.parcelamento.numeroParcelas}x de {formatCurrency(result.parcelamento.valorParcela)}
+              </strong>
+              .
+            </p>
+          )}
         </>
       )}
 

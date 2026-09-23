@@ -150,6 +150,7 @@ export function calculateINSS(data: CalculatorData): INSSResult {
         'Esta é uma estimativa inicial, calculada com as mesmas mecânicas oficiais do INSS de obra (Fator de Ajuste, Selic, CPP, MAED) a partir da área e destinação informadas. Ela não substitui uma análise técnica e tributária da documentação da obra, que depende da RMT real apurada com as tabelas oficiais.',
       isEstimativaProvisoria: true,
       regimeApuracao,
+      parcelamento: fatorAjusteResult.parcelamento,
       detalheInterno: {
         rmt100: fatorAjusteResult.rmt100,
         percentualFator: fatorAjusteResult.percentualFator,

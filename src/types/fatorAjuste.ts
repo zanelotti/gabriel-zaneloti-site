@@ -39,9 +39,30 @@ export interface FatorAjusteMonthRow {
   mora: number;
   maed: number;
   total: number;
+  /**
+   * true quando o vencimento dessa competência (dia 20 do mês seguinte) já
+   * passou na data do cálculo — ou seja, é uma competência EM ATRASO. false
+   * para o mês em curso ou meses futuros (declaração ainda em dia). Só as
+   * competências em atraso entram na base do parcelamento (ver
+   * `ParcelamentoEstimado.totalParcelavel`) — débito ainda em dia não é
+   * "saldo em atraso" e por isso não é parcelável.
+   */
+  emAtraso: boolean;
 }
 
+/**
+ * Parcelamento do saldo em atraso, disponível no e-CAC após a transmissão da
+ * DCTFWeb Aferição de Obras: parcela mínima R$ 200,00 (pessoa física) ou
+ * R$ 500,00 (pessoa jurídica), no máximo 60 parcelas, e as parcelas são
+ * debitadas automaticamente em conta corrente. Só é parcelável o saldo das
+ * competências JÁ VENCIDAS (em atraso) — a parte do débito ainda em dia
+ * (mês corrente ou futuro) não entra nessa base.
+ */
 export interface ParcelamentoEstimado {
+  /** false quando não há nenhuma competência em atraso (nada a parcelar ainda). */
+  aplicavel: boolean;
+  /** Soma do TOTAL só das competências em atraso — a base sobre a qual o parcelamento é calculado. */
+  totalParcelavel: number;
   parcelaMinima: number;
   numeroParcelas: number;
   valorParcela: number;

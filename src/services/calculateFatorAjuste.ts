@@ -47,6 +47,12 @@ import { addMonths, calcularSelicAcumulada, compareCompetencia, toCompetenciaKey
  * 10/2021 do primeiro relatório (Selic 57,53%, CPP R$157,34, total R$379,33)
  * é reproduzida exatamente por este motor (obras dentro do prazo decadencial,
  * onde a decadência não altera nenhum dos números).
+ *
+ * PARCELAMENTO (disponível no e-CAC após a transmissão da DCTFWeb): parcela
+ * mínima R$200 (PF) / R$500 (PJ), no máximo 60 parcelas, débito automático em
+ * conta corrente — e só é parcelável o saldo das competências JÁ VENCIDAS (em
+ * atraso); a parte do débito ainda em dia (mês corrente/futuro) fica de fora
+ * dessa base (ver `emAtraso` em cada linha mensal e `totalEmAtraso` abaixo).
  * ============================================================================
  */
 
@@ -172,6 +178,7 @@ function calcularLinhaMensal(competencia: string, remAtual: number, referencia: 
       mora: 0,
       maed: 0,
       total: cpp,
+      emAtraso: false,
     };
   }
 
@@ -196,6 +203,7 @@ function calcularLinhaMensal(competencia: string, remAtual: number, referencia: 
     mora,
     maed,
     total,
+    emAtraso: true,
   };
 }
 
@@ -248,9 +256,18 @@ export function calculateFatorAjuste(input: FatorAjusteInput): FatorAjusteResult
   const honorarios = input.honorarios !== null && input.honorarios > 0 ? round2(input.honorarios) : null;
   const reducaoLiquida = honorarios !== null ? round2(reducao - honorarios) : null;
 
+  // Parcelamento: só é parcelável o saldo das competências JÁ VENCIDAS (em
+  // atraso) — a parte do débito ainda em dia (mês corrente/futuro, sem multa
+  // nem mora) não é "saldo em atraso" e por isso fica de fora dessa base.
+  // Regras do parcelamento no e-CAC, após a DCTFWeb: parcela mínima R$200
+  // (PF) / R$500 (PJ), no máximo 60 parcelas, débito automático em conta.
+  const totalEmAtraso = somarTotal(linhasComFator.filter((linha) => linha.emAtraso));
   const parcelaMinima = input.responsavel === 'PF' ? 200 : 500;
-  const numeroParcelas = Math.max(1, Math.min(60, Math.floor(totalComFator / parcelaMinima)));
-  const valorParcela = round2(totalComFator / numeroParcelas);
+  const parcelamentoAplicavel = totalEmAtraso > 0;
+  const numeroParcelas = parcelamentoAplicavel
+    ? Math.max(1, Math.min(60, Math.floor(totalEmAtraso / parcelaMinima)))
+    : 0;
+  const valorParcela = parcelamentoAplicavel ? round2(totalEmAtraso / numeroParcelas) : 0;
 
   return {
     areaM2: input.areaM2,
@@ -266,6 +283,8 @@ export function calculateFatorAjuste(input: FatorAjusteInput): FatorAjusteResult
     honorarios,
     reducaoLiquida,
     parcelamento: {
+      aplicavel: parcelamentoAplicavel,
+      totalParcelavel: totalEmAtraso,
       parcelaMinima,
       numeroParcelas,
       valorParcela,
