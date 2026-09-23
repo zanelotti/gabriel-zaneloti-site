@@ -19,7 +19,7 @@ export const EXEMPLOS_SIMULACAO: ExemploSimulacao[] = [
     perfilObra: 'Residencial unifamiliar, com DCTFWeb enviada desde o início da obra',
     area: '320 m²',
     situacao: 'Acompanhamento desde o início',
-    reducaoPercentual: 72,
+    reducaoPercentual: 70,
   },
   {
     id: 'multifamiliar',
