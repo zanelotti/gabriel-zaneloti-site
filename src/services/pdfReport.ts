@@ -390,10 +390,16 @@ export async function generateLeadPdfBytes(data: CalculatorData, result: INSSRes
     cursor.y -= explPanelHeight + 18;
   } else {
     // 4 cards em grade 2x2: linha de cima neutra, linha de baixo em destaque (accent) — mesmas cores do site.
-    cursor.ensureSpace(140);
+    // Quando há parcelamento aplicável, o card "Valor estimado após redução" ganha uma nota curta embaixo do
+    // valor (ex: "Podendo ser parcelado em até 28x de R$204,89") — por isso todos os cards da grade crescem
+    // juntos, pra manter o alinhamento, mesmo que só um deles use a linha extra.
+    const parcelamentoNota = result.parcelamento?.aplicavel
+      ? `Podendo ser parcelado em até ${result.parcelamento.numeroParcelas}x de ${formatCurrency(result.parcelamento.valorParcela)}`
+      : null;
+    cursor.ensureSpace(parcelamentoNota ? 152 : 140);
     const cardGap = 8;
     const cardWidth = (CONTENT_WIDTH - cardGap) / 2;
-    const cardHeight = 52;
+    const cardHeight = parcelamentoNota ? 64 : 52;
     const gridTop = cursor.y;
     const cells: Array<[string, string, boolean]> = [
       ['INSS estimado antes da análise', formatCurrency(result.inssEstimado), false],
@@ -423,6 +429,12 @@ export async function generateLeadPdfBytes(data: CalculatorData, result: INSSRes
         font: fontBold,
         color: highlight ? ACCENT_700 : NAVY_900,
       });
+      if (index === 1 && parcelamentoNota) {
+        const notaLines = wrapText(parcelamentoNota, font, 7, cardWidth - 24);
+        notaLines.forEach((line, lineIndex) => {
+          cursor.page.drawText(line, { x: x + 12, y: yTop - 51 - lineIndex * 9, size: 7, font, color: NAVY_500 });
+        });
+      }
     });
     cursor.y = gridTop - 2 * (cardHeight + cardGap) + cardGap - 6;
 
@@ -454,38 +466,6 @@ export async function generateLeadPdfBytes(data: CalculatorData, result: INSSRes
       cursor.y -= 10;
     });
     cursor.y -= 4;
-
-    // ---- Parcelamento (só quando há saldo em atraso a parcelar) ----
-    if (result.parcelamento?.aplicavel) {
-      const p = result.parcelamento;
-      const parcelamentoTexto =
-        'A parte desse valor referente às competências em atraso na entrega da DCTFWeb pode ser parcelada ' +
-        `em até 60 vezes, com parcela mínima de ${formatCurrency(p.parcelaMinima)}, por débito automático em ` +
-        `conta corrente. Na sua simulação, isso equivaleria a aproximadamente ${p.numeroParcelas}x de ` +
-        `${formatCurrency(p.valorParcela)}.`;
-      const parcelamentoLines = wrapText(parcelamentoTexto, font, 8.5, CONTENT_WIDTH - 24);
-      const parcelamentoPanelHeight = 34 + parcelamentoLines.length * 12;
-
-      cursor.ensureSpace(parcelamentoPanelHeight + 10);
-      cursor.panel(parcelamentoPanelHeight, { fill: ACCENT_50, border: ACCENT_200, borderWidth: 1 });
-      cursor.page.drawText('DÁ PARA PARCELAR', {
-        x: MARGIN + 14,
-        y: cursor.y - 16,
-        size: 9,
-        font: fontBold,
-        color: ACCENT_700,
-      });
-      parcelamentoLines.forEach((line, index) => {
-        cursor.page.drawText(line, {
-          x: MARGIN + 14,
-          y: cursor.y - 30 - index * 12,
-          size: 8.5,
-          font,
-          color: NAVY_900,
-        });
-      });
-      cursor.y -= parcelamentoPanelHeight + 14;
-    }
   }
 
   cursor.line();

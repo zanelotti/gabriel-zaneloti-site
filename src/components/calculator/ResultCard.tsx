@@ -27,9 +27,11 @@ interface StatCardProps {
   value: number;
   format: 'currency' | 'percent';
   tone: 'neutral' | 'highlight';
+  /** Nota curta opcional, exibida abaixo do valor (ex: informação de parcelamento). */
+  note?: string;
 }
 
-function StatCard({ label, value, format, tone }: StatCardProps) {
+function StatCard({ label, value, format, tone, note }: StatCardProps) {
   const animated = useCountUp(value, 1000);
   const display = format === 'currency' ? formatCurrency(animated) : formatPercent(animated);
 
@@ -43,6 +45,7 @@ function StatCard({ label, value, format, tone }: StatCardProps) {
       <p className={`mt-2 text-2xl font-extrabold sm:text-3xl ${tone === 'highlight' ? 'text-accent-700' : 'text-navy-900'}`}>
         {display}
       </p>
+      {note && <p className="mt-1 text-xs font-medium text-navy-500">{note}</p>}
     </div>
   );
 }
@@ -172,6 +175,13 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
               value={result.valorAposReducao}
               format="currency"
               tone="neutral"
+              note={
+                result.parcelamento?.aplicavel
+                  ? `Podendo ser parcelado em até ${result.parcelamento.numeroParcelas}x de ${formatCurrency(
+                      result.parcelamento.valorParcela
+                    )}`
+                  : undefined
+              }
             />
             <StatCard label="Redução estimada" value={result.percentualReducao} format="percent" tone="highlight" />
             <StatCard label="Economia estimada" value={result.economiaEstimada} format="currency" tone="highlight" />
@@ -190,19 +200,6 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
             <strong className="text-navy-800">Importante:</strong> este resultado é uma estimativa inicial e não
             substitui uma análise técnica e tributária da documentação da obra.
           </p>
-
-          {result.parcelamento?.aplicavel && (
-            <p className="mt-4 rounded-xl border border-accent-200 bg-accent-50 p-4 text-sm leading-relaxed text-navy-700">
-              <strong className="text-navy-900">💳 Dá para parcelar.</strong> A parte desse valor referente às
-              competências em atraso na entrega da DCTFWeb pode ser parcelada em até <strong>60 vezes</strong>, com
-              parcela mínima de <strong>{formatCurrency(result.parcelamento.parcelaMinima)}</strong>, por débito
-              automático em conta corrente. Na sua simulação, isso equivaleria a aproximadamente{' '}
-              <strong>
-                {result.parcelamento.numeroParcelas}x de {formatCurrency(result.parcelamento.valorParcela)}
-              </strong>
-              .
-            </p>
-          )}
         </>
       )}
 
