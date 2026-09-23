@@ -6,8 +6,8 @@ import { guiaLeadService } from '@/services/guiaLeadService';
 import { trackEvent } from '@/services/analytics';
 
 const ERROS_PREVIA = [
-  'Não guardar as notas fiscais de pré-moldado e concreto usinado',
-  'Deixar passar o prazo sem reunir provas da época da obra',
+  'Não reunir comprovantes de pagamento da mão de obra',
+  'Não registrar a paralisação da obra no SERO',
   'Declarar errado (ou esquecer) as áreas complementares',
   'Interromper a entrega da DCTFWeb durante a execução da obra',
   'Confundir contrato de empreitada total com contrato de administração',
