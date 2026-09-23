@@ -136,7 +136,20 @@ function buildWhatsAppLink(lead) {
   if (!digits) return null;
   // Assume DDD + número informados sem o 55 do Brasil, como o campo do site pede.
   const numero = digits.length <= 11 ? `55${digits}` : digits;
-  const texto = `Olá, ${lead.nome || ''}! Vi que você simulou a redução do INSS da sua obra no meu site.`;
+  const nome = lead.nome || '';
+
+  // Mensagem de abertura do roteiro de vendas (etapa 1). Só cita o valor de
+  // economia quando o cálculo automático rodou de fato (PF com regime eSocial
+  // "normal" — ver linhaResultado acima); nos casos sem cálculo automático
+  // (PJ, obra antes de 10/2021 etc.) cai numa abertura sem valor, em vez de
+  // mostrar "R$ Não calculado" na mensagem.
+  const temEconomia =
+    lead.economiaEstimada !== null && lead.economiaEstimada !== undefined && !Number.isNaN(Number(lead.economiaEstimada));
+
+  const texto = temEconomia
+    ? `Oi ${nome}, tudo bem? Aqui é o Gabriel, vi que você simulou a regularização do INSS da sua obra aqui no site. Pela sua área e tipo de construção, o valor de economia identificado foi de ${formatCurrency(lead.economiaEstimada)} em relação ao que a Receita cobraria sem revisão. Posso te explicar rapidinho de onde vem esse número?`
+    : `Oi ${nome}, tudo bem? Aqui é o Gabriel, vi que você simulou a regularização do INSS da sua obra aqui no site. Posso te explicar rapidinho como funciona a redução no seu caso?`;
+
   return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
 }
 
