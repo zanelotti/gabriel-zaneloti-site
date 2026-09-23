@@ -169,6 +169,42 @@ Página separada do site público (não linkada, `noindex`), protegida por login
 
 O SQL de criação da tabela `leads` (colunas, índices, trigger de `updated_at` e as policies de RLS) está documentado em `supabase_setup.sql`, na raiz do projeto — rode uma vez no SQL Editor do Supabase.
 
+## SDR automatizado (PILOTO — WhatsApp)
+
+Um robô conduz ativamente a conversa de vendas pelo WhatsApp com os leads
+que simulam na calculadora, seguindo o roteiro em `SDR_PLAYBOOK.md` (base
+técnica, gatilhos de venda, e a regra de nunca informar honorários — quem
+passa o valor é sempre o Gabriel, pessoalmente).
+
+**Fase atual: restrito a leads de teste.** Um trigger no banco (ver
+`supabase_setup.sql`, função `set_sdr_ativo()`) só liga `sdr_ativo = true`
+para leads cujo nome comece com "teste". Nenhum lead real é contatado
+automaticamente enquanto esse for o critério — para liberar depois do
+piloto validado, basta trocar essa função no Supabase (nenhum deploy de
+código necessário).
+
+**Como funciona por baixo:**
+
+- `/api/sdr-pending.js` (GET) — lista os leads ativos do SDR que precisam
+  de atenção, sem nunca expor `honorarios`/`valor_fechado`.
+- `/api/sdr-update.js` (POST) — grava o histórico da conversa e muda o
+  estado (`sdr_estado`); quando o estado vira `aguardando_gabriel`, dispara
+  um e-mail avisando que é hora de informar o valor ao cliente.
+- Ambos protegidos por um token fixo (header `x-sdr-token`), não pela chave
+  `service_role` sozinha — variável `SDR_API_TOKEN` no Vercel.
+- Um scheduled task (roda fora do site, no ambiente do Claude) consulta
+  `/api/sdr-pending` periodicamente, conduz a conversa no WhatsApp Web do
+  computador do Gabriel e grava o resultado em `/api/sdr-update`.
+- No CRM (`LeadDetailModal`), cada lead do piloto mostra um painel "SDR
+  automatizado" com o estado atual, o histórico da conversa, um botão para
+  pausar/reativar o robô manualmente, e o botão "Já informei os honorários
+  — retomar SDR" (aparece só quando o estado pede essa confirmação).
+
+**Configuração** (variável de ambiente nova, no Vercel):
+
+- `SDR_API_TOKEN` — token secreto compartilhado só com o scheduled task
+  (gere com `openssl rand -hex 24` ou similar).
+
 ## Pendências propositalmente deixadas para você
 
 - [x] Fórmula real do Fator de Ajuste — implementada em `/calculo.html` (ferramenta interna); o simulador público continua com a estimativa (mock), de propósito

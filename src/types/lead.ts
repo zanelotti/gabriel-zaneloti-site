@@ -13,6 +13,38 @@ import type {
  */
 export type LeadStatus = 'novo' | 'contatado' | 'proposta_enviada' | 'decidindo' | 'fechado' | 'perdido';
 
+/**
+ * Estados da conversa do SDR automatizado (piloto). Ver SDR_PLAYBOOK.md na
+ * raiz do projeto para o significado e o fluxo completo de cada um.
+ */
+export type SdrEstado =
+  | 'novo'
+  | 'aguardando_lead'
+  | 'follow_up_agendado'
+  | 'aguardando_gabriel'
+  | 'retomado_pos_honorarios'
+  | 'fechado'
+  | 'perdido'
+  | 'pausado';
+
+export const SDR_ESTADO_LABEL: Record<SdrEstado, string> = {
+  novo: 'Aguardando 1º contato',
+  aguardando_lead: 'Aguardando resposta do lead',
+  follow_up_agendado: 'Follow-up agendado',
+  aguardando_gabriel: 'Aguardando você informar os honorários',
+  retomado_pos_honorarios: 'Retomado — fechando',
+  fechado: 'Fechado pelo SDR',
+  perdido: 'Perdido',
+  pausado: 'Pausado manualmente',
+};
+
+/** Uma mensagem no histórico da conversa do SDR. */
+export interface SdrHistoricoEntry {
+  em: string;
+  de: 'bot' | 'lead' | 'gabriel' | 'sistema';
+  texto: string;
+}
+
 export const LEAD_STATUS_ORDER: LeadStatus[] = [
   'novo',
   'contatado',
@@ -74,6 +106,16 @@ export interface Lead {
   /** Honorários efetivamente cobrados do cliente nesse lead (uso interno, nunca exibido ao cliente). */
   honorarios?: number | null;
   updatedAt?: string;
+
+  // --------------------------------------------------------------------
+  // SDR automatizado (piloto) — acompanhamento ativo via WhatsApp.
+  // --------------------------------------------------------------------
+  /** Se o SDR está autorizado a conversar com esse lead (hoje: só leads de teste). */
+  sdrAtivo?: boolean;
+  sdrEstado?: SdrEstado;
+  /** Data combinada para o próximo follow-up (quando o lead disse "me chama dia X"). */
+  sdrProximoContato?: string | null;
+  sdrHistorico?: SdrHistoricoEntry[];
 }
 
 /** Dados necessários para criar um novo lead (tudo, exceto id/createdAt, gerados pelo serviço). */

@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Lead, LeadStatus } from '@/types/lead';
+import type { Lead, LeadStatus, SdrEstado, SdrHistoricoEntry } from '@/types/lead';
 
 /**
  * ============================================================================
@@ -38,6 +38,10 @@ interface LeadRow {
   valor_fechado: number | null;
   honorarios: number | null;
   updated_at: string;
+  sdr_ativo: boolean;
+  sdr_estado: SdrEstado;
+  sdr_proximo_contato: string | null;
+  sdr_historico: SdrHistoricoEntry[] | null;
 }
 
 function rowToLead(row: LeadRow): Lead {
@@ -67,6 +71,10 @@ function rowToLead(row: LeadRow): Lead {
     valorFechado: row.valor_fechado,
     honorarios: row.honorarios,
     updatedAt: row.updated_at,
+    sdrAtivo: row.sdr_ativo,
+    sdrEstado: row.sdr_estado,
+    sdrProximoContato: row.sdr_proximo_contato,
+    sdrHistorico: row.sdr_historico ?? [],
   };
 }
 
@@ -155,6 +163,34 @@ export const crmLeadService = {
   async deleteLead(id: string): Promise<void> {
     const client = requireClient();
     const { error } = await client.from('leads').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  /**
+   * Confirma que você já informou os honorários ao cliente pessoalmente —
+   * o SDR volta a conduzir a conversa a partir daqui (ver SDR_PLAYBOOK.md).
+   */
+  async retomarSdrPosHonorarios(id: string): Promise<void> {
+    const client = requireClient();
+    const { error } = await client
+      .from('leads')
+      .update({ sdr_estado: 'retomado_pos_honorarios' satisfies SdrEstado })
+      .eq('id', id);
+    if (error) throw error;
+
+    const { error: rpcError } = await client.rpc('sdr_append_historico', {
+      p_id: id,
+      p_entry: { de: 'sistema', texto: 'Gabriel confirmou que já informou os honorários ao cliente.' },
+    });
+    if (rpcError) throw rpcError;
+  },
+
+  /** Pausa (ou reativa) o SDR automatizado nesse lead — assume/devolve o controle da conversa. */
+  async setSdrAtivo(id: string, ativo: boolean, novoEstado?: SdrEstado): Promise<void> {
+    const client = requireClient();
+    const patch: { sdr_ativo: boolean; sdr_estado?: SdrEstado } = { sdr_ativo: ativo };
+    if (novoEstado) patch.sdr_estado = novoEstado;
+    const { error } = await client.from('leads').update(patch).eq('id', id);
     if (error) throw error;
   },
 };
