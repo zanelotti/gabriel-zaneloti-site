@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Lead, LeadStatus } from '@/types/lead';
+import type { GuiaLead, Lead, LeadStatus } from '@/types/lead';
 
 /**
  * ============================================================================
@@ -155,6 +155,52 @@ export const crmLeadService = {
   async deleteLead(id: string): Promise<void> {
     const client = requireClient();
     const { error } = await client.from('leads').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+/** Formato bruto de uma linha da tabela `guia_leads` no Supabase (snake_case). */
+interface GuiaLeadRow {
+  id: string;
+  nome: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  material: string | null;
+  created_at: string;
+}
+
+function rowToGuiaLead(row: GuiaLeadRow): GuiaLead {
+  return {
+    id: row.id,
+    nome: row.nome ?? '',
+    email: row.email ?? '',
+    whatsapp: row.whatsapp ?? '',
+    material: row.material ?? '',
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * Camada de dados dos contatos que baixaram algum guia gratuito em PDF
+ * (tabela `guia_leads`) — usada só pela aba "Guia" do CRM.
+ */
+export const crmGuiaLeadService = {
+  /** Lista todos os contatos que baixaram algum guia, mais recentes primeiro. */
+  async listGuiaLeads(): Promise<GuiaLead[]> {
+    const client = requireClient();
+    const { data, error } = await client
+      .from('guia_leads')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data as GuiaLeadRow[]).map(rowToGuiaLead);
+  },
+
+  /** Remove um contato (ex: teste, duplicado, spam). */
+  async deleteGuiaLead(id: string): Promise<void> {
+    const client = requireClient();
+    const { error } = await client.from('guia_leads').delete().eq('id', id);
     if (error) throw error;
   },
 };

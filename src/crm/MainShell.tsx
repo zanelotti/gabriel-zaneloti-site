@@ -1,22 +1,28 @@
 import { useEffect, useState } from 'react';
-import { crmAuth, crmLeadService } from '@/services/crmService';
-import type { Lead } from '@/types/lead';
+import { crmAuth, crmGuiaLeadService, crmLeadService } from '@/services/crmService';
+import type { GuiaLead, Lead } from '@/types/lead';
 import { BoardView } from './BoardView';
 import { DashboardView } from './DashboardView';
+import { GuiaLeadsView } from './GuiaLeadsView';
 
-type Tab = 'quadro' | 'dashboard';
+type Tab = 'quadro' | 'dashboard' | 'guia';
 
 export function MainShell() {
   const [tab, setTab] = useState<Tab>('quadro');
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [guiaLeads, setGuiaLeads] = useState<GuiaLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const reload = async () => {
     setError(null);
     try {
-      const data = await crmLeadService.listLeads();
-      setLeads(data);
+      const [leadsData, guiaLeadsData] = await Promise.all([
+        crmLeadService.listLeads(),
+        crmGuiaLeadService.listGuiaLeads(),
+      ]);
+      setLeads(leadsData);
+      setGuiaLeads(guiaLeadsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao carregar os leads.');
     } finally {
@@ -55,6 +61,14 @@ export function MainShell() {
               Dashboard
             </button>
             <button
+              onClick={() => setTab('guia')}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                tab === 'guia' ? 'bg-navy-900 text-white' : 'text-navy-500 hover:bg-navy-100'
+              }`}
+            >
+              Guia
+            </button>
+            <button
               onClick={() => crmAuth.signOut()}
               className="ml-2 rounded-full px-4 py-2 text-sm font-semibold text-navy-400 hover:bg-navy-100"
             >
@@ -73,6 +87,7 @@ export function MainShell() {
 
         {!loading && !error && tab === 'quadro' && <BoardView leads={leads} onChange={reload} />}
         {!loading && !error && tab === 'dashboard' && <DashboardView leads={leads} />}
+        {!loading && !error && tab === 'guia' && <GuiaLeadsView guiaLeads={guiaLeads} onChange={reload} />}
       </main>
     </div>
   );

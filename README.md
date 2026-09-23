@@ -133,7 +133,7 @@ Os eventos já disparados pelo site, via `trackEvent()`:
 - `whatsapp_clicked`
 - `faq_opened`
 - `pdf_baixado`
-- `guia_gratuito_baixado`
+- `guia_caminho_baixado`
 
 ## PDF de diagnóstico
 
@@ -144,16 +144,17 @@ Dois PDFs diferentes, gerados com `pdf-lib` (biblioteca pura JS/TS, sem dependê
 
 ## Guia gratuito (lead magnet)
 
-Seção `GuiaGratuito.tsx` (entre "Urgência" e "FAQ" na página inicial): captura nome + WhatsApp de visitantes que ainda não estão prontos para preencher a calculadora completa, em troca do PDF estático `public/guia-gratuito-inss-obra.pdf` ("5 erros que fazem pessoas físicas pagarem mais INSS de obra" — conteúdo educativo real, baseado nos mesmos 12 gatilhos legais usados no resto do site). Para regenerar o PDF depois de editar o conteúdo, o script fonte é `build_guia_pdf.mjs` (raiz do projeto, usa `pdf-lib`; não roda em tempo de execução no site).
+Seção `GuiaCaminho.tsx` (entre "Urgência" e "FAQ" na página inicial): captura nome + e-mail + WhatsApp de visitantes que ainda não estão prontos para preencher a calculadora completa, em troca do PDF estático `public/guia-caminho-regularizacao.pdf` ("O caminho da regularização da sua obra" — cronograma completo do processo, do levantamento até a CND/CPEND, com o que é feito pelo Gabriel, o que fica com o cliente e os documentos necessários em cada etapa).
 
 - O download do PDF acontece imediatamente ao enviar o formulário (`src/services/guiaLeadService.ts`) — nunca espera a rede.
 - Em paralelo, a função serverless `/api/notify-guia-lead.js` grava o contato na tabela `guia_leads` do Supabase (separada de `leads`, já que ainda não é uma simulação completa) e avisa o Gabriel por e-mail — mesmas variáveis de ambiente já usadas por `/api/notify-lead.js` (`RESEND_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`).
 - SQL da tabela `guia_leads` também está em `supabase_setup.sql`.
 - Para atualizar o conteúdo do PDF no futuro, edite o texto direto no arquivo estático em `public/` (ele não é gerado em tempo de execução, ao contrário dos PDFs de diagnóstico).
+- **E-mail capturado para remarketing**: o campo de e-mail existe especificamente para permitir campanhas de remarketing (Meta Ads Custom Audiences, Google Ads Customer Match). A lista completa (nome, e-mail, WhatsApp) fica disponível pra exportar em CSV na aba "Guia" do CRM interno (ver seção abaixo).
 
 ## Conteúdo
 
-Todo o conteúdo institucional (textos, serviços, FAQ, número de economia acumulada, dados de contato) foi extraído do site atual, https://www.gabrielzaneloti.com.br/, e reorganizado em uma estrutura mais moderna. Nenhuma informação sobre certificações, clientes ou depoimentos foi inventada — os "Exemplos de simulação" da página inicial são ilustrativos (rotulados como tal), não depoimentos de clientes reais. A página `/sobre.html` reaproveita apenas conteúdo já existente no site (nenhuma credencial nova foi inventada) — envie mais detalhes reais (formação, tempo de atuação, registro profissional) se quiser enriquecê-la.
+Todo o conteúdo institucional (textos, serviços, FAQ, número de economia acumulada, dados de contato) foi extraído do site atual, https://www.gabrielzaneloti.com.br/, e reorganizado em uma estrutura mais moderna. Nenhuma informação sobre certificações, clientes ou depoimentos foi inventada. A página `/sobre.html` reaproveita apenas conteúdo já existente no site (nenhuma credencial nova foi inventada) — envie mais detalhes reais (formação, tempo de atuação, registro profissional) se quiser enriquecê-la.
 
 ## CRM interno (`/crm.html`)
 
@@ -161,6 +162,7 @@ Página separada do site público (não linkada, `noindex`), protegida por login
 
 - **Quadro** — os leads em colunas por etapa do funil: `Novo → Contatado → Proposta enviada → Decidindo → Fechado / Perdido`. Clique num lead pra ver os detalhes da simulação, mudar a etapa, escrever anotações e (quando fechado) registrar o valor fechado.
 - **Dashboard** — funil de conversão, leads por mês, por estado e por tipo de obra, taxa de conversão e valor total fechado.
+- **Guia** (`GuiaLeadsView.tsx`) — planilha com nome, e-mail, WhatsApp e data de todo mundo que baixou o guia gratuito (tabela `guia_leads`, independente do funil de `leads`). Tem um botão "Baixar CSV" que exporta a lista inteira pronta pra subir num sistema de remarketing (Meta Ads Custom Audiences, Google Ads Customer Match).
 
 **Como funciona por baixo:** o site público continua gravando cada simulação na tabela `leads` do Supabase através da função serverless `/api/notify-lead.js` (chave `service_role`, ignora RLS). O CRM lê e atualiza essa mesma tabela pelo navegador, usando a chave `anon` — protegida por Row Level Security (só usuário autenticado lê/edita) e pelo login do Supabase Auth.
 
@@ -179,5 +181,5 @@ O SQL de criação da tabela `leads` (colunas, índices, trigger de `updated_at`
 - [x] Backend/CRM real para leads — Supabase + `/crm.html` (quadro por etapa do funil + dashboard com gráficos)
 - [ ] IDs de GA4 / Google Ads / Meta Pixel / Google Tag Manager (variáveis de ambiente no Vercel)
 - [ ] Domínio e deploy (Vercel, Netlify ou similar)
-- [ ] Depoimentos reais de clientes (opcional) — hoje a seção "Exemplos de simulação" é ilustrativa, de propósito; envie 2-3 casos reais (mesmo anonimizados) se quiser trocar
+- [ ] Depoimentos reais de clientes (opcional) — envie 2-3 casos reais (mesmo anonimizados) se quiser incluir uma seção de prova social
 - [ ] Mais detalhes reais para `/sobre.html` (formação, tempo de atuação, registro profissional) — a página já está no ar com o conteúdo real que já existia no site

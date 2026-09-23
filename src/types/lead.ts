@@ -78,3 +78,18 @@ export interface Lead {
 
 /** Dados necessários para criar um novo lead (tudo, exceto id/createdAt, gerados pelo serviço). */
 export type NewLeadInput = Omit<Lead, 'id' | 'createdAt'>;
+
+/**
+ * Representa um contato que baixou algum guia gratuito em PDF (tabela
+ * `guia_leads`, separada de `leads` — ainda não é uma simulação completa).
+ * Usado na aba "Guia" do CRM, principalmente para exportar nome + e-mail
+ * para campanhas de remarketing (Meta Ads / Google Ads).
+ */
+export interface GuiaLead {
+  id: string;
+  nome: string;
+  email: string;
+  whatsapp: string;
+  material: string;
+  createdAt: string;
+}

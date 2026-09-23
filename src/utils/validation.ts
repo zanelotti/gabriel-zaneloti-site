@@ -17,6 +17,11 @@ export function isValidWhatsApp(value: string): boolean {
   return true;
 }
 
+/** Validação simples de e-mail: formato `algo@algo.algo`, sem validar existência real da caixa. */
+export function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 /** Etapa 1 — Dados do cliente. */
 export function validateStep1(data: Pick<CalculatorData, 'nome' | 'whatsapp'>): FormErrors<CalculatorData> {
   const errors: FormErrors<CalculatorData> = {};

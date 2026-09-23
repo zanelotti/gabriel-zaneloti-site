@@ -81,23 +81,27 @@ create policy "Authenticated users can delete leads"
   using (true);
 
 -- ============================================================================
--- Tabela `guia_leads` — contatos que baixaram algum dos guias gratuitos em
--- PDF (hoje: "5 erros que fazem construtoras pagarem mais INSS de obra" e
--- "O caminho da regularização da sua obra"), captados pelas seções
--- GuiaGratuito / GuiaCaminho antes de fazerem uma simulação completa.
--- O campo `material` diferencia de qual PDF veio cada contato.
+-- Tabela `guia_leads` — contatos que baixaram o guia gratuito em PDF
+-- ("O caminho da regularização da sua obra"), captados pela seção
+-- GuiaCaminho antes de fazerem uma simulação completa. O campo `material`
+-- existe para diferenciar de qual PDF veio cada contato, caso outro guia
+-- seja adicionado no futuro. O e-mail é capturado especificamente para uso
+-- em campanhas de remarketing (Meta Ads / Google Ads) — ver seção "Guia
+-- gratuito" do CRM (aba "Guia"), que lista e exporta esses contatos em CSV.
 -- Gravada só pela função /api/notify-guia-lead.js (chave service_role).
 -- ============================================================================
 create table if not exists public.guia_leads (
   id text primary key,
   nome text,
+  email text,
   whatsapp text,
-  material text not null default 'guia-5-erros',
+  material text not null default 'guia-caminho-regularizacao',
   created_at timestamptz not null default now()
 );
 
--- Se a tabela `guia_leads` já existia antes deste campo ser adicionado, rode só esta linha:
--- alter table public.guia_leads add column if not exists material text not null default 'guia-5-erros';
+-- Se a tabela `guia_leads` já existia antes destes campos serem adicionados, rode só estas linhas:
+-- alter table public.guia_leads add column if not exists material text not null default 'guia-caminho-regularizacao';
+-- alter table public.guia_leads add column if not exists email text;
 
 create index if not exists guia_leads_created_at_idx on public.guia_leads (created_at desc);
 
@@ -106,5 +110,11 @@ alter table public.guia_leads enable row level security;
 drop policy if exists "Authenticated users can read guia_leads" on public.guia_leads;
 create policy "Authenticated users can read guia_leads"
   on public.guia_leads for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Authenticated users can delete guia_leads" on public.guia_leads;
+create policy "Authenticated users can delete guia_leads"
+  on public.guia_leads for delete
   to authenticated
   using (true);

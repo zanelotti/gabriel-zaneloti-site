@@ -7,16 +7,17 @@
  * notificação para o Gabriel (função serverless `/api/notify-guia-lead`) roda
  * em paralelo, fire-and-forget, e engole qualquer erro de rede.
  *
- * Um único serviço atende os dois materiais hoje disponíveis (identificados
- * pelo campo `material`, gravado junto no Supabase para diferenciar de qual
- * PDF veio cada contato).
+ * Preparado para atender mais de um material ao mesmo tempo (basta acrescentar
+ * uma entrada em `GUIAS`); o campo `material` é gravado junto no Supabase
+ * para diferenciar de qual PDF veio cada contato.
  * ============================================================================
  */
 
-export type GuiaMaterial = 'guia-5-erros' | 'guia-caminho-regularizacao';
+export type GuiaMaterial = 'guia-caminho-regularizacao';
 
 export interface GuiaLeadInput {
   nome: string;
+  email: string;
   whatsapp: string;
   material?: GuiaMaterial;
 }
@@ -27,10 +28,6 @@ interface GuiaConfig {
 }
 
 const GUIAS: Record<GuiaMaterial, GuiaConfig> = {
-  'guia-5-erros': {
-    pdfHref: '/guia-gratuito-inss-obra.pdf',
-    pdfDownloadName: 'guia-5-erros-inss-de-obra.pdf',
-  },
   'guia-caminho-regularizacao': {
     pdfHref: '/guia-caminho-regularizacao.pdf',
     pdfDownloadName: 'o-caminho-da-regularizacao.pdf',
@@ -63,7 +60,7 @@ function downloadGuiaPdf(material: GuiaMaterial): void {
 export const guiaLeadService = {
   /** Registra o interesse (best-effort) e dispara o download do guia. */
   capture(input: GuiaLeadInput): void {
-    const material = input.material ?? 'guia-5-erros';
+    const material = input.material ?? 'guia-caminho-regularizacao';
     notifyByEmail({ ...input, material });
     downloadGuiaPdf(material);
   },

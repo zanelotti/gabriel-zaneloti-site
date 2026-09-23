@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Container } from '@/components/ui/Container';
 import { maskWhatsApp } from '@/utils/formatters';
-import { isValidWhatsApp } from '@/utils/validation';
+import { isValidWhatsApp, isValidEmail } from '@/utils/validation';
 import { guiaLeadService } from '@/services/guiaLeadService';
 import { trackEvent } from '@/services/analytics';
 
@@ -20,15 +20,21 @@ const CONTEUDO_PREVIA = [
  */
 export function GuiaCaminho() {
   const [nome, setNome] = useState('');
+  const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
-  const [errors, setErrors] = useState<{ nome?: string; whatsapp?: string }>({});
+  const [errors, setErrors] = useState<{ nome?: string; email?: string; whatsapp?: string }>({});
   const [sent, setSent] = useState(false);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
 
-    const nextErrors: { nome?: string; whatsapp?: string } = {};
+    const nextErrors: { nome?: string; email?: string; whatsapp?: string } = {};
     if (!nome.trim()) nextErrors.nome = 'Informe seu nome.';
+    if (!email.trim()) {
+      nextErrors.email = 'Informe seu e-mail.';
+    } else if (!isValidEmail(email)) {
+      nextErrors.email = 'Informe um e-mail válido.';
+    }
     if (!whatsapp.trim()) {
       nextErrors.whatsapp = 'Informe seu WhatsApp.';
     } else if (!isValidWhatsApp(whatsapp)) {
@@ -38,7 +44,12 @@ export function GuiaCaminho() {
     if (Object.keys(nextErrors).length > 0) return;
 
     trackEvent('guia_caminho_baixado', { origem: 'secao_guia_caminho' });
-    guiaLeadService.capture({ nome: nome.trim(), whatsapp, material: 'guia-caminho-regularizacao' });
+    guiaLeadService.capture({
+      nome: nome.trim(),
+      email: email.trim(),
+      whatsapp,
+      material: 'guia-caminho-regularizacao',
+    });
     setSent(true);
   };
 
@@ -80,7 +91,7 @@ export function GuiaCaminho() {
           ) : (
             <form onSubmit={handleSubmit} noValidate>
               <h3 className="text-lg font-bold text-white">Baixe agora, sem custo</h3>
-              <p className="mt-1 text-sm text-navy-200">Só precisamos do seu nome e WhatsApp.</p>
+              <p className="mt-1 text-sm text-navy-200">Só precisamos do seu nome, e-mail e WhatsApp.</p>
 
               <div className="mt-5 space-y-4">
                 <div>
@@ -99,6 +110,25 @@ export function GuiaCaminho() {
                     aria-invalid={Boolean(errors.nome)}
                   />
                   {errors.nome && <p className="field-error">{errors.nome}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="guia-caminho-email" className="field-label text-navy-200">
+                    E-mail
+                  </label>
+                  <input
+                    id="guia-caminho-email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    className={`field-input ${errors.email ? 'field-input-error' : ''}`}
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    aria-invalid={Boolean(errors.email)}
+                  />
+                  {errors.email && <p className="field-error">{errors.email}</p>}
                 </div>
 
                 <div>

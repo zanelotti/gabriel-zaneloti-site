@@ -2,10 +2,9 @@
  * ============================================================================
  *  FUNÇÃO SERVERLESS (Vercel) — CAPTURA DO "GUIA GRATUITO" (lead magnet)
  * ============================================================================
- * Chamada pelo frontend (`guiaLeadService.ts`) quando alguém baixa o guia
- * gratuito em PDF pela seção "5 erros que fazem construtoras pagarem mais
- * INSS de obra". Faz duas coisas, em paralelo, cada uma independente da
- * outra:
+ * Chamada pelo frontend (`guiaLeadService.ts`) quando alguém baixa algum dos
+ * guias gratuitos em PDF do site. Faz duas coisas, em paralelo, cada uma
+ * independente da outra:
  *   1. Envia um e-mail simples para o Gabriel avisando do novo interessado.
  *   2. Grava o registro numa tabela própria do Supabase (`guia_leads`),
  *      separada da tabela `leads` do funil principal — este contato ainda
@@ -21,12 +20,11 @@
 const DEFAULT_NOTIFICATION_EMAIL = 'comercial.mfzeng@gmail.com';
 
 const MATERIAIS = {
-  'guia-5-erros': '5 erros que fazem pessoas físicas pagarem mais INSS de obra',
   'guia-caminho-regularizacao': 'O caminho da regularização da sua obra',
 };
 
 function materialLabel(material) {
-  return MATERIAIS[material] || MATERIAIS['guia-5-erros'];
+  return MATERIAIS[material] || MATERIAIS['guia-caminho-regularizacao'];
 }
 
 function escapeHtml(value) {
@@ -61,8 +59,9 @@ async function saveToSupabase(guiaLead) {
       body: JSON.stringify({
         id: generateId(),
         nome: guiaLead.nome ?? null,
+        email: guiaLead.email ?? null,
         whatsapp: guiaLead.whatsapp ?? null,
-        material: guiaLead.material || 'guia-5-erros',
+        material: guiaLead.material || 'guia-caminho-regularizacao',
         created_at: new Date().toISOString(),
       }),
     });
@@ -89,6 +88,7 @@ async function sendEmail(guiaLead) {
 
   const toEmail = process.env.LEAD_NOTIFICATION_EMAIL || DEFAULT_NOTIFICATION_EMAIL;
   const nome = escapeHtml(guiaLead.nome || 'Sem nome');
+  const leadEmail = escapeHtml(guiaLead.email || 'Sem e-mail');
   const whatsapp = escapeHtml(guiaLead.whatsapp || 'Sem WhatsApp');
   const material = escapeHtml(materialLabel(guiaLead.material));
 
@@ -107,6 +107,7 @@ async function sendEmail(guiaLead) {
         html: `
           <div style="font-family:sans-serif;font-size:14px;color:#0f1638;">
             <p><strong>${nome}</strong> baixou o guia gratuito "${material}".</p>
+            <p>E-mail: ${leadEmail}</p>
             <p>WhatsApp: ${whatsapp}</p>
             <p style="color:#7c8ab0;font-size:12px;">Este é um contato ainda sem simulação completa — considere fazer um follow-up.</p>
           </div>
