@@ -118,6 +118,12 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
             </p>
           </div>
           <div>
+            <p className="text-xs font-semibold uppercase text-navy-400">Honorários estimados (12%)</p>
+            <p className="font-medium text-navy-800">
+              {lead.economiaEstimada !== null ? formatCurrency(lead.economiaEstimada * 0.12) : '—'}
+            </p>
+          </div>
+          <div>
             <p className="text-xs font-semibold uppercase text-navy-400">Recebido em</p>
             <p className="font-medium text-navy-800">
               {new Date(lead.createdAt).toLocaleDateString('pt-BR')}
@@ -165,7 +171,7 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
               />
             </div>
             <div>
-              <label className="field-label">Meus honorários (R$)</label>
+              <label className="field-label">Meus honorários (valor real, R$)</label>
               <input
                 type="number"
                 step="0.01"

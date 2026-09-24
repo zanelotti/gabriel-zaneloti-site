@@ -27,6 +27,16 @@ export function DashboardView({ leads }: DashboardViewProps) {
   const valorTotalFechado = fechados.reduce((sum, l) => sum + (l.valorFechado ?? 0), 0);
   const honorariosTotais = fechados.reduce((sum, l) => sum + (l.honorarios ?? 0), 0);
 
+  // Honorários estimados (12% da economia) dos leads ainda em aberto — dá uma
+  // ideia do potencial do funil, diferente de "Meus honorários" (valor real,
+  // só preenchido quando o lead já está fechado).
+  const honorariosPotenciais = leads
+    .filter((l) => {
+      const status = l.status ?? 'novo';
+      return status !== 'fechado' && status !== 'perdido' && l.economiaEstimada !== null;
+    })
+    .reduce((sum, l) => sum + (l.economiaEstimada ?? 0) * 0.12, 0);
+
   const agora = new Date();
   const inicioDoMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
   const leadsEsteMes = leads.filter((l) => new Date(l.createdAt) >= inicioDoMes).length;
@@ -102,6 +112,11 @@ export function DashboardView({ leads }: DashboardViewProps) {
         />
         <StatTile label="Valor fechado" value={formatCurrency(valorTotalFechado)} accent="accent" />
         <StatTile label="Meus honorários" value={formatCurrency(honorariosTotais)} accent="accent" />
+        <StatTile
+          label="Honorários em aberto (12% est.)"
+          value={formatCurrency(honorariosPotenciais)}
+          hint="Leads ainda não fechados"
+        />
       </div>
 
       <div className="card">
