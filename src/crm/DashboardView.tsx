@@ -21,7 +21,8 @@ export function DashboardView({ leads }: DashboardViewProps) {
   const total = leads.length;
   const fechados = leads.filter((l) => (l.status ?? 'novo') === 'fechado');
   const perdidos = leads.filter((l) => (l.status ?? 'novo') === 'perdido');
-  const emAndamento = total - fechados.length - perdidos.length;
+  const semResposta = leads.filter((l) => (l.status ?? 'novo') === 'sem_resposta');
+  const emAndamento = total - fechados.length - perdidos.length - semResposta.length;
 
   const taxaConversao = total > 0 ? (fechados.length / total) * 100 : 0;
   const valorTotalFechado = fechados.reduce((sum, l) => sum + (l.valorFechado ?? 0), 0);
@@ -29,11 +30,12 @@ export function DashboardView({ leads }: DashboardViewProps) {
 
   // Honorários estimados (12% da economia) dos leads ainda em aberto — dá uma
   // ideia do potencial do funil, diferente de "Meus honorários" (valor real,
-  // só preenchido quando o lead já está fechado).
+  // só preenchido quando o lead já está fechado). Não conta leads "sem
+  // resposta" nem "perdido".
   const honorariosPotenciais = leads
     .filter((l) => {
       const status = l.status ?? 'novo';
-      return status !== 'fechado' && status !== 'perdido' && l.economiaEstimada !== null;
+      return status !== 'fechado' && status !== 'perdido' && status !== 'sem_resposta' && l.economiaEstimada !== null;
     })
     .reduce((sum, l) => sum + (l.economiaEstimada ?? 0) * 0.12, 0);
 
@@ -104,6 +106,7 @@ export function DashboardView({ leads }: DashboardViewProps) {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile label="Total de leads" value={String(total)} hint={`${leadsEsteMes} este mês`} />
         <StatTile label="Em andamento" value={String(emAndamento)} />
+        <StatTile label="Sem resposta" value={String(semResposta.length)} />
         <StatTile
           label="Taxa de conversão"
           value={formatPercent(taxaConversao)}

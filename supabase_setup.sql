@@ -26,7 +26,7 @@ create table if not exists public.leads (
 
   -- Campos do CRM
   status text not null default 'novo'
-    check (status in ('novo', 'contatado', 'proposta_enviada', 'decidindo', 'fechado', 'perdido')),
+    check (status in ('novo', 'contatado', 'sem_resposta', 'proposta_enviada', 'decidindo', 'fechado', 'perdido')),
   notas text,
   valor_fechado numeric,
   honorarios numeric,
@@ -35,6 +35,13 @@ create table if not exists public.leads (
 
 -- Se a tabela `leads` já existia antes deste campo ser adicionado, rode só esta linha:
 -- alter table public.leads add column if not exists honorarios numeric;
+
+-- Se a tabela `leads` já existia antes do status 'sem_resposta' ser adicionado
+-- (coluna "Sem resposta" do quadro, para leads contatados que não respondem
+-- no WhatsApp), rode estas duas linhas para liberar esse novo valor:
+-- alter table public.leads drop constraint if exists leads_status_check;
+-- alter table public.leads add constraint leads_status_check
+--   check (status in ('novo', 'contatado', 'sem_resposta', 'proposta_enviada', 'decidindo', 'fechado', 'perdido'));
 
 create index if not exists leads_status_idx on public.leads (status);
 create index if not exists leads_created_at_idx on public.leads (created_at desc);
