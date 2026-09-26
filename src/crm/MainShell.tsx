@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
-import { crmAuth, crmGuiaLeadService, crmLeadService } from '@/services/crmService';
+import { crmAuth, crmGuiaLeadService, crmLeadService, crmTrafficService } from '@/services/crmService';
+import type { PageView } from '@/services/crmService';
 import type { GuiaLead, Lead } from '@/types/lead';
 import { BoardView } from './BoardView';
 import { DashboardView } from './DashboardView';
 import { GuiaLeadsView } from './GuiaLeadsView';
+import { TrafficView } from './TrafficView';
 
-type Tab = 'quadro' | 'dashboard' | 'guia';
+type Tab = 'quadro' | 'dashboard' | 'guia' | 'trafego';
 
 export function MainShell() {
   const [tab, setTab] = useState<Tab>('quadro');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [guiaLeads, setGuiaLeads] = useState<GuiaLead[]>([]);
+  const [pageViews, setPageViews] = useState<PageView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +30,16 @@ export function MainShell() {
       setError(err instanceof Error ? err.message : 'Falha ao carregar os leads.');
     } finally {
       setLoading(false);
+    }
+
+    // Tráfego é carregado à parte: se a tabela `page_views` ainda não existir
+    // no Supabase (supabase_setup.sql não rodado ainda), isso não deve travar
+    // o resto do CRM (quadro, dashboard, guia).
+    try {
+      const pageViewsData = await crmTrafficService.listPageViews();
+      setPageViews(pageViewsData);
+    } catch {
+      setPageViews([]);
     }
   };
 
@@ -69,6 +82,14 @@ export function MainShell() {
               Guia
             </button>
             <button
+              onClick={() => setTab('trafego')}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                tab === 'trafego' ? 'bg-navy-900 text-white' : 'text-navy-500 hover:bg-navy-100'
+              }`}
+            >
+              Tráfego
+            </button>
+            <button
               onClick={() => crmAuth.signOut()}
               className="ml-2 rounded-full px-4 py-2 text-sm font-semibold text-navy-400 hover:bg-navy-100"
             >
@@ -88,6 +109,7 @@ export function MainShell() {
         {!loading && !error && tab === 'quadro' && <BoardView leads={leads} onChange={reload} />}
         {!loading && !error && tab === 'dashboard' && <DashboardView leads={leads} />}
         {!loading && !error && tab === 'guia' && <GuiaLeadsView guiaLeads={guiaLeads} onChange={reload} />}
+        {!loading && !error && tab === 'trafego' && <TrafficView pageViews={pageViews} />}
       </main>
     </div>
   );

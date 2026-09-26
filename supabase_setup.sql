@@ -125,3 +125,41 @@ create policy "Authenticated users can delete guia_leads"
   on public.guia_leads for delete
   to authenticated
   using (true);
+
+-- ============================================================================
+-- Tabela `page_views` — tráfego do site público (visualizações de página),
+-- pra acompanhar visitantes sem depender de um plano pago de analytics.
+-- Cada visita às páginas públicas (home, sobre, privacidade, termos) grava
+-- uma linha aqui. Gravada só pela função /api/track-pageview.js (chave
+-- service_role) — o navegador nunca escreve direto nesta tabela, mesmo
+-- padrão de segurança das tabelas `leads` e `guia_leads` acima. Lida pela
+-- aba "Tráfego" do CRM.
+-- ============================================================================
+create table if not exists public.page_views (
+  id bigint generated always as identity primary key,
+  path text not null,
+  referrer text,
+  utm_source text,
+  utm_medium text,
+  utm_campaign text,
+  visitor_id text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists page_views_created_at_idx on public.page_views (created_at desc);
+create index if not exists page_views_path_idx on public.page_views (path);
+create index if not exists page_views_visitor_id_idx on public.page_views (visitor_id);
+
+alter table public.page_views enable row level security;
+
+drop policy if exists "Authenticated users can read page_views" on public.page_views;
+create policy "Authenticated users can read page_views"
+  on public.page_views for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Authenticated users can delete page_views" on public.page_views;
+create policy "Authenticated users can delete page_views"
+  on public.page_views for delete
+  to authenticated
+  using (true);

@@ -204,3 +204,64 @@ export const crmGuiaLeadService = {
     if (error) throw error;
   },
 };
+
+/** Formato bruto de uma linha da tabela `page_views` no Supabase (snake_case). */
+interface PageViewRow {
+  id: number;
+  path: string;
+  referrer: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  visitor_id: string | null;
+  created_at: string;
+}
+
+/** Uma visualização de página (tráfego do site público), lida da tabela `page_views`. */
+export interface PageView {
+  id: number;
+  path: string;
+  referrer: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  visitorId: string | null;
+  createdAt: string;
+}
+
+function rowToPageView(row: PageViewRow): PageView {
+  return {
+    id: row.id,
+    path: row.path,
+    referrer: row.referrer,
+    utmSource: row.utm_source,
+    utmMedium: row.utm_medium,
+    utmCampaign: row.utm_campaign,
+    visitorId: row.visitor_id,
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * Camada de dados do tráfego do site (tabela `page_views`) — usada só pela
+ * aba "Tráfego" do CRM. Gravada só pela função serverless
+ * `/api/track-pageview.js` (chave service_role); aqui só lemos.
+ */
+export const crmTrafficService = {
+  /** Últimos 180 dias de visualizações, mais recentes primeiro (limite de segurança: 20.000 linhas). */
+  async listPageViews(): Promise<PageView[]> {
+    const client = requireClient();
+    const desde = new Date();
+    desde.setDate(desde.getDate() - 180);
+
+    const { data, error } = await client
+      .from('page_views')
+      .select('*')
+      .gte('created_at', desde.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(20000);
+
+    if (error) throw error;
+    return (data as PageViewRow[]).map(rowToPageView);
+  },
+};
