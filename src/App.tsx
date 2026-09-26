@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Hero } from '@/components/Hero';
@@ -32,6 +33,7 @@ function App() {
       </main>
       <Footer />
       <WhatsAppButton />
+      <Analytics />
     </div>
   );
 }
