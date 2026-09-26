@@ -1,4 +1,5 @@
 import type { Lead, NewLeadInput } from '@/types/lead';
+import type { CalculatorData, INSSResult } from '@/types/calculator';
 
 /**
  * ============================================================================
@@ -118,6 +119,33 @@ function notifyByEmail(lead: Lead): void {
   });
 }
 
+/**
+ * Avisa o Gabriel por e-mail quando um lead baixa o PDF de diagnóstico do
+ * resultado — um segundo sinal de interesse, mais forte que só simular. Não
+ * grava um novo registro (o lead já existe desde o fim da simulação, via
+ * `createLead`) — é só uma notificação extra, com o WhatsApp do cliente já
+ * preenchido e um roteiro de próximos passos pro Gabriel. Fire-and-forget,
+ * mesmo padrão de `notifyByEmail`: nunca deve atrapalhar o download do PDF
+ * em si.
+ */
+function notifyPdfDownload(data: CalculatorData, result: INSSResult): void {
+  if (typeof fetch === 'undefined') return;
+  const payload = {
+    ...data,
+    ...result,
+    evento: 'pdf_baixado',
+    createdAt: new Date().toISOString(),
+  };
+  fetch('/api/notify-lead', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch(() => {
+    // Mesma lógica do notifyByEmail: falha de rede etc. não deve gerar
+    // nenhum erro visível pro visitante, que já conseguiu baixar o PDF.
+  });
+}
+
 export const leadService = {
   /** Cria e persiste um novo lead a partir dos dados da simulação + resultado. */
   async createLead(input: NewLeadInput): Promise<Lead> {
@@ -130,4 +158,6 @@ export const leadService = {
   async listLeads(): Promise<Lead[]> {
     return activeAdapter.list();
   },
+
+  notifyPdfDownload,
 };
