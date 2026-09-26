@@ -154,29 +154,6 @@ function buildWhatsAppLink(lead) {
 }
 
 /**
- * Mesma ideia de `buildWhatsAppLink`, mas para o evento "baixou o PDF de
- * diagnóstico" — o lead já demonstrou interesse ao simular, e baixar o PDF é
- * um segundo sinal, mais forte, de que está considerando regularizar a obra.
- * A mensagem referencia esse download específico em vez de "vi que você
- * simulou", para soar como continuidade natural da jornada dele no site.
- */
-function buildWhatsAppLinkPdfBaixado(lead) {
-  const digits = onlyDigits(lead.whatsapp);
-  if (!digits) return null;
-  const numero = digits.length <= 11 ? `55${digits}` : digits;
-  const nome = lead.nome || '';
-
-  const temEconomia =
-    lead.economiaEstimada !== null && lead.economiaEstimada !== undefined && !Number.isNaN(Number(lead.economiaEstimada));
-
-  const texto = temEconomia
-    ? `Oi ${nome}, tudo bem? Aqui é o Gabriel. Vi que você baixou o diagnóstico da sua simulação do INSS da obra aqui no site — pelo que você preencheu, a economia estimada foi de ${formatCurrency(lead.economiaEstimada)} em relação ao que a Receita cobraria sem nenhuma revisão. Você chegou a bater o olho no PDF? Posso te explicar rapidinho como dá pra regularizar a obra a partir desse resultado.`
-    : `Oi ${nome}, tudo bem? Aqui é o Gabriel. Vi que você baixou o diagnóstico da sua simulação do INSS da obra aqui no site. Posso te explicar rapidinho como funciona a regularização no seu caso?`;
-
-  return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
-}
-
-/**
  * Renderiza o detalhamento interno do cálculo (lançamentos mensais + honorários
  * de 12% sobre a economia + redução líquida), no mesmo formato dos relatórios
  * internos do Gabriel (`/calculo.html`). Só aparece para quem recebe este
@@ -275,24 +252,6 @@ function buildDetalheInternoHtml(lead) {
         Cálculos com base no desconto de 50% da multa da MAED, para pagamentos em até 30 dias. Este detalhamento é só
         para uso interno — nunca aparece para quem preenche a calculadora no site.
       </p>
-    </div>`;
-}
-
-/**
- * Bloco de orientação exibido SÓ no e-mail do evento "pdf_baixado" — um
- * roteiro curto pro Gabriel seguir de acordo com a resposta do lead no
- * WhatsApp. Uso interno, nunca aparece pro cliente.
- */
-function buildRoteiroPdfBaixadoHtml() {
-  return `
-    <div style="margin:20px 0 0;padding:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
-      <p style="margin:0 0 8px;font-weight:700;color:#1e3a8a;font-size:13px;text-transform:uppercase;letter-spacing:.03em;">📋 Roteiro rápido — próximos passos</p>
-      <ul style="margin:0;padding-left:18px;color:#1e40af;font-size:13px;line-height:1.6;">
-        <li style="margin-bottom:8px;"><strong>Confirmou interesse / quer saber mais:</strong> explique que a economia é calculada comparando o valor cheio que a Receita cobraria (sem nenhuma redução) com o valor final que ele pagaria depois de aplicadas as reduções cabíveis à obra dele; seu honorário é de 12% sobre essa economia comprovada.</li>
-        <li style="margin-bottom:8px;"><strong>Perguntou quanto custa a análise:</strong> deixe claro que a análise inicial não tem custo — o valor só é definido depois de a economia estar confirmada.</li>
-        <li style="margin-bottom:8px;"><strong>Não respondeu em 1-2 dias:</strong> mande um segundo contato mais direto, retomando o valor de economia identificado na simulação.</li>
-        <li><strong>Disse que vai resolver por conta própria ou vai pensar:</strong> reforce, sem pressionar, que a pendência é corrigida pela Selic mês a mês e que, sem a regularização, não é possível emitir a certidão negativa (CND) necessária para vender, financiar ou dar baixa no imóvel.</li>
-      </ul>
     </div>`;
 }
 
@@ -503,8 +462,7 @@ function determinarRegimeApuracao(dataInicio) {
   return 'gfip_anterior_2021';
 }
 
-function buildEmailHtml(lead, evento) {
-  const isPdfBaixado = evento === 'pdf_baixado';
+function buildEmailHtml(lead) {
   const regimeApuracao = determinarRegimeApuracao(lead.dataInicio);
   // Fator de Ajuste (IN RFB nº 2.021/2021, art. 33) só se aplica a Pessoa
   // Física — mesma regra usada no ResultCard.tsx do site.
@@ -544,7 +502,7 @@ function buildEmailHtml(lead, evento) {
           </tr>
         </table>`;
 
-  const whatsappLink = isPdfBaixado ? buildWhatsAppLinkPdfBaixado(lead) : buildWhatsAppLink(lead);
+  const whatsappLink = buildWhatsAppLink(lead);
 
   const linhas = [
     ['Nome', lead.nome || 'Não informado'],
@@ -575,18 +533,10 @@ function buildEmailHtml(lead, evento) {
     )
     .join('');
 
-  const heading = isPdfBaixado ? 'Lead baixou o diagnóstico em PDF 📄' : 'Nova simulação no site 🎯';
-  const introText = isPdfBaixado
-    ? `${escapeHtml(lead.nome || 'Alguém')} acabou de baixar o PDF com o diagnóstico da simulação — é um sinal forte de que está considerando regularizar a obra.`
-    : `${escapeHtml(lead.nome || 'Alguém')} acabou de preencher a calculadora de INSS de obras.`;
-  const rodapeTexto = isPdfBaixado
-    ? `PDF baixado em ${new Date(lead.createdAt || Date.now()).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (horário de Brasília).`
-    : `Simulação recebida em ${new Date(lead.createdAt || Date.now()).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (horário de Brasília).`;
-
   return `
     <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#111827;">
-      <h2 style="margin:0 0 4px;font-size:20px;">${heading}</h2>
-      <p style="margin:0 0 20px;color:#6b7280;font-size:14px;">${introText}</p>
+      <h2 style="margin:0 0 4px;font-size:20px;">Nova simulação no site 🎯</h2>
+      <p style="margin:0 0 20px;color:#6b7280;font-size:14px;">${escapeHtml(lead.nome || 'Alguém')} acabou de preencher a calculadora de INSS de obras.</p>
       ${avisoPJ}
       ${avisoGfipAnterior}
       ${linhaResultado}
@@ -598,8 +548,7 @@ function buildEmailHtml(lead, evento) {
           ? `<a href="${whatsappLink}" style="display:inline-block;background:#22c55e;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 20px;border-radius:8px;">Chamar ${escapeHtml(lead.nome || 'lead')} no WhatsApp</a>`
           : ''
       }
-      ${isPdfBaixado ? buildRoteiroPdfBaixadoHtml() : ''}
-      <p style="margin:24px 0 0;color:#9ca3af;font-size:12px;">${rodapeTexto}</p>
+      <p style="margin:24px 0 0;color:#9ca3af;font-size:12px;">Simulação recebida em ${new Date(lead.createdAt || Date.now()).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} (horário de Brasília).</p>
       ${buildDetalheInternoHtml(lead)}
     </div>`;
 }
@@ -669,7 +618,7 @@ async function saveToSupabase(lead) {
 }
 
 /** Envia o e-mail de notificação via Resend. Retorna sempre um resultado, nunca lança. */
-async function sendEmail(lead, evento) {
+async function sendEmail(lead) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.error('[notify-lead] RESEND_API_KEY não configurada no projeto Vercel.');
@@ -697,11 +646,8 @@ async function sendEmail(lead, evento) {
         from: 'Simulador INSS de Obras <onboarding@resend.dev>',
         to: [toEmail],
         reply_to: toEmail,
-        subject:
-          evento === 'pdf_baixado'
-            ? `📄 Baixou o PDF: ${lead.nome || 'Visitante do site'}`
-            : `Nova simulação: ${lead.nome || 'Visitante do site'}`,
-        html: buildEmailHtml(lead, evento),
+        subject: `Nova simulação: ${lead.nome || 'Visitante do site'}`,
+        html: buildEmailHtml(lead),
         ...(attachments ? { attachments } : {}),
       }),
     });
@@ -748,18 +694,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  // 'pdf_baixado' = o lead baixou o PDF de diagnóstico depois de já ter
-  // simulado — o registro dele já existe no Supabase desde o fim da
-  // simulação, então aqui só disparamos o e-mail extra (com o roteiro e o
-  // WhatsApp já preenchido), sem gravar uma segunda linha duplicada.
-  const evento = lead.evento === 'pdf_baixado' ? 'pdf_baixado' : 'simulacao';
-
   // As duas integrações rodam em paralelo e são independentes: uma falhar
   // (ou ainda não estar configurada) não afeta a outra.
-  const [email, db] = await Promise.all([
-    sendEmail(lead, evento),
-    evento === 'pdf_baixado' ? Promise.resolve({ ok: true, reason: 'skipped_pdf_baixado' }) : saveToSupabase(lead),
-  ]);
+  const [email, db] = await Promise.all([sendEmail(lead), saveToSupabase(lead)]);
 
   res.status(200).json({ ok: email.ok || db.ok, email, db });
 }

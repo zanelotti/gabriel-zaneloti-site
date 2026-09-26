@@ -5,7 +5,6 @@ import { formatArea, formatCurrency, formatDateBR, formatPercent } from '@/utils
 import { generateWhatsAppMessage } from '@/services/whatsapp';
 import { trackEvent } from '@/services/analytics';
 import { downloadLeadPdf } from '@/services/pdfReport';
-import { leadService } from '@/services/leadService';
 import { BeforeAfterBars } from './BeforeAfterBars';
 import { PostSaleTimeline } from './PostSaleTimeline';
 import {
@@ -238,7 +237,6 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
           onClick={() => {
             trackEvent('pdf_baixado', { origem: 'resultado' });
             void downloadLeadPdf(data, result);
-            leadService.notifyPdfDownload(data, result);
           }}
           className="btn-outline w-full sm:w-auto"
         >
