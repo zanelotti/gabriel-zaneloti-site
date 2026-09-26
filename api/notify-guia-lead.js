@@ -38,6 +38,46 @@ function generateId() {
   return `guia_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function onlyDigits(value) {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+/**
+ * Monta o link de WhatsApp pronto pra o Gabriel chamar o contato, com uma
+ * mensagem já preenchida com o nome dele. Diferente do link usado no e-mail
+ * de simulação (que já sabe o valor de economia) — aqui a pessoa ainda não
+ * simulou nada, só baixou o guia gratuito, então a mensagem convida pra dar
+ * o próximo passo em vez de citar um número.
+ */
+function buildWhatsAppLink(guiaLead) {
+  const digits = onlyDigits(guiaLead.whatsapp);
+  if (!digits) return null;
+  const numero = digits.length <= 11 ? `55${digits}` : digits;
+  const nome = guiaLead.nome || '';
+  const material = materialLabel(guiaLead.material);
+
+  const texto = `Oi ${nome}, tudo bem? Aqui é o Gabriel. Vi que você baixou o guia "${material}" — isso costuma ser sinal de que tem uma obra pra regularizar. Posso te ajudar a entender o seu caso? Se quiser, dá pra fazer uma simulação rápida no site e já ver uma estimativa de economia, ou posso te explicar direto por aqui como funciona.`;
+
+  return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+}
+
+/**
+ * Roteiro rápido pro Gabriel seguir de acordo com a resposta do contato no
+ * WhatsApp. Uso interno, nunca aparece pro cliente.
+ */
+function buildRoteiroHtml() {
+  return `
+    <div style="margin:16px 0 0;padding:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
+      <p style="margin:0 0 8px;font-weight:700;color:#1e3a8a;font-size:13px;text-transform:uppercase;letter-spacing:.03em;">📋 Roteiro rápido — próximos passos</p>
+      <ul style="margin:0;padding-left:18px;color:#1e40af;font-size:13px;line-height:1.6;">
+        <li style="margin-bottom:8px;"><strong>Perguntou como funciona / quer saber mais:</strong> convide pra fazer a simulação no site (já dá uma estimativa de economia em R$) ou colete os dados da obra direto por ali; deixe claro que a análise inicial não tem custo.</li>
+        <li style="margin-bottom:8px;"><strong>Perguntou quanto custa:</strong> reforce que a análise inicial não tem custo — o honorário é de 12% sobre a economia comprovada, e só é definido depois de confirmada.</li>
+        <li style="margin-bottom:8px;"><strong>Não respondeu em 1-2 dias:</strong> mande um segundo contato, convidando de novo pra fazer a simulação no site.</li>
+        <li><strong>Disse que vai resolver por conta própria ou vai pensar:</strong> reforce, sem pressionar, que a pendência é corrigida pela Selic mês a mês e que, sem a regularização, não é possível emitir a certidão negativa (CND) necessária para vender, financiar ou dar baixa no imóvel.</li>
+      </ul>
+    </div>`;
+}
+
 async function saveToSupabase(guiaLead) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -91,6 +131,7 @@ async function sendEmail(guiaLead) {
   const leadEmail = escapeHtml(guiaLead.email || 'Sem e-mail');
   const whatsapp = escapeHtml(guiaLead.whatsapp || 'Sem WhatsApp');
   const material = escapeHtml(materialLabel(guiaLead.material));
+  const whatsappLink = buildWhatsAppLink(guiaLead);
 
   try {
     const resendResponse = await fetch('https://api.resend.com/emails', {
@@ -105,11 +146,17 @@ async function sendEmail(guiaLead) {
         reply_to: toEmail,
         subject: `Novo download do guia gratuito: ${guiaLead.nome || 'Visitante do site'}`,
         html: `
-          <div style="font-family:sans-serif;font-size:14px;color:#0f1638;">
+          <div style="font-family:sans-serif;font-size:14px;color:#0f1638;max-width:600px;margin:0 auto;">
             <p><strong>${nome}</strong> baixou o guia gratuito "${material}".</p>
             <p>E-mail: ${leadEmail}</p>
             <p>WhatsApp: ${whatsapp}</p>
             <p style="color:#7c8ab0;font-size:12px;">Este é um contato ainda sem simulação completa — considere fazer um follow-up.</p>
+            ${
+              whatsappLink
+                ? `<a href="${whatsappLink}" style="display:inline-block;margin-top:8px;background:#22c55e;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 20px;border-radius:8px;">Chamar ${nome} no WhatsApp</a>`
+                : ''
+            }
+            ${buildRoteiroHtml()}
           </div>
         `,
       }),
