@@ -514,6 +514,7 @@ export const SELIC_MENSAL: Record<string, number> = {
   '2026-06': 1.12,
   '2026-07': 1.22,
   '2026-08': 1.09,
+  '2026-09': 1.08,
 };
 
 /**
