@@ -1,67 +1,80 @@
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 
-interface Depoimento {
-  texto: string;
-  /** Classes de largura da grade — as três primeiras ocupam 1/3, as duas últimas 1/2 (em telas grandes). */
-  span: string;
+interface Print {
+  arquivo: string;
+  largura: number;
+  altura: number;
+  alt: string;
 }
 
 /**
- * Feedbacks reais recebidos por WhatsApp. Por privacidade, nenhum nome,
- * telefone ou dado da obra é exibido — só o que o cliente disse.
+ * Prints reais de conversas de WhatsApp com clientes. Por privacidade, nome,
+ * foto, telefone e número da obra foram removidos ou cobertos em cada imagem
+ * (arquivos em /public/depoimentos).
  */
-const DEPOIMENTOS: Depoimento[] = [
+const PRINTS: Print[] = [
   {
-    texto:
-      'Gostei do seu serviço, foi bastante objetivo e prático e com preço justo. Resolvendo de forma rápida a regularização do INSS da minha obra.',
-    span: 'lg:col-span-2',
+    arquivo: 'depoimento-1.jpg',
+    largura: 571,
+    altura: 757,
+    alt: 'Conversa de WhatsApp: cliente diz que gostou do serviço, objetivo, prático, com preço justo, resolvendo de forma rápida a regularização do INSS da obra.',
   },
   {
-    texto:
-      'Para mim foi um trabalho excelente, foi rápido e ajudou muito a gente. Porque o valor que a gente teria que pagar sem o seu trabalho seria muito alto, e com o seu trabalho reduziu muito o valor e ainda teve como parcelar.',
-    span: 'lg:col-span-2',
+    arquivo: 'depoimento-2.jpg',
+    largura: 571,
+    altura: 780,
+    alt: 'Conversa de WhatsApp: cliente diz que foi um trabalho excelente e rápido, que o valor sem o serviço seria muito alto e que, com o serviço, o valor reduziu muito e ainda teve como parcelar.',
   },
   {
-    texto:
-      'O valor veio até mais baixo do que você tinha simulado, poxa muito obrigado, salvou minha pele, eu tava ficando nervoso com o valor. Vou recomendar aos meus amigos.',
-    span: 'lg:col-span-2',
+    arquivo: 'depoimento-3.jpg',
+    largura: 512,
+    altura: 275,
+    alt: 'Conversa de WhatsApp: cliente diz que o valor veio mais baixo do que o simulado, agradece e diz que vai recomendar aos amigos.',
   },
   {
-    texto: 'Foi rápido até, muito bom, vou pagar agora mesmo, muito obrigado pela agilidade no atendimento.',
-    span: 'lg:col-span-3',
+    arquivo: 'depoimento-4.jpg',
+    largura: 720,
+    altura: 625,
+    alt: 'Conversa de WhatsApp: após receber a certidão, cliente diz que foi rápido, muito bom, e agradece pela agilidade no atendimento.',
   },
   {
-    texto:
-      'Com certeza foi top, já passei seu contato pro pessoal do condomínio aqui e alguns já disseram que entraram em contato. Nota mil!',
-    span: 'sm:col-span-2 lg:col-span-3',
+    arquivo: 'depoimento-5.jpg',
+    largura: 719,
+    altura: 850,
+    alt: 'Conversa de WhatsApp: após receber a certidão, cliente diz que foi top e que já passou o contato para o pessoal do condomínio, e alguns já entraram em contato.',
   },
 ];
 
-function DepoimentoCard({ texto, span }: Depoimento) {
-  return (
-    <figure className={`flex flex-col rounded-xl2 border border-navy-100 bg-white p-6 shadow-soft ${span}`}>
-      <span aria-hidden="true" className="text-4xl font-extrabold leading-none text-accent-500">
-        “
-      </span>
-      <blockquote className="mt-2 flex-1 text-base leading-relaxed text-navy-700">{texto}</blockquote>
-      <figcaption className="mt-5 text-sm font-semibold text-navy-500">
-        Cliente · regularização de INSS de obra
-      </figcaption>
-    </figure>
-  );
-}
-
-/** Seção de prova social: depoimentos reais de clientes, de forma compacta e anônima. */
+/** Seção de prova social: prints reais de feedbacks de clientes (com dados pessoais ocultados). */
 export function Depoimentos() {
   return (
     <section id="depoimentos" className="scroll-mt-20 bg-navy-50 py-20 sm:py-28">
       <Container>
-        <SectionHeading eyebrow="Depoimentos" title="O que dizem os clientes que já regularizaram" />
+        <SectionHeading
+          eyebrow="Depoimentos"
+          title="O que dizem os clientes que já regularizaram"
+          description="Mensagens reais recebidas por WhatsApp, com os dados dos clientes ocultados."
+        />
 
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-6">
-          {DEPOIMENTOS.map((depoimento) => (
-            <DepoimentoCard key={depoimento.texto} {...depoimento} />
+        <div className="mt-12 columns-1 gap-5 sm:columns-2 lg:columns-3">
+          {PRINTS.map((print) => (
+            <a
+              key={print.arquivo}
+              href={`/depoimentos/${print.arquivo}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-5 block break-inside-avoid overflow-hidden rounded-xl2 border border-navy-100 bg-white shadow-soft transition-shadow duration-200 hover:shadow-card"
+            >
+              <img
+                src={`/depoimentos/${print.arquivo}`}
+                alt={print.alt}
+                width={print.largura}
+                height={print.altura}
+                loading="lazy"
+                className="block h-auto w-full"
+              />
+            </a>
           ))}
         </div>
       </Container>
