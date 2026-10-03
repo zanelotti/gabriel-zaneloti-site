@@ -34,12 +34,40 @@ function chaveDoMes(dataBcb) {
   return `${ano}-${mes}`;
 }
 
-async function buscarUltimosMeses() {
-  const response = await fetch(API_URL, { headers: { Accept: 'application/json' } });
-  if (!response.ok) {
-    throw new Error(`Falha ao consultar a API do Bacen: ${response.status} ${await response.text()}`);
+const TENTATIVAS = 4;
+const espera = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * A API do Bacen é instável e às vezes recusa ou demora para responder a
+ * servidores de nuvem (como os do GitHub Actions). Por isso: timeout por
+ * tentativa, até 4 tentativas com espera crescente, User-Agent identificado e
+ * erro detalhado (inclui a causa real, que o `fetch` esconde em "fetch failed").
+ */
+async function baixarJsonDoBacen() {
+  let ultimoErro;
+  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa += 1) {
+    try {
+      const response = await fetch(API_URL, {
+        headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; selic-updater/1.0)' },
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!response.ok) {
+        const corpo = (await response.text()).slice(0, 300);
+        throw new Error(`HTTP ${response.status} ${response.statusText} — ${corpo}`);
+      }
+      return await response.json();
+    } catch (error) {
+      const causa = error.cause ? ` (causa: ${error.cause.code || error.cause.message || error.cause})` : '';
+      ultimoErro = new Error(`Falha ao consultar a API do Bacen na tentativa ${tentativa}/${TENTATIVAS}: ${error.message}${causa}`);
+      console.error(`[update-selic] ${ultimoErro.message}`);
+      if (tentativa < TENTATIVAS) await espera(tentativa * 5000);
+    }
   }
-  const dados = await response.json();
+  throw ultimoErro;
+}
+
+async function buscarUltimosMeses() {
+  const dados = await baixarJsonDoBacen();
   return dados
     .map((item) => {
       const valor = Number(item.valor);
