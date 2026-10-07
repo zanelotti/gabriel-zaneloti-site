@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { GuiaLead, Lead, LeadStatus } from '@/types/lead';
+import type { Agendamento, AgendamentoStatus, GuiaLead, Lead, LeadStatus } from '@/types/lead';
 
 /**
  * ============================================================================
@@ -263,5 +263,82 @@ export const crmTrafficService = {
 
     if (error) throw error;
     return (data as PageViewRow[]).map(rowToPageView);
+  },
+};
+
+/** Formato bruto de uma linha da tabela `agendamentos` no Supabase (snake_case). */
+interface AgendamentoRow {
+  id: string;
+  nome: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  inicio: string;
+  fim: string;
+  observacoes: string | null;
+  status: AgendamentoStatus;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  gclid: string | null;
+  gbraid: string | null;
+  wbraid: string | null;
+  landing_page: string | null;
+  google_event_link: string | null;
+  created_at: string;
+}
+
+function rowToAgendamento(row: AgendamentoRow): Agendamento {
+  return {
+    id: row.id,
+    nome: row.nome ?? '',
+    email: row.email ?? '',
+    whatsapp: row.whatsapp ?? '',
+    inicio: row.inicio,
+    fim: row.fim,
+    observacoes: row.observacoes ?? '',
+    status: row.status ?? 'agendado',
+    utmSource: row.utm_source,
+    utmMedium: row.utm_medium,
+    utmCampaign: row.utm_campaign,
+    gclid: row.gclid,
+    gbraid: row.gbraid,
+    wbraid: row.wbraid,
+    landingPage: row.landing_page,
+    googleEventLink: row.google_event_link,
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * Camada de dados das consultorias gratuitas agendadas pelo site (tabela
+ * `agendamentos`) — usada só pela aba "Agenda" do CRM. Gravada só pela função
+ * serverless `/api/agendar.js`; aqui lemos, mudamos o status e removemos.
+ */
+export const crmAgendamentoService = {
+  /** Lista todos os agendamentos, do horário mais recente para o mais antigo. */
+  async listAgendamentos(): Promise<Agendamento[]> {
+    const client = requireClient();
+    const { data, error } = await client
+      .from('agendamentos')
+      .select('*')
+      .order('inicio', { ascending: false })
+      .limit(5000);
+
+    if (error) throw error;
+    return (data as AgendamentoRow[]).map(rowToAgendamento);
+  },
+
+  /** Marca a consultoria como realizada, não compareceu ou cancelada (libera o horário). */
+  async updateStatus(id: string, status: AgendamentoStatus): Promise<void> {
+    const client = requireClient();
+    const { error } = await client.from('agendamentos').update({ status }).eq('id', id);
+    if (error) throw error;
+  },
+
+  /** Remove um agendamento (ex: teste, duplicado, spam). */
+  async deleteAgendamento(id: string): Promise<void> {
+    const client = requireClient();
+    const { error } = await client.from('agendamentos').delete().eq('id', id);
+    if (error) throw error;
   },
 };

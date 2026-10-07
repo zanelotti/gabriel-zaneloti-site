@@ -8,6 +8,7 @@ import { Authority } from '@/components/Authority';
 import { About } from '@/components/About';
 import { Benefits } from '@/components/Benefits';
 import { Depoimentos } from '@/components/Depoimentos';
+import { Agendamento } from '@/components/Agendamento';
 import { GuiaCaminho } from '@/components/GuiaCaminho';
 import { FAQ } from '@/components/FAQ';
 import { CTA } from '@/components/CTA';
@@ -26,6 +27,7 @@ function App() {
         <About />
         <Benefits />
         <Depoimentos />
+        <Agendamento />
         <GuiaCaminho />
         <FAQ />
         <CTA />

@@ -1,6 +1,5 @@
 import { Container } from '@/components/ui/Container';
 import { RiskFreeBadge } from '@/components/ui/RiskFreeBadge';
-import { generateGenericWhatsAppLink } from '@/services/whatsapp';
 import { trackEvent } from '@/services/analytics';
 
 export function CTA() {
@@ -28,11 +27,9 @@ export function CTA() {
             Simular agora
           </a>
           <a
-            href={generateGenericWhatsAppLink()}
-            target="_blank"
-            rel="noopener noreferrer"
+            href="#agendar"
             className="btn text-white bg-white/10 hover:bg-white/20 w-full sm:w-auto"
-            onClick={() => trackEvent('whatsapp_clicked', { origem: 'cta_final' })}
+            onClick={() => trackEvent('click_agendar', { origem: 'cta_final' })}
           >
             Agendar consultoria gratuita
           </a>

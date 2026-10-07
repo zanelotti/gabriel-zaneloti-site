@@ -104,3 +104,46 @@ export interface GuiaLead {
   material: string;
   createdAt: string;
 }
+
+/** Situação de uma consultoria gratuita agendada pelo site. */
+export type AgendamentoStatus = 'agendado' | 'realizado' | 'nao_compareceu' | 'cancelado';
+
+export const AGENDAMENTO_STATUS_ORDER: AgendamentoStatus[] = [
+  'agendado',
+  'realizado',
+  'nao_compareceu',
+  'cancelado',
+];
+
+export const AGENDAMENTO_STATUS_LABEL: Record<AgendamentoStatus, string> = {
+  agendado: 'Agendado',
+  realizado: 'Realizado',
+  nao_compareceu: 'Não compareceu',
+  cancelado: 'Cancelado',
+};
+
+/**
+ * Consultoria gratuita agendada pelo site (tabela `agendamentos`). Além do
+ * contato, guarda a origem do clique (gclid/gbraid/wbraid e UTMs) para uso no
+ * Google Ads — aba "Agenda" do CRM.
+ */
+export interface Agendamento {
+  id: string;
+  nome: string;
+  email: string;
+  /** Somente dígitos, com DDD (sem o +55). */
+  whatsapp: string;
+  inicio: string;
+  fim: string;
+  observacoes: string;
+  status: AgendamentoStatus;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  gclid: string | null;
+  gbraid: string | null;
+  wbraid: string | null;
+  landingPage: string | null;
+  googleEventLink: string | null;
+  createdAt: string;
+}

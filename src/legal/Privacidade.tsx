@@ -41,6 +41,10 @@ export default function Privacidade() {
         <li>O resultado estimado da simulação, calculado a partir desses dados.</li>
       </Ul>
       <p>
+        Ao agendar uma consultoria gratuita, coletamos também seu nome, e-mail, WhatsApp, o horário escolhido
+        e, se você quiser informar, uma breve descrição da obra.
+      </p>
+      <p>
         Também podemos coletar automaticamente dados de navegação (como páginas visitadas e origem do
         acesso) por meio de ferramentas de analytics e publicidade, descritas na seção 5.
       </p>
@@ -49,8 +53,14 @@ export default function Privacidade() {
       <Ul>
         <li>Calcular e enviar a estimativa de simulação solicitada;</li>
         <li>Entrar em contato para dar continuidade ao atendimento sobre a sua obra;</li>
+        <li>Agendar, confirmar e realizar a consultoria gratuita que você solicitou;</li>
         <li>Manter um registro interno de simulações e leads recebidos;</li>
-        <li>Medir a performance do site e das campanhas de divulgação (de forma agregada/estatística).</li>
+        <li>Medir a performance do site e das campanhas de divulgação (de forma agregada/estatística);</li>
+        <li>
+          Avaliar e melhorar nossos anúncios, inclusive informando às plataformas de anúncios (como o Google Ads)
+          que um clique resultou em agendamento e criando listas de público a partir de e-mails e telefones de
+          quem agendou — esses dados são enviados em formato criptografado (hash).
+        </li>
       </Ul>
       <p>Não vendemos nem compartilhamos seus dados com terceiros para fins de marketing de terceiros.</p>
 
@@ -62,6 +72,10 @@ export default function Privacidade() {
         </li>
         <li>
           <strong>Supabase</strong> — armazenamento do histórico de simulações;
+        </li>
+        <li>
+          <strong>Google</strong> — registro da consultoria na agenda do Gabriel (Google Agenda) e mensuração de
+          anúncios (Google Analytics e Google Ads);
         </li>
         <li>
           <strong>Vercel</strong> — hospedagem do site.

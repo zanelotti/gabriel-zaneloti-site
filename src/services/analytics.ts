@@ -11,6 +11,7 @@
  *   VITE_GOOGLE_ADS_CONVERSION_ID=         (ex: AW-XXXXXXXXX)
  *   VITE_GOOGLE_ADS_LEAD_LABEL=            (rótulo da ação de conversão "Envio de simulação")
  *   VITE_GOOGLE_ADS_WHATSAPP_LABEL=        (opcional — rótulo da ação de conversão "Clique no WhatsApp")
+ *   VITE_GOOGLE_ADS_SCHEDULE_LABEL=        (rótulo da ação de conversão "Consultoria agendada")
  *   VITE_META_PIXEL_ID=                    (ex: 000000000000000)
  *
  * O Google Tag Manager NÃO usa variável de ambiente — o snippet oficial do
@@ -43,7 +44,10 @@ export type AnalyticsEventName =
   | 'whatsapp_clicked'
   | 'faq_opened'
   | 'pdf_baixado'
-  | 'guia_caminho_baixado';
+  | 'guia_caminho_baixado'
+  | 'click_agendar'
+  | 'agenda_horario_escolhido'
+  | 'consultoria_agendada';
 
 export interface AnalyticsEventPayload {
   [key: string]: string | number | boolean | undefined;
@@ -53,12 +57,14 @@ const GA4_ID = import.meta.env.VITE_GA4_MEASUREMENT_ID as string | undefined;
 const GOOGLE_ADS_ID = import.meta.env.VITE_GOOGLE_ADS_CONVERSION_ID as string | undefined;
 const GOOGLE_ADS_LEAD_LABEL = import.meta.env.VITE_GOOGLE_ADS_LEAD_LABEL as string | undefined;
 const GOOGLE_ADS_WHATSAPP_LABEL = import.meta.env.VITE_GOOGLE_ADS_WHATSAPP_LABEL as string | undefined;
+const GOOGLE_ADS_SCHEDULE_LABEL = import.meta.env.VITE_GOOGLE_ADS_SCHEDULE_LABEL as string | undefined;
 const META_PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID as string | undefined;
 
 /** Mapa evento → rótulo da ação de conversão correspondente no Google Ads (quando configurado). */
 const GOOGLE_ADS_CONVERSION_LABEL_BY_EVENT: Partial<Record<AnalyticsEventName, string | undefined>> = {
   calculator_completed: GOOGLE_ADS_LEAD_LABEL,
   whatsapp_clicked: GOOGLE_ADS_WHATSAPP_LABEL,
+  consultoria_agendada: GOOGLE_ADS_SCHEDULE_LABEL,
 };
 
 declare global {
@@ -144,6 +150,20 @@ export function initAnalytics(): void {
 }
 
 /**
+ * Conversões otimizadas (Enhanced Conversions): informa ao gtag o e-mail e o
+ * telefone de quem acabou de converter. O Google faz o hash (SHA-256) no
+ * navegador antes de enviar — ajuda a atribuir a conversão ao anúncio mesmo
+ * quando o cookie de clique se perdeu. Chame ANTES de `trackEvent` da conversão.
+ */
+export function setEnhancedConversionData(data: { email?: string; whatsappDigits?: string }): void {
+  if (!isAnalyticsAvailable() || typeof window.gtag !== 'function') return;
+  const userData: Record<string, string> = {};
+  if (data.email) userData.email = data.email.trim().toLowerCase();
+  if (data.whatsappDigits) userData.phone_number = `+55${data.whatsappDigits}`;
+  if (Object.keys(userData).length > 0) window.gtag('set', 'user_data', userData);
+}
+
+/**
  * Dispara um evento de analytics para todas as plataformas configuradas.
  * Se nenhum ID estiver configurado, o evento é apenas registrado no console
  * (modo desenvolvimento), sem erros — nada é enviado para lugar nenhum.
@@ -166,6 +186,8 @@ export function trackEvent(name: AnalyticsEventName, payload: AnalyticsEventPayl
 
   if (META_PIXEL_ID && typeof window.fbq === 'function') {
     window.fbq('trackCustom', name, payload);
+    // Evento padrão da Meta para agendamentos (permite otimizar anúncios por ele).
+    if (name === 'consultoria_agendada') window.fbq('track', 'Schedule');
   }
 
   // Alimenta o dataLayer do Tag Manager (criado pelo snippet fixo no HTML de

@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react';
-import { crmAuth, crmGuiaLeadService, crmLeadService, crmTrafficService } from '@/services/crmService';
+import { crmAgendamentoService, crmAuth, crmGuiaLeadService, crmLeadService, crmTrafficService } from '@/services/crmService';
 import type { PageView } from '@/services/crmService';
-import type { GuiaLead, Lead } from '@/types/lead';
+import type { Agendamento, GuiaLead, Lead } from '@/types/lead';
+import { AgendamentosView } from './AgendamentosView';
 import { BoardView } from './BoardView';
 import { DashboardView } from './DashboardView';
 import { GuiaLeadsView } from './GuiaLeadsView';
 import { TrafficView } from './TrafficView';
 
-type Tab = 'quadro' | 'dashboard' | 'guia' | 'trafego';
+type Tab = 'quadro' | 'dashboard' | 'agenda' | 'guia' | 'trafego';
 
 export function MainShell() {
   const [tab, setTab] = useState<Tab>('quadro');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [guiaLeads, setGuiaLeads] = useState<GuiaLead[]>([]);
+  const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [pageViews, setPageViews] = useState<PageView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +32,14 @@ export function MainShell() {
       setError(err instanceof Error ? err.message : 'Falha ao carregar os leads.');
     } finally {
       setLoading(false);
+    }
+
+    // Agenda também é carregada à parte: se a tabela `agendamentos` ainda não
+    // existir no Supabase, o resto do CRM continua funcionando.
+    try {
+      setAgendamentos(await crmAgendamentoService.listAgendamentos());
+    } catch {
+      setAgendamentos([]);
     }
 
     // Tráfego é carregado à parte: se a tabela `page_views` ainda não existir
@@ -74,6 +84,14 @@ export function MainShell() {
               Dashboard
             </button>
             <button
+              onClick={() => setTab('agenda')}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                tab === 'agenda' ? 'bg-navy-900 text-white' : 'text-navy-500 hover:bg-navy-100'
+              }`}
+            >
+              Agenda
+            </button>
+            <button
               onClick={() => setTab('guia')}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                 tab === 'guia' ? 'bg-navy-900 text-white' : 'text-navy-500 hover:bg-navy-100'
@@ -108,6 +126,9 @@ export function MainShell() {
 
         {!loading && !error && tab === 'quadro' && <BoardView leads={leads} onChange={reload} />}
         {!loading && !error && tab === 'dashboard' && <DashboardView leads={leads} />}
+        {!loading && !error && tab === 'agenda' && (
+          <AgendamentosView agendamentos={agendamentos} onChange={reload} />
+        )}
         {!loading && !error && tab === 'guia' && <GuiaLeadsView guiaLeads={guiaLeads} onChange={reload} />}
         {!loading && !error && tab === 'trafego' && <TrafficView pageViews={pageViews} />}
       </main>
