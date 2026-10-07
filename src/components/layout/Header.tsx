@@ -57,7 +57,7 @@ export function Header() {
           ))}
         </nav>
 
-        <a href="#calculadora" className="btn-primary hidden whitespace-nowrap xl:inline-flex" onClick={handleSimularClick}>
+        <a href="#calculadora" className="btn-primary ml-4 hidden whitespace-nowrap px-5 py-2.5 xl:inline-flex" onClick={handleSimularClick}>
           Simular agora
         </a>
 
