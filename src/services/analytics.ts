@@ -101,8 +101,12 @@ export function initAnalytics(): void {
     document.head.appendChild(script);
 
     window.dataLayer = window.dataLayer ?? [];
-    window.gtag = function gtag(...args: unknown[]) {
-      window.dataLayer!.push(args);
+    // IMPORTANTE: o gtag.js só reconhece comandos empurrados como o objeto
+    // `arguments` (igual ao snippet oficial do Google). Empurrar um array comum
+    // (ex: rest parameters) faz o Google IGNORAR o comando em silêncio.
+    window.gtag = function gtag() {
+      // eslint-disable-next-line prefer-rest-params
+      window.dataLayer!.push(arguments);
     };
     window.gtag('js', new Date());
 
