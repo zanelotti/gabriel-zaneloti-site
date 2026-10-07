@@ -45,7 +45,7 @@ export function Header() {
           </span>
         </a>
 
-        <nav className="hidden items-center gap-7 lg:flex" aria-label="Navegação principal">
+        <nav className="hidden items-center gap-5 whitespace-nowrap xl:flex 2xl:gap-7" aria-label="Navegação principal">
           {NAV_LINKS.map((link) => (
             <a
               key={link.href}
@@ -57,13 +57,13 @@ export function Header() {
           ))}
         </nav>
 
-        <a href="#calculadora" className="btn-primary hidden lg:inline-flex" onClick={handleSimularClick}>
+        <a href="#calculadora" className="btn-primary hidden whitespace-nowrap xl:inline-flex" onClick={handleSimularClick}>
           Simular agora
         </a>
 
         <button
           type="button"
-          className="flex h-11 w-11 items-center justify-center rounded-lg text-navy-900 lg:hidden"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-navy-900 xl:hidden"
           aria-label={isMenuOpen ? 'Fechar menu' : 'Abrir menu'}
           aria-expanded={isMenuOpen}
           onClick={() => setIsMenuOpen((prev) => !prev)}
@@ -81,7 +81,7 @@ export function Header() {
       </Container>
 
       {isMenuOpen && (
-        <div className="border-t border-navy-100 bg-white lg:hidden animate-fade-in">
+        <div className="border-t border-navy-100 bg-white xl:hidden animate-fade-in">
           <Container className="flex flex-col gap-1 py-4">
             {NAV_LINKS.map((link) => (
               <a
