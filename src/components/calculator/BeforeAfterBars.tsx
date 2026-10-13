@@ -29,6 +29,8 @@ function Bar({ label, value, widthPercent, tone }: BarProps) {
 interface BeforeAfterBarsProps {
   antes: number;
   depois: number;
+  /** Versão enxuta (sem moldura nem texto de rodapé), usada dentro do bloco de resultado. */
+  compact?: boolean;
 }
 
 /**
@@ -36,8 +38,17 @@ interface BeforeAfterBarsProps {
  * de redução calculado (fluxo normal do ResultCard). Não cita os gatilhos
  * legais específicos, só o fundamento geral (IN RFB nº 2021/2021).
  */
-export function BeforeAfterBars({ antes, depois }: BeforeAfterBarsProps) {
+export function BeforeAfterBars({ antes, depois, compact = false }: BeforeAfterBarsProps) {
   const maxValue = Math.max(antes, depois, 1);
+
+  if (compact) {
+    return (
+      <div className="mt-5 space-y-3.5">
+        <Bar label="Valor presumido pela Receita" value={antes} widthPercent={(antes / maxValue) * 100} tone="neutral" />
+        <Bar label="Após a redução legal" value={depois} widthPercent={(depois / maxValue) * 100} tone="accent" />
+      </div>
+    );
+  }
 
   return (
     <div className="mt-6 rounded-xl2 border border-navy-100 bg-white p-5">

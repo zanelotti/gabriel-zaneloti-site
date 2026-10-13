@@ -1,7 +1,7 @@
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 
-interface Print {
+export interface Print {
   arquivo: string;
   largura: number;
   altura: number;
@@ -13,7 +13,7 @@ interface Print {
  * foto, telefone e número da obra foram removidos ou cobertos em cada imagem
  * (arquivos em /public/depoimentos).
  */
-const PRINTS: Print[] = [
+export const PRINTS: Print[] = [
   {
     arquivo: 'depoimento-1.jpg',
     largura: 571,
