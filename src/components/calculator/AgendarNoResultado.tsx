@@ -18,8 +18,6 @@ import {
 } from '@/services/agendamentoService';
 
 const ORIGEM = 'resultado_simulacao';
-const DIAS_INICIAIS = 3;
-const HORARIOS_INICIAIS = 6;
 
 type Carregamento = 'carregando' | 'pronto' | 'erro';
 
@@ -61,8 +59,6 @@ export function AgendarNoResultado({ nome, whatsapp, resumoObra, titulo, texto, 
   const [dias, setDias] = useState<DiaLivre[]>([]);
   const [diaSel, setDiaSel] = useState<string | null>(null);
   const [horarioSel, setHorarioSel] = useState<string | null>(null);
-  const [maisDias, setMaisDias] = useState(false);
-  const [maisHorarios, setMaisHorarios] = useState(false);
 
   const [email, setEmail] = useState('');
   const [erroEmail, setErroEmail] = useState<string | null>(null);
@@ -89,14 +85,11 @@ export function AgendarNoResultado({ nome, whatsapp, resumoObra, titulo, texto, 
   }, [carregar]);
 
   const diaAtual = useMemo(() => dias.find((d) => d.data === diaSel) ?? null, [dias, diaSel]);
-  const diasVisiveis = maisDias ? dias : dias.slice(0, DIAS_INICIAIS);
   const horariosDoDia = diaAtual?.horarios ?? [];
-  const horariosVisiveis = maisHorarios ? horariosDoDia : horariosDoDia.slice(0, HORARIOS_INICIAIS);
 
   const escolherDia = (data: string) => {
     setDiaSel(data);
     setHorarioSel(null);
-    setMaisHorarios(false);
     setErroEnvio(null);
   };
 
@@ -246,8 +239,8 @@ export function AgendarNoResultado({ nome, whatsapp, resumoObra, titulo, texto, 
 
           {estado === 'pronto' && dias.length > 0 && (
             <form onSubmit={handleSubmit} noValidate className="mt-5">
-              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Dia da análise">
-                {diasVisiveis.map((dia) => {
+              <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-2" role="radiogroup" aria-label="Dia da análise">
+                {dias.map((dia) => {
                   const { semana, diaMes } = rotuloDia(dia.data);
                   const ativo = dia.data === diaSel;
                   return (
@@ -257,7 +250,7 @@ export function AgendarNoResultado({ nome, whatsapp, resumoObra, titulo, texto, 
                       role="radio"
                       aria-checked={ativo}
                       onClick={() => escolherDia(dia.data)}
-                      className={`rounded-xl border-2 px-2 py-2.5 text-center transition-colors ${
+                      className={`w-[5.25rem] shrink-0 snap-start rounded-xl border-2 px-2 py-2.5 text-center transition-colors ${
                         ativo ? 'border-amber-400 bg-white/10' : 'border-white/15 bg-white/5 hover:border-white/40'
                       }`}
                     >
@@ -267,19 +260,10 @@ export function AgendarNoResultado({ nome, whatsapp, resumoObra, titulo, texto, 
                   );
                 })}
               </div>
-              {dias.length > DIAS_INICIAIS && (
-                <button
-                  type="button"
-                  onClick={() => setMaisDias((v) => !v)}
-                  className="mt-2 text-xs font-semibold text-navy-200 underline hover:text-white"
-                >
-                  {maisDias ? 'Ver menos dias' : 'Ver mais dias'}
-                </button>
-              )}
 
               <p className="mt-4 text-xs font-medium text-navy-200">Horários · Brasília</p>
-              <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Horário da análise">
-                {horariosVisiveis.map((horario) => {
+              <div className="mt-2 grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4" role="radiogroup" aria-label="Horário da análise">
+                {horariosDoDia.map((horario) => {
                   const ativo = horario.inicio === horarioSel;
                   return (
                     <button
@@ -297,15 +281,6 @@ export function AgendarNoResultado({ nome, whatsapp, resumoObra, titulo, texto, 
                   );
                 })}
               </div>
-              {horariosDoDia.length > HORARIOS_INICIAIS && (
-                <button
-                  type="button"
-                  onClick={() => setMaisHorarios((v) => !v)}
-                  className="mt-2 text-xs font-semibold text-navy-200 underline hover:text-white"
-                >
-                  {maisHorarios ? 'Ver menos horários' : 'Ver mais horários'}
-                </button>
-              )}
 
               {horarioSel && (
                 <div className="mt-5">

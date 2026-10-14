@@ -5,10 +5,10 @@
  * ============================================================================
  * Variáveis de ambiente opcionais (todas têm um padrão):
  *   AGENDA_WORKING_DAYS      dias de atendimento, 0=dom ... 6=sáb   (padrão "1,2,3,4,5")
- *   AGENDA_WORKING_HOURS     janelas de atendimento                  (padrão "09:00-12:00,14:00-18:00")
+ *   AGENDA_WORKING_HOURS     janelas de atendimento                  (padrão "09:00-18:00")
  *   AGENDA_SLOT_MINUTES      espaçamento entre horários oferecidos   (padrão 15)
  *   AGENDA_MEETING_MINUTES   duração da consultoria                  (padrão 10)
- *   AGENDA_DAYS_AHEAD        quantos dias à frente oferecer          (padrão 14)
+ *   AGENDA_DAYS_AHEAD        quantos dias à frente oferecer          (padrão 15)
  *   AGENDA_MIN_NOTICE_HOURS  antecedência mínima                     (padrão 2)
  *   AGENDA_UTC_OFFSET_MINUTES fuso (Brasília = -180, sem horário de verão desde 2019)
  * ============================================================================
@@ -26,7 +26,7 @@ export function getConfig() {
     .map((d) => Number.parseInt(d.trim(), 10))
     .filter((d) => d >= 0 && d <= 6);
 
-  const windows = (process.env.AGENDA_WORKING_HOURS || '09:00-12:00,14:00-18:00')
+  const windows = (process.env.AGENDA_WORKING_HOURS || '09:00-18:00')
     .split(',')
     .map((part) => /^\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*$/.exec(part))
     .filter(Boolean)
@@ -35,10 +35,10 @@ export function getConfig() {
 
   return {
     workingDays: days.length ? days : [1, 2, 3, 4, 5],
-    windows: windows.length ? windows : [{ start: 9 * 60, end: 12 * 60 }, { start: 14 * 60, end: 18 * 60 }],
+    windows: windows.length ? windows : [{ start: 9 * 60, end: 18 * 60 }],
     slotMinutes: intEnv('AGENDA_SLOT_MINUTES', 15, { min: 5, max: 240 }),
     meetingMinutes: intEnv('AGENDA_MEETING_MINUTES', 10, { min: 5, max: 240 }),
-    daysAhead: intEnv('AGENDA_DAYS_AHEAD', 14, { min: 1, max: 60 }),
+    daysAhead: intEnv('AGENDA_DAYS_AHEAD', 15, { min: 1, max: 60 }),
     minNoticeMs: intEnv('AGENDA_MIN_NOTICE_HOURS', 2, { min: 0, max: 168 }) * 3600_000,
     offsetMinutes: Number.isFinite(Number.parseInt(process.env.AGENDA_UTC_OFFSET_MINUTES ?? '', 10))
       ? Number.parseInt(process.env.AGENDA_UTC_OFFSET_MINUTES, 10)
