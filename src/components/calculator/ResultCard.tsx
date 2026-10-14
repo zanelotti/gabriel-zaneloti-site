@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import type { CalculatorData, INSSResult } from '@/types/calculator';
 import { useCountUp } from '@/hooks/useCountUp';
 import { formatArea, formatCurrency, formatDateBR, formatPercent } from '@/utils/formatters';
-import { generateGenericWhatsAppLink, generateWhatsAppMessage } from '@/services/whatsapp';
+import { generateWhatsAppMessage } from '@/services/whatsapp';
 import { trackEvent } from '@/services/analytics';
 import { downloadLeadPdf } from '@/services/pdfReport';
 import { PRINTS } from '@/components/Depoimentos';
@@ -311,13 +311,22 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
       {/* 3. Diferenciais e prova social */}
       <ConfiancaESocial />
 
-      {/* 4. Diagnóstico em PDF */}
+      {/* 4. Conversar agora / guardar o diagnóstico em PDF */}
       <div className="mt-6 rounded-xl2 border border-navy-100 bg-white p-5 sm:p-6">
-        <h4 className="text-lg font-bold text-navy-900">Quer o diagnóstico completo em PDF?</h4>
+        <h4 className="text-lg font-bold text-navy-900">Ficou com alguma dúvida?</h4>
         <p className="mt-1.5 text-sm text-navy-500">
-          Baixe agora, ou peça pelo WhatsApp que eu envio junto com os próximos passos.
+          Me chame no WhatsApp que eu tiro as suas dúvidas. Você também pode baixar o diagnóstico em PDF para guardar.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary w-full sm:w-auto"
+            onClick={() => trackEvent('whatsapp_clicked', { origem: 'resultado' })}
+          >
+            Quero conversar pelo WhatsApp
+          </a>
           <button
             type="button"
             onClick={() => {
@@ -328,15 +337,6 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
           >
             Baixar diagnóstico em PDF
           </button>
-          <a
-            href={generateGenericWhatsAppLink('Olá, Gabriel! Quero receber o diagnóstico completo da minha obra em PDF, junto com os próximos passos.')}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-outline w-full sm:w-auto"
-            onClick={() => trackEvent('whatsapp_clicked', { origem: 'resultado_pdf' })}
-          >
-            Receber no WhatsApp
-          </a>
         </div>
       </div>
 
