@@ -200,10 +200,10 @@ export function ResultCard({ data, result, onReset }: ResultCardProps) {
         ? 'Confirme essa economia em 10 minutos'
         : 'Vamos analisar sua obra em 10 minutos';
   const textoAgenda = fatorAjusteNaoAplicavel
-    ? 'Cada empresa tem particularidades (regime tributário, CNAE, contabilidade) que mudam a estratégia de redução. Escolha um horário e eu analiso o seu caso com você — sem custo e sem compromisso.'
+    ? 'Cada empresa tem particularidades (regime tributário, CNAE, contabilidade) que mudam a estratégia de redução. Escolha um horário e eu analiso o seu caso com você, sem custo e sem compromisso.'
     : exigeAnaliseManual
-      ? 'Obras iniciadas antes de outubro de 2021 têm regras próprias de apuração. Escolha um horário e eu faço a simulação completa com você — sem custo e sem compromisso.'
-      : 'Escolha um horário. Eu analiso sua obra com você e mostro quanto dá pra reduzir de verdade — sem custo e sem compromisso.';
+      ? 'Obras iniciadas antes de outubro de 2021 têm regras próprias de apuração. Escolha um horário e eu faço a simulação completa com você, sem custo e sem compromisso.'
+      : 'Escolha um horário. Eu analiso sua obra com você e mostro quanto dá pra reduzir de verdade, sem custo e sem compromisso.';
 
   // Resumo curto que vai junto no agendamento (aparece no evento da agenda e no e-mail do Gabriel).
   const resumoObra = [
