@@ -131,14 +131,14 @@ function ConfiancaESocial() {
 
       <div className="mt-6 border-t border-navy-100 pt-5">
         <p className="section-eyebrow">Quem já regularizou</p>
-        <div className="-mx-1 mt-3 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
+        <div className="mt-3 columns-2 gap-3">
           {PRINTS.map((print) => (
             <a
               key={print.arquivo}
               href={`/depoimentos/${print.arquivo}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 snap-start overflow-hidden rounded-xl border border-navy-100 bg-navy-50"
+              className="mb-3 block break-inside-avoid overflow-hidden rounded-xl border border-navy-100 bg-navy-50"
             >
               <img
                 src={`/depoimentos/${print.arquivo}`}
@@ -146,12 +146,12 @@ function ConfiancaESocial() {
                 width={print.largura}
                 height={print.altura}
                 loading="lazy"
-                className="block h-56 w-auto max-w-none"
+                className="block h-auto w-full"
               />
             </a>
           ))}
         </div>
-        <p className="mt-1 text-xs text-navy-400">Mensagens reais de clientes, com os dados ocultados. Toque para ampliar.</p>
+        <p className="text-xs text-navy-400">Mensagens reais de clientes, com os dados ocultados. Toque para ampliar.</p>
       </div>
     </div>
   );
