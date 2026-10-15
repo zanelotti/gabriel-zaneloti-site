@@ -143,12 +143,25 @@ function buildWhatsAppLink(lead) {
   // "normal" — ver linhaResultado acima); nos casos sem cálculo automático
   // (PJ, obra antes de 10/2021 etc.) cai numa abertura sem valor, em vez de
   // mostrar "R$ Não calculado" na mensagem.
+  const isPJ = lead.responsavel === 'PJ';
+  // Pessoa Jurídica: o Fator de Ajuste não se aplica, então o valor de economia
+  // guardado no lead (calculado "como se fosse PF") NUNCA vai na mensagem — a
+  // economia real de uma PJ vem de outras frentes (contabilidade regular,
+  // CPRB/Simples Nacional, créditos abatíveis) e depende de conversar antes.
   const temEconomia =
-    lead.economiaEstimada !== null && lead.economiaEstimada !== undefined && !Number.isNaN(Number(lead.economiaEstimada));
+    !isPJ &&
+    lead.economiaEstimada !== null &&
+    lead.economiaEstimada !== undefined &&
+    !Number.isNaN(Number(lead.economiaEstimada));
 
-  const texto = temEconomia
-    ? `Oi ${nome}, tudo bem? Aqui é o Gabriel, vi que você simulou a regularização do INSS da sua obra aqui no site. Pela sua área e tipo de construção, o valor de economia identificado foi de ${formatCurrency(lead.economiaEstimada)} em relação ao que a Receita cobraria sem revisão. Posso te explicar rapidinho de onde vem esse número?`
-    : `Oi ${nome}, tudo bem? Aqui é o Gabriel, vi que você simulou a regularização do INSS da sua obra aqui no site. Posso te explicar rapidinho como funciona a redução no seu caso?`;
+  let texto;
+  if (isPJ) {
+    texto = `Oi ${nome}, tudo bem? Aqui é o Gabriel, vi que você simulou a regularização do INSS da obra da sua empresa aqui no site. Para obras de pessoa jurídica o caminho de redução é outro (contabilidade da obra, desoneração da folha, créditos abatíveis), e cada empresa tem as suas particularidades. Está podendo conversar sobre a regularização da sua obra rapidinho?`;
+  } else if (temEconomia) {
+    texto = `Oi ${nome}, tudo bem? Aqui é o Gabriel, vi que você simulou a regularização do INSS da sua obra aqui no site. Pela sua área e tipo de construção, o valor de economia identificado foi de ${formatCurrency(lead.economiaEstimada)} em relação ao que a Receita cobraria sem revisão. Posso te explicar rapidinho de onde vem esse número?`;
+  } else {
+    texto = `Oi ${nome}, tudo bem? Aqui é o Gabriel, vi que você simulou a regularização do INSS da sua obra aqui no site. Posso te explicar rapidinho como funciona a redução no seu caso?`;
+  }
 
   return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
 }
