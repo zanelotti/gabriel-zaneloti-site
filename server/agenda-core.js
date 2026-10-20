@@ -9,7 +9,7 @@
  *   AGENDA_SLOT_MINUTES      espaçamento entre horários oferecidos   (padrão 15)
  *   AGENDA_MEETING_MINUTES   duração da consultoria                  (padrão 10)
  *   AGENDA_DAYS_AHEAD        quantos dias à frente oferecer          (padrão 15)
- *   AGENDA_MIN_NOTICE_HOURS  antecedência mínima                     (padrão 2)
+ *   AGENDA_MIN_NOTICE_HOURS  antecedência mínima                     (padrão 24)
  *   AGENDA_UTC_OFFSET_MINUTES fuso (Brasília = -180, sem horário de verão desde 2019)
  * ============================================================================
  */
@@ -39,7 +39,7 @@ export function getConfig() {
     slotMinutes: intEnv('AGENDA_SLOT_MINUTES', 15, { min: 5, max: 240 }),
     meetingMinutes: intEnv('AGENDA_MEETING_MINUTES', 10, { min: 5, max: 240 }),
     daysAhead: intEnv('AGENDA_DAYS_AHEAD', 15, { min: 1, max: 60 }),
-    minNoticeMs: intEnv('AGENDA_MIN_NOTICE_HOURS', 2, { min: 0, max: 168 }) * 3600_000,
+    minNoticeMs: intEnv('AGENDA_MIN_NOTICE_HOURS', 24, { min: 0, max: 168 }) * 3600_000,
     offsetMinutes: Number.isFinite(Number.parseInt(process.env.AGENDA_UTC_OFFSET_MINUTES ?? '', 10))
       ? Number.parseInt(process.env.AGENDA_UTC_OFFSET_MINUTES, 10)
       : -180,
