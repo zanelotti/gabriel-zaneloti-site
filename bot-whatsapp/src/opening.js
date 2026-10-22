@@ -14,12 +14,29 @@ const ECONOMIA_GRANDE_MIN = 30000;
 const REDUCAO_GRANDE_MIN = 70;
 const ECONOMIA_PEQUENA_MAX = 5000;
 
+const numeroOk = (v) => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
+
+/**
+ * Os números que o site mostrou ao lead, para ele se lembrar: o que a Receita cobraria, o que ficaria com o
+ * planejamento, quanto isso representa e o percentual de economia. Só pessoa física, e só quando o site calculou tudo.
+ */
+function corpoComValores(lead, obra) {
+  if (!numeroOk(lead.inss_estimado) || !numeroOk(lead.valor_apos_reducao) || !numeroOk(lead.economia_estimada)) return '';
+  const sem = Number(lead.inss_estimado);
+  const com = Number(lead.valor_apos_reducao);
+  const eco = Number(lead.economia_estimada);
+  let pct = numeroOk(lead.percentual_reducao) ? Number(lead.percentual_reducao) : NaN;
+  if (!Number.isFinite(pct) && sem > 0) pct = (eco / sem) * 100;
+  const pctTxt = Number.isFinite(pct) && pct > 0 ? ` (cerca de ${pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% de economia)` : '';
+  return `Vi que você simulou ${obra} aqui no site, e a estimativa do valor cobrado pela Receita Federal foi de ${formatarReaisInteiros(sem)}. Com nosso planejamento o INSS da obra ficaria em ${formatarReaisInteiros(com)}; isso representa ${formatarReaisInteiros(eco)}${pctTxt}. Esta é uma hora ruim para eu te explicar de onde vêm esses números?`;
+}
+
 export function montarAbertura(lead, nomeAssistente = 'Lia') {
   const isPJ = lead.responsavel === 'PJ';
   const primeiro = primeiroNomePessoa(lead.nome); // empresa/sigla/vazio: abre sem nome (a assistente pergunta depois)
   const saudacao = primeiro
-    ? `Oi, ${primeiro}, tudo bem? Aqui é ${nomeAssistente}, assistente do Gabriel Zaneloti, da regularização de INSS de obra.`
-    : `Oi, tudo bem? Aqui é ${nomeAssistente}, assistente do Gabriel Zaneloti, da regularização de INSS de obra.`;
+    ? `Oi, ${primeiro}, tudo bem? Aqui é ${nomeAssistente}, assistente do Gabriel Zaneloti, especialista em regularização de INSS de obra.`
+    : `Oi, tudo bem? Aqui é ${nomeAssistente}, assistente do Gabriel Zaneloti, especialista em regularização de INSS de obra.`;
 
   const area = Number(lead.area_principal);
   const obra = Number.isFinite(area) && area > 0 ? `a obra de ${formatarArea(area)}` : 'a sua obra';
@@ -30,6 +47,7 @@ export function montarAbertura(lead, nomeAssistente = 'Lia') {
   const gfipAnterior = !isPJ && regimeApuracao(lead.data_inicio) === 'gfip_anterior_2021';
   const semCalculo = !isPJ && (lead.inss_estimado === null || lead.inss_estimado === undefined);
 
+  const valores = temEconomia ? corpoComValores(lead, obra) : '';
   let variante;
   let corpo;
 
@@ -44,13 +62,13 @@ export function montarAbertura(lead, nomeAssistente = 'Lia') {
     corpo = `Vi que você simulou ${obra} aqui no site, e o cálculo automático não conseguiu fechar uma estimativa para o seu caso. Isso costuma indicar que vale olhar com cuidado. Esta é uma hora ruim para eu entender melhor a sua obra?`;
   } else if (temEconomia && (economia >= ECONOMIA_GRANDE_MIN || Number(lead.percentual_reducao) >= REDUCAO_GRANDE_MIN)) {
     variante = 'Economia grande';
-    corpo = `Vi que você simulou ${obra} aqui no site, e a estimativa de economia ficou em torno de ${formatarReaisInteiros(economia)} em relação ao que a Receita cobraria sem revisão. Parece bom demais para ser verdade, né? Esta é uma hora ruim para eu te explicar de onde vem esse número?`;
+    corpo = valores || `Vi que você simulou ${obra} aqui no site, e a estimativa de economia ficou em torno de ${formatarReaisInteiros(economia)} em relação ao que a Receita cobraria sem revisão. Parece bom demais para ser verdade, né? Esta é uma hora ruim para eu te explicar de onde vem esse número?`;
   } else if (temEconomia && economia < ECONOMIA_PEQUENA_MAX) {
     variante = 'Economia pequena';
-    corpo = `Vi que você simulou ${obra} aqui no site, e a estimativa de economia ficou em torno de ${formatarReaisInteiros(economia)}. O que você esperava ver nesse resultado?`;
+    corpo = valores || `Vi que você simulou ${obra} aqui no site, e a estimativa de economia ficou em torno de ${formatarReaisInteiros(economia)}. O que você esperava ver nesse resultado?`;
   } else if (temEconomia) {
     variante = 'Economia média';
-    corpo = `Vi que você simulou ${obra} aqui no site, e a estimativa de economia ficou em torno de ${formatarReaisInteiros(economia)} em relação ao que a Receita cobraria sem revisão. Pode ser que esse número tenha gerado dúvida. Esta é uma hora ruim para eu te explicar de onde ele vem?`;
+    corpo = valores || `Vi que você simulou ${obra} aqui no site, e a estimativa de economia ficou em torno de ${formatarReaisInteiros(economia)} em relação ao que a Receita cobraria sem revisão. Pode ser que esse número tenha gerado dúvida. Esta é uma hora ruim para eu te explicar de onde ele vem?`;
   } else {
     variante = 'Padrão';
     corpo = `Vi que você simulou ${obra} aqui no site. Esta é uma hora ruim para eu te explicar como funciona a redução no seu caso?`;

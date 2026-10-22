@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { criarSite } from '../src/site.js';
 import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel, dentroDoHorario, montarConhecimentoDeLinhas } from '../src/painel.js';
 import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAprendizado } from '../src/aprendizado.js';
-import { calcularHonorario, limparNomeInformado, nomeParecePessoa, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
+import { calcularHonorario, criarChamador, limparNomeInformado, nomeParecePessoa, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
 
 let passou = 0;
 const teste = async (nome, fn) => {
@@ -1270,6 +1270,31 @@ await teste('lista pronta em uma só mensagem (sem linhas em branco) sai inteira
   const novas = ctx.wa.enviados.slice(antes);
   assert.equal(novas.length, 1);
   assert.equal(novas[0].texto, lista);
+});
+
+await teste('chamada ao Claude desliga o pensamento; se a API recusar o parâmetro, tenta sem ele e não volta a pedir', async () => {
+  const recebidos = [];
+  const client = {
+    messages: {
+      async create(p) {
+        recebidos.push(p);
+        if (p.thinking) {
+          const e = new Error('thinking: disabled is not supported for this model');
+          e.status = 400;
+          throw e;
+        }
+        return { content: [], stop_reason: 'end_turn' };
+      },
+    },
+  };
+  const chamar = criarChamador(client, silencioso);
+  await chamar({ model: 'm', max_tokens: 10, messages: [] });
+  await chamar({ model: 'm', max_tokens: 10, messages: [] });
+  assert.deepEqual(recebidos.map((p) => Boolean(p.thinking)), [true, false, false]);
+  const ok = [];
+  const c2 = criarChamador({ messages: { async create(p) { ok.push(p); return { content: [] }; } } }, silencioso);
+  await c2({ model: 'm', max_tokens: 10, messages: [] });
+  assert.deepEqual(ok[0].thinking, { type: 'disabled' });
 });
 
 console.log('\nAprendizado automático');
