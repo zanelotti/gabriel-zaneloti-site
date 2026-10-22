@@ -67,6 +67,7 @@ export interface BotConversa {
   criadoEm: string;
   atualizadoEm: string;
   agendouEm: string | null;
+  nomeContato: string | null;
 }
 
 interface BotConversaRow {
@@ -78,6 +79,7 @@ interface BotConversaRow {
   criado_em: string;
   atualizado_em: string;
   agendou_em: string | null;
+  nome_contato?: string | null;
 }
 
 export interface BotMensagem {
@@ -217,6 +219,7 @@ export const botService = {
       criadoEm: r.criado_em,
       atualizadoEm: r.atualizado_em,
       agendouEm: r.agendou_em,
+      nomeContato: r.nome_contato ?? null,
     }));
   },
 

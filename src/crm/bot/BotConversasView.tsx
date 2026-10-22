@@ -76,7 +76,11 @@ export function BotConversasView({ leads, conversas, resumo, onChange }: BotConv
   });
 
   const selecionada = conversas.find((c) => c.id === selecionadaId) ?? null;
-  const nomeDe = (c: BotConversa) => nomePorLead.get(c.leadId) || maskWhatsApp(c.telefone.replace(/^55/, ''));
+  const nomeDe = (c: BotConversa) => {
+    const cadastro = nomePorLead.get(c.leadId) || maskWhatsApp(c.telefone.replace(/^55/, ''));
+    // Quando o cadastro tem nome de empresa, o bot pergunta o nome da pessoa e o CRM mostra os dois.
+    return c.nomeContato && c.nomeContato !== cadastro ? `${c.nomeContato} (${cadastro})` : cadastro;
+  };
 
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_1fr]">

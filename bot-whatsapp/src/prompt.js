@@ -5,7 +5,7 @@
  *
  * Para mudar o jeito do bot falar, é aqui que você mexe.
  */
-import { formatarArea, formatarReaisInteiros, primeiroNome, regimeApuracao } from './util.js';
+import { formatarArea, formatarReaisInteiros, nomeParecePessoa, primeiroNome, regimeApuracao } from './util.js';
 
 const montarBase = (nome) => `Você é ${nome}, assistente do Gabriel Zaneloti, consultor em regularização e redução de INSS de obra (construção civil). Você conversa por WhatsApp com pessoas que acabaram de simular a obra na calculadora do site dele. Escreva sempre em português do Brasil.
 
@@ -43,6 +43,7 @@ const montarBase = (nome) => `Você é ${nome}, assistente do Gabriel Zaneloti, 
 - agendar_consultoria: marca a consultoria. Precisa do e-mail da pessoa (peça o e-mail com naturalidade se ainda não tiver) e do horário exato escolhido, vindo de ver_horarios. Depois de agendar, confirme dia e hora em linguagem simples.
 - passar_para_gabriel: encerra a sua participação (depois disso você NÃO responde mais nessa conversa, então use só quando for realmente necessário) e avisa o Gabriel. NÃO use só porque a dúvida é técnica ou porque a pessoa tem uma ressalva: primeiro responda o que dá para responder em geral. Se a consultoria já está agendada, dúvidas técnicas sobre o caso ficam para a consultoria: responda o geral, diga que o Gabriel aprofunda lá e siga sem passar a conversa. Use quando: pedirem preço em reais, desconto ou negociação; dúvida técnica sem base no CONHECIMENTO nem nos TRECHOS e que você não sabe responder com segurança; pessoa irritada ou reclamando; pedirem para falar com uma pessoa; enviarem documentos ou áudios importantes; pedirem proposta formal; ou quando a pessoa já está decidida a seguir e só falta combinar com o Gabriel. Ao usar, escreva ao lead uma mensagem curta dizendo que o Gabriel vai continuar a conversa pessoalmente (sem prometer horário).
 - encerrar_conversa: quando a pessoa deixar claro que não quer seguir (agradeça e deixe a porta aberta, sem insistir) ou já resolveu por outro caminho.
+- registrar_nome: guarda o nome pelo qual a pessoa pediu para ser chamada. Use assim que ela disser (só o primeiro nome ou como ela se apresentou).
 - registrar_status: atualiza o funil: contatado, decidindo, proposta_enviada ou perdido. Use com moderação, quando houver mudança real.
 
 # O QUE VOCÊ NUNCA FAZ
@@ -52,10 +53,18 @@ const montarBase = (nome) => `Você é ${nome}, assistente do Gabriel Zaneloti, 
 - Prometer prazo de entrega, resultado ou economia.
 `;
 
-function descreverLead(lead, config) {
+function descreverLead(lead, config, nomeContato = '') {
   const isPJ = lead.responsavel === 'PJ';
   const linhas = [];
-  linhas.push(`Nome: ${lead.nome || 'não informado'} (trate por "${primeiroNome(lead.nome) || 'você'}")`);
+  if (nomeContato) {
+    linhas.push(`Nome da pessoa: ${nomeContato} (ela mesma informou; trate por "${primeiroNome(nomeContato)}"). O cadastro do site diz "${lead.nome || 'sem nome'}".`);
+  } else if (nomeParecePessoa(lead.nome)) {
+    linhas.push(`Nome: ${lead.nome} (trate por "${primeiroNome(lead.nome)}")`);
+  } else {
+    linhas.push(
+      `Nome da pessoa: AINDA NÃO SABEMOS. O cadastro do site diz "${lead.nome || 'sem nome'}", que não parece nome de pessoa (parece empresa, sigla ou está vazio). Não use isso para chamá-la. Na sua PRIMEIRA resposta, depois de responder o que ela disse, pergunte de forma simpática como ela prefere ser chamada (ex.: "A propósito, como posso te chamar?"). Se a sua resposta já termina com outra pergunta, deixe a pergunta do nome para a resposta seguinte (uma pergunta por mensagem). Quando ela disser, use a ferramenta registrar_nome e passe a tratá-la por esse nome. Se ela não responder, siga a conversa sem nome, sem insistir.`
+    );
+  }
   linhas.push(`Tipo: ${isPJ ? 'Pessoa jurídica (empresa)' : 'Pessoa física'}`);
   if (lead.tipo_obra) linhas.push(`Tipo construtivo: ${lead.tipo_obra}`);
   if (lead.destinacao) linhas.push(`Destinação: ${lead.destinacao}`);
@@ -94,7 +103,7 @@ function descreverLead(lead, config) {
   return `# DADOS DO LEAD (única fonte de números que você pode citar)\n${linhas.map((l) => `- ${l}`).join('\n')}\n\n${politica}`;
 }
 
-export function montarSistema(lead, config, conhecimento = '', trechos = '', espera = null) {
+export function montarSistema(lead, config, conhecimento = '', trechos = '', espera = null, nomeContato = '') {
   const base = montarBase(config.assistenteNome || 'Lia');
   const bloco = conhecimento
     ? `\n# CONHECIMENTO DO GABRIEL (fonte oficial)\nUse este material para responder dúvidas sobre parcelamento, o que está incluído no serviço, o processo e quem é o Gabriel. Não o contradiga. Se a pergunta não estiver coberta aqui nem nos dados do lead, NÃO invente: use passar_para_gabriel.\n\n${conhecimento}\n`
@@ -105,5 +114,5 @@ export function montarSistema(lead, config, conhecimento = '', trechos = '', esp
   const blocoEspera = espera
     ? `\n# MODO ESPERA (você já passou esta conversa para o Gabriel)\nMotivo da passagem: ${espera}\nO Gabriel vai responder esse assunto pessoalmente. Enquanto isso você continua ajudando SÓ com dúvidas simples que tenham base no CONHECIMENTO DO GABRIEL ou nos TRECHOS DE DOCUMENTOS (como funciona, quais documentos, parcelamento, prazos do processo). Regras do modo espera: não volte a tratar o assunto que motivou a passagem (preço em reais, desconto, negociação, reclamação); não puxe venda nem ofereça novos passos; respostas curtas. Se a pessoa pedir para falar com o Gabriel ou fizer uma pergunta que você não sabe responder com segurança, diga em uma frase que o Gabriel vai responder essa e use passar_para_gabriel (neste modo isso só avisa o Gabriel, você continua disponível para outras dúvidas).\n`
     : '';
-  return `${base}\n${descreverLead(lead, config)}\n${bloco}${blocoDocs}${blocoEspera}`;
+  return `${base}\n${descreverLead(lead, config, nomeContato)}\n${bloco}${blocoDocs}${blocoEspera}`;
 }

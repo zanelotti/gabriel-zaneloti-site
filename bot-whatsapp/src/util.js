@@ -28,6 +28,47 @@ export function primeiroNome(nome) {
   return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
 }
 
+const SEM_ACENTO = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// Palavras que indicam empresa/organização (e não o nome de uma pessoa).
+const PALAVRAS_DE_EMPRESA = new Set(
+  (
+    'ltda ltd me mei epp eireli sa cia companhia construtora construtoras construcao construcoes engenharia empreendimentos empreendimento ' +
+    'incorporadora incorporacoes imobiliaria imoveis comercio servicos servico industria industrias grupo holding associacao condominio ' +
+    'instituto clinica escritorio arquitetura projetos reformas obras engenheiros arquitetos consultoria assessoria agro transportes ' +
+    'transportadora locacao empreiteira sociedade fundacao igreja prefeitura loja mercado supermercado hotel pousada restaurante ' +
+    'distribuidora comercial materiais concreto madeireira marmoraria metalurgica tecnologia solucoes sistemas participacoes patrimonial ' +
+    'construtech tech investimentos gestao negocios importadora exportadora cooperativa sindicato ong'
+  ).split(' ')
+);
+
+/** O texto digitado no cadastro parece o nome de uma pessoa (e não uma empresa, sigla ou vazio)? */
+export function nomeParecePessoa(nome) {
+  const bruto = String(nome ?? '').trim();
+  if (!bruto) return false;
+  if (/[0-9@&/\\_]/.test(bruto)) return false;
+  const tokens = SEM_ACENTO(bruto).split(/[^a-z]+/).filter(Boolean);
+  if (tokens.length === 0 || tokens.length > 6) return false;
+  if (tokens.some((t) => PALAVRAS_DE_EMPRESA.has(t))) return false;
+  if (tokens.length === 1 && tokens[0].length <= 3) return false; // sigla, ex.: "JMX"
+  return true;
+}
+
+/** Primeiro nome só quando o cadastro parece um nome de pessoa; caso contrário, vazio. */
+export function primeiroNomePessoa(nome) {
+  return nomeParecePessoa(nome) ? primeiroNome(nome) : '';
+}
+
+/** Limpa o nome que a pessoa informou no WhatsApp ("me chama de joão" → "João"). Vazio se não parecer um nome. */
+export function limparNomeInformado(nome) {
+  let t = String(nome ?? '').trim().replace(/^(me chamo|meu nome é|meu nome e|sou o|sou a|pode me chamar de|me chama de|aqui é o|aqui é a|aqui é)\s+/i, '');
+  t = t.replace(/[.!,;:]+$/g, '').trim();
+  if (!t || t.length > 40 || /[0-9@/\\_]/.test(t)) return '';
+  const partes = t.split(/\s+/);
+  if (partes.length > 3) return '';
+  return partes.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ');
+}
+
 export function formatarReaisInteiros(valor) {
   return Number(valor).toLocaleString('pt-BR', {
     style: 'currency',

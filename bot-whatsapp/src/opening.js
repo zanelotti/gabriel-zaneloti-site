@@ -8,7 +8,7 @@
  * "direito" ou "advogado". O valor de economia NUNCA é citado para pessoa jurídica
  * (o Fator de Ajuste só vale para pessoa física).
  */
-import { formatarArea, formatarReaisInteiros, primeiroNome, regimeApuracao } from './util.js';
+import { formatarArea, formatarReaisInteiros, primeiroNomePessoa, regimeApuracao } from './util.js';
 
 const ECONOMIA_GRANDE_MIN = 30000;
 const REDUCAO_GRANDE_MIN = 70;
@@ -16,7 +16,7 @@ const ECONOMIA_PEQUENA_MAX = 5000;
 
 export function montarAbertura(lead, nomeAssistente = 'Lia') {
   const isPJ = lead.responsavel === 'PJ';
-  const primeiro = primeiroNome(lead.nome);
+  const primeiro = primeiroNomePessoa(lead.nome); // empresa/sigla/vazio: abre sem nome (a assistente pergunta depois)
   const saudacao = primeiro
     ? `Oi, ${primeiro}, tudo bem? Aqui é ${nomeAssistente}, assistente do Gabriel Zaneloti, da regularização de INSS de obra.`
     : `Oi, tudo bem? Aqui é ${nomeAssistente}, assistente do Gabriel Zaneloti, da regularização de INSS de obra.`;

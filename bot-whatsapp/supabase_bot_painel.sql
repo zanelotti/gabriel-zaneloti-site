@@ -57,6 +57,9 @@ create index if not exists bot_uso_criado_idx on public.bot_uso (criado_em);
 -- 5) Quando a consultoria foi marcada pelo bot (métrica do painel).
 alter table public.bot_conversas add column if not exists agendou_em timestamptz;
 
+-- 6) Nome pelo qual a pessoa pediu para ser chamada (quando o cadastro tem nome de empresa ou está vazio).
+alter table public.bot_conversas add column if not exists nome_contato text;
+
 -- ----------------------------------------------------------------------------
 -- Segurança: só quem está logado no CRM (usuário autenticado) acessa pelo navegador.
 -- O bot usa a chave secreta (service_role), que ignora o RLS.

@@ -12,7 +12,7 @@
  */
 import { dividirMensagens, pediuParar, validarSaida } from './guards.js';
 import { montarAbertura } from './opening.js';
-import { aleatorio, dormir, normalizarTelefoneBR } from './util.js';
+import { aleatorio, dormir, limparNomeInformado, normalizarTelefoneBR } from './util.js';
 
 const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
 const TRINTA_MIN = 30 * 60 * 1000;
@@ -218,11 +218,12 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   // 3) Resposta do assistente
   // ---------------------------------------------------------------------------
   function montarFerramentas(conversa, lead) {
+    let nomeAtual = conversa.nome_contato || '';
     return {
       ver_horarios: () => site.verHorarios(),
       agendar_consultoria: async ({ inicio, email }) => {
         const r = await site.agendar({
-          nome: lead.nome,
+          nome: nomeAtual || lead.nome,
           email,
           whatsapp: lead.whatsapp,
           inicio,
@@ -240,6 +241,18 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       },
       passar_para_gabriel: async () => ({ ok: true }),
       encerrar_conversa: async () => ({ ok: true }),
+      registrar_nome: async ({ nome }) => {
+        const limpo = limparNomeInformado(nome);
+        if (!limpo) return { ok: false, erro: 'isso não parece um nome; pergunte de novo' };
+        nomeAtual = limpo;
+        try {
+          await store.salvarNomeContato(conversa.id, limpo);
+        } catch (e) {
+          log.warn(`[bot] não consegui guardar o nome (rodou o supabase_bot_painel.sql de novo?): ${e.message}`);
+        }
+        await store.atualizarLead(lead.id, { nota: `Nome informado no WhatsApp: ${limpo}` });
+        return { ok: true, nome: limpo };
+      },
       registrar_status: async ({ status, nota }) => {
         await store.atualizarLead(lead.id, { status, nota });
         return { ok: true };
@@ -272,7 +285,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
       let resultado;
       try {
-        resultado = await cerebro.gerarResposta({ lead, historico, ferramentas: montarFerramentas(conversa, lead), log, espera: emEspera ? motivoEspera : null });
+        resultado = await cerebro.gerarResposta({ lead, historico, ferramentas: montarFerramentas(conversa, lead), log, espera: emEspera ? motivoEspera : null, nomeContato: conversa.nome_contato || '' });
         falhasResposta.delete(conversaId);
         if (resultado.uso && (resultado.uso.entrada || resultado.uso.saida)) {
           try {

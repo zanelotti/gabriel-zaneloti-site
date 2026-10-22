@@ -177,6 +177,10 @@ export function criarStore({ url, key }) {
       checar(await db.from('bot_uso').insert({ conversa_id, entrada, saida }), 'registrar uso');
     },
 
+    async salvarNomeContato(conversaId, nome) {
+      checar(await db.from('bot_conversas').update({ nome_contato: nome }).eq('id', conversaId), 'salvar nome do contato');
+    },
+
     async marcarAgendou(conversaId) {
       checar(await db.from('bot_conversas').update({ agendou_em: new Date().toISOString() }).eq('id', conversaId), 'marcar agendamento');
     },

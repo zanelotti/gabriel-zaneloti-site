@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { criarSite } from '../src/site.js';
 import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel, dentroDoHorario, montarConhecimentoDeLinhas } from '../src/painel.js';
-import { normalizarTelefoneBR } from '../src/util.js';
+import { limparNomeInformado, nomeParecePessoa, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
 
 let passou = 0;
 const teste = async (nome, fn) => {
@@ -154,6 +154,9 @@ function criarStoreMemoria() {
     },
     async marcarAgendou(id) {
       this.agendou.push(id);
+    },
+    async salvarNomeContato(id, nome) {
+      conversas.find((c) => c.id === id).nome_contato = nome;
     },
     async conversasAtivas() {
       return conversas.filter((c) => c.estado === 'ativa');
@@ -403,7 +406,7 @@ await teste('lead pergunta o custo: assistente responde (12% sobre economia comp
   assert.equal(ctx.avisos.length, 0, 'não manda e-mail só porque o lead respondeu');
   // O modelo recebeu o histórico e as ferramentas
   const chamada = ctx.client.chamadas[0];
-  assert.ok(chamada.tools.length === 5);
+  assert.ok(chamada.tools.length === 6);
   assert.equal(chamada.messages[chamada.messages.length - 1].role, 'user');
 });
 
@@ -952,6 +955,88 @@ await teste('consumo de tokens e agendamento ficam registrados para o painel', a
   ctx.bot.pararTimers();
   assert.deepEqual(ctx.store.usos[0], { conversa_id: c.id, entrada: 5000, saida: 80 });
   assert.equal(montarConhecimentoDeLinhas([{ titulo: 'a', conteudo: 'x R$ 10', ativo: false }]).texto, '');
+});
+
+
+console.log('\nNome da pessoa');
+
+await teste('nome de empresa, sigla ou vazio não é tratado como nome de pessoa', () => {
+  for (const n of ['Construtora Silva Ltda', 'JMX Engenharia', 'ABC', '', null, 'Empreendimentos Sol e Mar', 'Casa 12 Reformas', 'Silva & Filhos', 'Grupo Horizonte', 'Maria Eng', 'MFZ Construtech']) {
+    if (n === 'Maria Eng') continue; // pessoa com sobrenome estranho: aceito
+    assert.equal(nomeParecePessoa(n), false, `"${n}" não é nome de pessoa`);
+    assert.equal(primeiroNomePessoa(n), '');
+  }
+  for (const n of ['maria da SILVA', 'João', 'José Carlos Pereira Neto', 'Ana Paula', 'Gabriel Zaneloti']) {
+    assert.equal(nomeParecePessoa(n), true, `"${n}" é nome de pessoa`);
+  }
+  assert.equal(primeiroNomePessoa('maria da SILVA'), 'Maria');
+});
+
+await teste('nome informado no WhatsApp é limpo ("me chama de joão")', () => {
+  assert.equal(limparNomeInformado('me chama de joão'), 'João');
+  assert.equal(limparNomeInformado('Meu nome é carlos eduardo.'), 'Carlos Eduardo');
+  assert.equal(limparNomeInformado('11999998888'), '');
+  assert.equal(limparNomeInformado('quero saber o valor do parcelamento hoje'), '');
+});
+
+await teste('abertura para cadastro com nome de empresa não usa o nome', () => {
+  const a = montarAbertura(lead({ nome: 'Construtora Silva Ltda' }), 'Lia');
+  assert.match(a.texto, /^Oi, tudo bem\? Aqui é Lia/);
+  assert.doesNotMatch(a.texto, /Construtora/);
+  const b = montarAbertura(lead({ nome: '' }), 'Lia');
+  assert.match(b.texto, /^Oi, tudo bem\? Aqui é Lia/);
+  const c = montarAbertura(lead({ nome: 'maria da SILVA' }), 'Lia');
+  assert.match(c.texto, /^Oi, Maria, tudo bem\?/);
+});
+
+await teste('sem nome de pessoa: prompt manda perguntar o nome; depois que registra, passa a usar e agenda com ele', async () => {
+  const chamadasSite = [];
+  const siteFalso = criarSite({
+    siteUrl: 'https://exemplo.test',
+    fetchImpl: async (url, opts) => {
+      chamadasSite.push({ url, opts });
+      if (String(url).includes('agenda-horarios')) return { ok: true, json: async () => ({ dias: [{ data: '2026-10-24', horarios: [{ inicio: '2026-10-24T15:00:00.000Z', rotulo: 'sábado 12:00' }] }] }) };
+      return { ok: true, json: async () => ({ ok: true, confirmado_para: '2026-10-24T15:00:00.000Z' }) };
+    },
+  });
+  const ctx = montar({
+    siteFalso,
+    roteiro: [
+      texto('Claro, te explico. A propósito, como posso te chamar?'),
+      [...texto('Prazer, Carlos!'), uso('registrar_nome', { nome: 'me chama de carlos' })],
+      texto('Prazer, Carlos! Quer ver os horários da consultoria?'),
+      [uso('ver_horarios', {})],
+      [uso('agendar_consultoria', { inicio: '2026-10-24T15:00:00.000Z', email: 'carlos@exemplo.com' })],
+      texto('Combinado, Carlos. Está marcado.'),
+    ],
+  });
+  const l = lead({ nome: 'Construtora Silva Ltda' });
+  const c = await abrir(ctx, l);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'como funciona?' });
+  await ctx.bot.responder(c.id);
+  assert.match(ctx.client.chamadas[0].system, /AINDA NÃO SABEMOS/);
+  assert.match(ctx.client.chamadas[0].system, /como posso te chamar/);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'me chama de carlos' });
+  await ctx.bot.responder(c.id);
+  assert.equal(ctx.store.conversas[0].nome_contato, 'Carlos');
+  assert.match(l.notas, /Nome informado no WhatsApp: Carlos/);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'quero' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  const ultimoSistema = ctx.client.chamadas[3].system;
+  assert.match(ultimoSistema, /Nome da pessoa: Carlos/);
+  assert.doesNotMatch(ultimoSistema, /AINDA NÃO SABEMOS/);
+  const post = chamadasSite.find((x) => x.opts?.method === 'POST');
+  assert.equal(JSON.parse(post.opts.body).nome, 'Carlos', 'agenda no nome que a pessoa informou, não no da empresa');
+});
+
+await teste('nome que não parece nome é recusado pela ferramenta', async () => {
+  const ctx = montar({ roteiro: [[uso('registrar_nome', { nome: 'quero saber o valor do parcelamento hoje' })], texto('Desculpe, como posso te chamar?')] });
+  const c = await abrir(ctx, lead({ nome: 'ABC' }));
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'oi' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.store.conversas[0].nome_contato, undefined);
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

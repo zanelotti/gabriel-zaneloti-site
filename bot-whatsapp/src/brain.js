@@ -54,6 +54,16 @@ export const FERRAMENTAS = [
     },
   },
   {
+    name: 'registrar_nome',
+    description: 'Guarda o nome pelo qual a pessoa quer ser chamada (quando ela disser como prefere ser tratada).',
+    input_schema: {
+      type: 'object',
+      properties: { nome: { type: 'string', description: 'Nome informado pela pessoa, só o nome (ex.: "João").' } },
+      required: ['nome'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'registrar_status',
     description: 'Atualiza o status do lead no funil do Gabriel, quando houver mudança real.',
     input_schema: {
@@ -103,7 +113,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
   /**
    * @returns {Promise<{mensagens: string[], acao: null | {tipo: 'passar'|'encerrar', motivo: string, resumo?: string}}>}
    */
-  async function gerarResposta({ lead, historico, ferramentas, log = console, espera = null }) {
+  async function gerarResposta({ lead, historico, ferramentas, log = console, espera = null, nomeContato = '' }) {
     // Busca nos documentos grandes (normativa, manual) os trechos ligados ao que o lead disse por último.
     let trechos = { texto: '', valores: [] };
     if (documentos && documentos.total > 0) {
@@ -119,7 +129,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
       }
     }
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
-    const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera);
+    const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato);
     const messages = montarHistorico(historico);
     let acao = null;
     const consumo = { entrada: 0, saida: 0 };
