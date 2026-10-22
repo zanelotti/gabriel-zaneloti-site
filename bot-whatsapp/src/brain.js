@@ -78,6 +78,20 @@ export const FERRAMENTAS = [
   },
 ];
 
+/** Só é oferecida quando existe a pasta de documentos (normativa, manual do SERO...). */
+const FERRAMENTA_DOCUMENTOS = {
+  name: 'consultar_documentos',
+  description:
+    'Pesquisa na normativa e nos manuais oficiais (IN RFB 2.021/2021, Manual do SERO etc.). Use quando a pessoa perguntar COMO algo funciona (como reduz, o que conta como crédito, pré-moldado, decadência, documentos) e os trechos já fornecidos não responderem. Passe de 3 a 8 palavras-chave TÉCNICAS, não a frase da pessoa (ex.: "nota fiscal pré-moldado redução remuneração", "crédito remuneração GFIP eSocial CNO", "decadência cinco anos prova").',
+  input_schema: {
+    type: 'object',
+    properties: { termos: { type: 'string', description: 'Palavras-chave técnicas separadas por espaço.' } },
+    required: ['termos'],
+    additionalProperties: false,
+  },
+};
+const MAX_CONSULTAS = 3;
+
 const TEXTO_PADRAO = {
   passar: 'Vou pedir para o Gabriel continuar essa conversa com você pessoalmente, ele te responde por aqui.',
   encerrar: 'Tudo bem! Obrigado pelo seu tempo. Se mudar de ideia ou surgir alguma dúvida, é só me chamar por aqui.',
@@ -129,6 +143,8 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
       }
     }
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
+    const ferramentasApi = documentos && documentos.total > 0 ? [...FERRAMENTAS, FERRAMENTA_DOCUMENTOS] : FERRAMENTAS;
+    let consultas = 0;
     const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato);
     const messages = montarHistorico(historico);
     let acao = null;
@@ -141,7 +157,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
         model: modelo,
         max_tokens: 700,
         system,
-        tools: FERRAMENTAS,
+        tools: ferramentasApi,
         messages,
       });
 
@@ -159,6 +175,21 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
         messages.push({ role: 'assistant', content: blocos });
         const resultados = [];
         for (const uso of usos) {
+          if (uso.name === 'consultar_documentos') {
+            consultas += 1;
+            let saida;
+            if (!documentos || documentos.total === 0) saida = { erro: 'sem documentos disponíveis' };
+            else if (consultas > MAX_CONSULTAS) saida = { erro: 'limite de consultas atingido; responda com o que já tem ou use passar_para_gabriel' };
+            else {
+              const achados = formatarTrechos(documentos.buscar(String(uso.input?.termos || ''), { k: 4 }));
+              valoresExtras.push(...achados.valores);
+              saida = achados.texto
+                ? { trechos: achados.texto }
+                : { trechos: 'Nada encontrado com esses termos. Tente outras palavras-chave técnicas ou use o CONHECIMENTO.' };
+            }
+            resultados.push({ type: 'tool_result', tool_use_id: uso.id, content: JSON.stringify(saida) });
+            continue;
+          }
           try {
             const fn = ferramentas[uso.name];
             if (!fn) throw new Error(`ferramenta desconhecida: ${uso.name}`);

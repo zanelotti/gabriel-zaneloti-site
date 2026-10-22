@@ -31,7 +31,8 @@ export function tokenizar(texto) {
     .replace(/[̀-ͯ]/g, '')
     .split(/[^a-z0-9]+/)
     .filter((t) => t.length >= 3 && !STOPWORDS.has(t))
-    .map((t) => (t.length > 4 && t.endsWith('s') ? t.slice(0, -1) : t));
+    .map((t) => (t.length > 4 && t.endsWith('s') ? t.slice(0, -1) : t))
+    .map((t) => (t.length > 6 ? t.slice(0, 6) : t)); // radical: reduzir/reduzido/reduzindo → reduzi
 }
 
 /** Divide um texto longo em trechos de ~1100 caracteres, quebrando em fim de linha. */

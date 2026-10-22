@@ -15,6 +15,7 @@ const FUSO = 'America/Sao_Paulo';
 const EXPIRA_COMANDO_MS = 10 * 60 * 1000;
 
 export const VERSAO_PAINEL = 'painel-1';
+const ARQUIVOS_SEMEADOS_ANTES = ['01-parcelamento.md', '02-servicos-e-processo.md', '03-sobre-o-gabriel.md'];
 
 const lista = (v) =>
   String(v ?? '')
@@ -115,9 +116,23 @@ export function criarPainel({ store, wa, bot, config, conhecimento, conhecimento
       const linha = await store.lerConfigRemota();
       if (!linha) await store.criarConfigRemota(configParaLinha(config));
       // Copia os arquivos da pasta conhecimento para o banco UMA vez (se o Gabriel apagar algo no CRM, não volta).
-      if (conhecimentoArquivos.itens.length && !(await store.lerEstado('conhecimento_semeado'))) {
-        await store.semearConhecimento(conhecimentoArquivos.itens);
-        await store.gravarEstado('conhecimento_semeado', new Date().toISOString());
+      // Arquivos novos na pasta são copiados quando aparecem pela primeira vez.
+      if (conhecimentoArquivos.itens.length) {
+        const raw = await store.lerEstado('conhecimento_semeado');
+        let ja = [];
+        if (raw) {
+          try {
+            const v = JSON.parse(raw);
+            ja = Array.isArray(v) ? v : ARQUIVOS_SEMEADOS_ANTES;
+          } catch {
+            ja = ARQUIVOS_SEMEADOS_ANTES; // versão antiga guardava só a data
+          }
+        }
+        const novos = conhecimentoArquivos.itens.filter((i) => !ja.includes(i.chave));
+        if (novos.length) {
+          await store.semearConhecimento(novos);
+          await store.gravarEstado('conhecimento_semeado', JSON.stringify([...ja, ...novos.map((n) => n.chave)]));
+        }
       }
     } catch (e) {
       log.warn(`[painel] não consegui preparar as tabelas do painel (${e.message}). Rodou o supabase_bot_painel.sql?`);

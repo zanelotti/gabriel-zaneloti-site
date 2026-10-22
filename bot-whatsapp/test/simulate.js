@@ -1039,4 +1039,66 @@ await teste('nome que não parece nome é recusado pela ferramenta', async () =>
   assert.equal(ctx.store.conversas[0].nome_contato, undefined);
 });
 
+
+await teste('ferramenta consultar_documentos: o assistente pesquisa com termos técnicos e usa o resultado (inclusive valores citados)', async () => {
+  const d = pastaDeDocs({
+    'manual.txt': [
+      'Avaliação de Notas Fiscais de Pré-Moldado: o uso de pré-moldado poderá acarretar a redução de 70% da remuneração devida, desde que as notas somem ao menos 40% do custo da obra.',
+      'Para efeito de crédito, a remuneração de empregados registrados e vinculada ao CNO da obra abate o valor devido, com limite de R$ 15.000 no exemplo.',
+      ...Array.from({ length: 80 }, (_, i) => `Item ${i}. Disposições gerais sobre cadastro de obra e prazos de entrega, parágrafo ${i}.`),
+    ].join('\n'),
+  });
+  const documentos = await indexarDocumentos({ ...d, log: silencioso });
+  const resposta = 'Para empresa, uma das frentes é a nota fiscal de pré-moldado: se somar ao menos 40% do custo, a normativa permite reduzir 70% da remuneração daquela área. Na obra, teve notas de pré-moldado?';
+  const ctx = montar({
+    documentos,
+    roteiro: [[uso('consultar_documentos', { termos: 'nota fiscal pré-moldado redução remuneração' })], texto(resposta)],
+  });
+  const c = await abrir(ctx, lead({ responsavel: 'PJ', economia_estimada: null, inss_estimado: null }));
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'como que reduz o imposto nesse caso?' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.ok(ctx.client.chamadas[0].tools.some((t) => t.name === 'consultar_documentos'), 'ferramenta oferecida');
+  const resultado = ctx.client.chamadas[1].messages.at(-1).content[0];
+  assert.match(resultado.content, /pré-moldado/i);
+  assert.match(ctx.wa.enviados.at(-1).texto, /70%/);
+});
+
+await teste('sem pasta de documentos a ferramenta de consulta não é oferecida', async () => {
+  const ctx = montar({ roteiro: [texto('Claro.')] });
+  const c = await abrir(ctx, lead());
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'oi' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.ok(!ctx.client.chamadas[0].tools.some((t) => t.name === 'consultar_documentos'));
+});
+
+await teste('radical: "reduzir" encontra "reduz" e "reduzido"', async () => {
+  const d = pastaDeDocs({
+    'n.txt': ['O valor reduzido da contribuição depende do enquadramento da obra e da comprovação documental apresentada.', ...Array.from({ length: 60 }, (_, i) => `Linha ${i} sobre assuntos diversos de cadastro e prazos ${i}.`)].join('\n'),
+  });
+  const ind = await indexarDocumentos({ ...d, log: silencioso });
+  assert.ok(ind.buscar('como reduzir contribuição comprovação').length >= 1);
+});
+
+await teste('conhecimento: arquivo novo na pasta é copiado uma vez; o apagado no CRM não volta', async () => {
+  const store = criarStoreMemoria();
+  const cfg = { ...config, ativo: true, listaTeste: [], horarioInicio: '08:00', horarioFim: '20:00', cambio: 5.5, arquivoParar: 'x.txt' };
+  const conhecimento = { texto: '', valores: [], arquivos: [] };
+  const mk = (itens) => criarPainel({ store, wa: criarWaFalso(), bot: {}, config: cfg, conhecimento, conhecimentoArquivos: { itens }, log: silencioso, controle: criarControleDePausa(cfg) });
+  // instalação antiga: flag guardava só a data
+  store.estados.conhecimento_semeado = new Date().toISOString();
+  store.conhecimentoRemoto.push({ ativo: true, chave: '01-parcelamento.md', titulo: 'parcelamento', conteudo: 'texto antigo editado', ordem: 10 });
+  const itens = [
+    { chave: '01-parcelamento.md', titulo: 'parcelamento', conteudo: 'texto do arquivo', ordem: 10 },
+    { chave: '04-formas-de-reduzir.md', titulo: 'formas de reduzir', conteudo: 'pré-moldado e créditos', ordem: 40 },
+  ];
+  await mk(itens).preparar();
+  assert.equal(store.conhecimentoRemoto.length, 2, 'só o arquivo novo foi acrescentado');
+  assert.equal(store.conhecimentoRemoto[0].conteudo, 'texto antigo editado', 'edição do CRM preservada');
+  store.conhecimentoRemoto.pop(); // Gabriel apaga o novo
+  await mk(itens).preparar();
+  assert.equal(store.conhecimentoRemoto.length, 1, 'não ressuscita');
+});
+
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);
