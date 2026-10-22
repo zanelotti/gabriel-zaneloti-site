@@ -8,6 +8,7 @@ import { dividirMensagens, validarSaida } from './guards.js';
 import { formatarTrechos } from './documentos.js';
 import { formatarAprendidos } from './aprendizado.js';
 import { montarSistema } from './prompt.js';
+import { criarChamador } from './util.js';
 
 export const FERRAMENTAS = [
   {
@@ -126,6 +127,7 @@ export function montarHistorico(historico) {
 
 export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { texto: '', valores: [] }, documentos = null, aprendizado = null }) {
   const anthropic = client || new Anthropic({ apiKey });
+  const chamar = criarChamador(anthropic);
 
   /**
    * @returns {Promise<{mensagens: string[], acao: null | {tipo: 'passar'|'encerrar', motivo: string, resumo?: string}}>}
@@ -171,7 +173,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     let ultimoMotivo = '';
 
     for (let rodada = 0; rodada < 8; rodada++) {
-      const resp = await anthropic.messages.create({
+      const resp = await chamar({
         model: modelo,
         max_tokens: MAX_TOKENS_RESPOSTA,
         system,
@@ -179,6 +181,9 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
         messages,
       });
 
+      if (resp.stop_reason && !['end_turn', 'tool_use'].includes(resp.stop_reason)) {
+        log.warn(`[cerebro] o Claude parou com motivo "${resp.stop_reason}" (${resp.usage?.output_tokens ?? '?'} tokens de saída).`);
+      }
       consumo.entrada += resp.usage?.input_tokens || 0;
       consumo.saida += resp.usage?.output_tokens || 0;
       const blocos = resp.content || [];

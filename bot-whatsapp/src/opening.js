@@ -38,7 +38,9 @@ export function montarAbertura(lead, nomeAssistente = 'Lia') {
     ? `Oi, ${primeiro}, tudo bem? Aqui é ${nomeAssistente}, assistente do Gabriel Zaneloti, especialista em regularização de INSS de obra.`
     : `Oi, tudo bem? Aqui é ${nomeAssistente}, assistente do Gabriel Zaneloti, especialista em regularização de INSS de obra.`;
 
-  const area = Number(lead.area_principal);
+  // A área da obra na mensagem é a soma da área principal com a complementar (piscina, garagem coberta etc.).
+  const complementar = Number(lead.area_piscina);
+  const area = Number(lead.area_principal) + (Number.isFinite(complementar) && complementar > 0 ? complementar : 0);
   const obra = Number.isFinite(area) && area > 0 ? `a obra de ${formatarArea(area)}` : 'a sua obra';
 
   const economia = Number(lead.economia_estimada);

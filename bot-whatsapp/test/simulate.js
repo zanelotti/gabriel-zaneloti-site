@@ -8,7 +8,7 @@ import { criarCerebro, montarHistorico } from '../src/brain.js';
 import { dividirMensagens, extrairValoresReais, pediuParar, validarSaida } from '../src/guards.js';
 import { montarAbertura } from '../src/opening.js';
 import { montarSistema } from '../src/prompt.js';
-import { carregarConhecimento } from '../src/conhecimento.js';
+import { carregarConhecimento, sha256 } from '../src/conhecimento.js';
 import { formatarTrechos, indexarDocumentos, dividirEmTrechos } from '../src/documentos.js';
 import { mkdtempSync, mkdirSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -1329,6 +1329,87 @@ await teste('a abertura nova vale para economia grande, média e pequena', () =>
 await teste('empresa nunca recebe valores na abertura', () => {
   const a = montarAbertura(lead({ responsavel: 'PJ', inss_estimado: 17000, economia_estimada: 9000, valor_apos_reducao: 8000 }), 'Lia');
   assert.doesNotMatch(a.texto, /R\$/);
+});
+
+await teste('a área na abertura soma a principal com a complementar; o prompt traz a área total', () => {
+  const l = lead({ area_principal: 180, area_piscina: 20, inss_estimado: 15542, valor_apos_reducao: 5758, economia_estimada: 9784, percentual_reducao: 63 });
+  const a = montarAbertura(l, 'Lia');
+  assert.match(a.texto, /a obra de 200 m²/);
+  assert.match(montarSistema(l, config), /Área total \(principal \+ complementar\): 200 m²/);
+  const sem = montarAbertura(lead({ area_principal: 180, area_piscina: null }), 'Lia');
+  assert.match(sem.texto, /a obra de 180 m²/);
+  assert.doesNotMatch(montarSistema(lead({ area_principal: 180, area_piscina: null }), config), /Área total/);
+});
+
+console.log('\nMão de obra: pessoa física x empresa');
+
+await teste('pessoa física: bloqueia falar em funcionário registrado/CLT; empresa pode', () => {
+  const pf = lead({ responsavel: 'PF' });
+  const pj = lead({ responsavel: 'PJ', economia_estimada: null, inss_estimado: null });
+  for (const t of [
+    'Tem algum funcionário registrado ou prestador com recolhimento de INSS ligado à obra?',
+    'Teve pedreiro com carteira assinada na obra?',
+    'Os trabalhadores eram CLT?',
+    'Os funcionários registrados na época viram crédito.',
+  ]) {
+    const r = validarSaida(t, pf);
+    assert.equal(r.ok, false, t);
+    assert.match(r.motivo, /AUTÔNOMO/);
+    assert.equal(validarSaida(t, pj).ok, true, `empresa pode: ${t}`);
+  }
+  assert.equal(validarSaida('Durante a obra, teve pedreiro ou algum prestador autônomo? Mesmo sem recolhimento, dá para regularizar recolhendo depois.', pf).ok, true);
+});
+
+await teste('prompt e conhecimento trazem a regra: autônomo com recolhimento retroativo para pessoa física', () => {
+  const sis = montarSistema(lead({ responsavel: 'PF' }), config, carregarConhecimento().texto);
+  assert.match(sis, /AUTÔNOMO \(contribuinte individual\)/);
+  assert.match(sis, /RETROATIVA/);
+  assert.match(sis, /MÃO DE OBRA \(pessoa física\)/);
+  assert.match(sis, /nunca tenha recolhido nada/);
+  const c = carregarConhecimento().texto;
+  assert.match(c, /inclusive de forma retroativa/);
+  assert.doesNotMatch(c, /quem teve funcionário registrado na obra costuma ter o melhor resultado/);
+});
+
+await teste('fluxo: se a Lia perguntar por funcionário registrado a pessoa física, a resposta é bloqueada e reescrita com autônomo', async () => {
+  const ctx = montar({
+    roteiro: [
+      texto('Pra eu entender melhor: tem algum funcionário registrado na obra?'),
+      texto('Pra eu entender melhor: durante a obra, teve pedreiro ou algum prestador autônomo? Mesmo sem INSS recolhido, dá para regularizar recolhendo depois.'),
+    ],
+  });
+  const c = await abrir(ctx, lead({ responsavel: 'PF' }));
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'como posso reduzir?' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.match(ctx.wa.enviados.at(-1).texto, /autônomo/);
+  assert.doesNotMatch(ctx.wa.enviados.map((e) => e.texto).join(' '), /funcionário registrado/);
+});
+
+await teste('item aprendido que fala de CLT só passa se disser que é de empresa', () => {
+  const ctxv = { lead: lead(), nomeContato: '' };
+  const base = { topico: 'mão de obra', pergunta: 'Funcionários registrados ajudam a reduzir o INSS da obra?' };
+  assert.equal(validarAprendizado({ ...base, resposta: 'Sim, os funcionários registrados na época da obra viram crédito quando ligados ao CNO da obra.' }, ctxv).ok, false);
+  assert.equal(validarAprendizado({ ...base, resposta: 'Para empresa, os funcionários registrados na época da obra viram crédito quando ligados ao CNO da obra.' }, ctxv).ok, true);
+});
+
+await teste('texto corrigido do conhecimento substitui a versão antiga do CRM só se ninguém editou', async () => {
+  const antigo = 'texto antigo do arquivo 04';
+  const store = criarStoreMemoria();
+  store.atualizarConhecimento = async (id, conteudo) => {
+    store.conhecimentoRemoto.find((l) => l.id === id).conteudo = conteudo;
+  };
+  const cfg = { ...config, ativo: true, listaTeste: [], horarioInicio: '08:00', horarioFim: '20:00', cambio: 5.5, arquivoParar: 'x.txt' };
+  const itens = [{ chave: '04-formas-de-reduzir.md', titulo: 'formas de reduzir', conteudo: 'texto NOVO corrigido', ordem: 40 }];
+  const versoes = { '04-formas-de-reduzir.md': [sha256(antigo)] };
+  const mk = () => criarPainel({ store, wa: criarWaFalso(), bot: {}, config: cfg, conhecimento: { texto: '', valores: [], arquivos: [] }, conhecimentoArquivos: { itens, versoes }, log: silencioso, controle: criarControleDePausa(cfg) });
+  store.estados.conhecimento_semeado = JSON.stringify(['04-formas-de-reduzir.md']);
+  store.conhecimentoRemoto.push({ id: 7, ativo: true, chave: '04-formas-de-reduzir.md', titulo: 'x', conteudo: antigo, ordem: 40 });
+  await mk().preparar();
+  assert.equal(store.conhecimentoRemoto[0].conteudo, 'texto NOVO corrigido', 'versão intacta é atualizada');
+  store.conhecimentoRemoto[0].conteudo = 'o Gabriel editou isto';
+  await mk().preparar();
+  assert.equal(store.conhecimentoRemoto[0].conteudo, 'o Gabriel editou isto', 'edição do Gabriel é preservada');
 });
 
 console.log('\nAprendizado automático');

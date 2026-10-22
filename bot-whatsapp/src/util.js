@@ -123,3 +123,27 @@ export function calcularHonorario(lead) {
   }
   return { tipo: 'PF', economiaConhecida: true, valor: Math.round(bruto), minimoAplicado: false };
 }
+
+/**
+ * Chamada ao Claude com o "pensamento" desligado: num bot de WhatsApp ele só gasta tokens (e tempo) e,
+ * com limite curto de resposta, chegou a cortar mensagens no meio da frase. Se a API recusar o parâmetro,
+ * tenta de novo sem ele e passa a chamar sempre sem.
+ */
+export function criarChamador(anthropic, log = console) {
+  let comParametro = true;
+  return async function chamar(params) {
+    if (comParametro) {
+      try {
+        return await anthropic.messages.create({ ...params, thinking: { type: 'disabled' } });
+      } catch (e) {
+        if (e?.status === 400 && /thinking/i.test(String(e?.message))) {
+          comParametro = false;
+          log.warn('[claude] a API não aceitou desligar o pensamento; seguindo sem esse parâmetro.');
+        } else {
+          throw e;
+        }
+      }
+    }
+    return anthropic.messages.create(params);
+  };
+}
