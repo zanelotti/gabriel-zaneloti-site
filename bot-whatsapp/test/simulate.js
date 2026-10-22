@@ -256,7 +256,7 @@ await teste('validarSaida bloqueia palavras e promessas proibidas', () => {
     'É risco zero para você',
     'Isso é totalmente legal',
     'Fale com um advogado',
-    'Sua pessoa jurídica pode reduzir',
+    'Temos assessoria jurídica para isso',
     'O mínimo que cobro é alto',
     'O honorário é 15% da economia',
     'Eu garanto que você economiza',
@@ -265,6 +265,8 @@ await teste('validarSaida bloqueia palavras e promessas proibidas', () => {
     assert.equal(validarSaida(t, l).ok, false, t);
   }
   assert.equal(validarSaida('O honorário é de 12% sobre a economia que a gente conseguir comprovar.', l).ok, true);
+  assert.equal(validarSaida('Para pessoa jurídica o caminho de redução é outro.', l).ok, true, '"pessoa jurídica" é termo correto e pode');
+  assert.equal(validarSaida('Isso vale para Pessoas Jurídicas com CNPJ.', l).ok, true);
   assert.equal(validarSaida('A estimativa do site foi de R$ 42.000 de economia.', l).ok, true);
   assert.equal(validarSaida('A estimativa ficou em torno de R$ 42.000,00.', l).ok, true);
 });

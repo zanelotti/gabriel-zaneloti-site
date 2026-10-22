@@ -4,8 +4,8 @@
  * (ASSISTENTE_NOME) como assistente do Gabriel, e não como se fosse o próprio Gabriel.
  *
  * Regras de conteúdo (alinhadas com o Gabriel): nada de "só paga se economizar",
- * sem mencionar honorários na abertura, e sem as palavras "legal", "jurídico",
- * "direito" ou "advogado". O valor de economia NUNCA é citado para pessoa jurídica
+ * sem mencionar honorários na abertura, e sem as palavras "legal", "direito" ou "advogado"
+ * (nem "jurídico" fora de "pessoa jurídica"). O valor de economia NUNCA é citado para pessoa jurídica
  * (o Fator de Ajuste só vale para pessoa física).
  */
 import { formatarArea, formatarReaisInteiros, primeiroNomePessoa, regimeApuracao } from './util.js';
