@@ -1,6 +1,6 @@
 # Bot de WhatsApp do Gabriel: como instalar e usar
 
-Este bot aborda sozinho, 24h por dia, cada lead que preenche a calculadora do site. Ele se apresenta como assistente virtual do Gabriel, conversa usando as técnicas do livro, tira dúvidas simples e agenda a consultoria. Quando o assunto é preço, desconto, dúvida técnica ou quando o lead pede uma pessoa, ele passa a conversa para você e avisa por e-mail.
+Este bot aborda sozinho, 24h por dia, cada lead que preenche a calculadora do site. Ele se apresenta pelo nome (padrão: Lia, mude com ASSISTENTE_NOME no .env) como assistente do Gabriel, conversa usando as técnicas do livro, tira dúvidas simples e agenda a consultoria. Quando o assunto é preço, desconto, dúvida técnica ou quando o lead pede uma pessoa, ele passa a conversa para você e avisa por e-mail.
 
 > **Importante:** ele usa o WhatsApp por QR code (a biblioteca Baileys), que **não é a API oficial**. O WhatsApp pode restringir ou banir números que usam automação, inclusive o seu número principal. As proteções do bot reduzem o risco, mas não o eliminam. Você decidiu seguir com o número atual; se um dia quiser reduzir o risco, o mais seguro é um número só para o bot.
 
@@ -40,11 +40,15 @@ Apague o valor de `LISTA_TESTE` no `.env`, salve e reinicie o `iniciar.bat` (fec
 - Para o bot ligar junto com o Windows: aperte `Win + R`, digite `shell:startup`, e coloque ali um atalho do `iniciar.bat`.
 - Se o computador desligar ou ficar sem internet, os leads daquele período ficam esperando e recebem a mensagem quando voltar (até 48 horas depois do preenchimento; leads mais antigos não são abordados).
 
+## O que o bot sabe: a pasta `conhecimento`
+
+Tudo que está nos arquivos `.md` e `.txt` da pasta **`conhecimento`** é lido pelo bot ao ligar (parcelamento, serviços incluídos, sua história). Para ensinar algo novo, crie ou edite um arquivo lá, salve e reinicie o bot (feche a janela do `iniciar.bat` e abra de novo). Se a resposta não estiver lá, o bot não inventa: passa a conversa para você. Confira principalmente o arquivo `01-parcelamento.md`, que tem a forma de pagamento dos honorários que o bot vai falar.
+
 ## No dia a dia
 
 - **Assumir uma conversa:** é só responder pelo seu WhatsApp no celular. O bot percebe e se cala naquela conversa.
 - **Parar tudo na hora:** crie um arquivo de texto chamado **`PARAR.txt`** nesta pasta. Para voltar, apague o arquivo.
-- **Avisos por e-mail:** você recebe quando o lead responde pela primeira vez, quando o bot passa a conversa para você, quando alguém pede para parar, quando chega áudio/arquivo e quando algo dá errado.
+- **Avisos por e-mail:** só quando você precisa agir: o bot passou a conversa para você, chegou áudio ou arquivo, não foi possível contatar um lead ou algo deu errado.
 - **Funil:** o bot atualiza o status do lead no seu CRM (contatado, decidindo, perdido) e escreve uma nota em cada passo.
 
 ## O que o bot nunca faz

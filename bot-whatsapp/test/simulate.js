@@ -8,6 +8,7 @@ import { criarCerebro, montarHistorico } from '../src/brain.js';
 import { dividirMensagens, extrairValoresReais, pediuParar, validarSaida } from '../src/guards.js';
 import { montarAbertura } from '../src/opening.js';
 import { montarSistema } from '../src/prompt.js';
+import { carregarConhecimento } from '../src/conhecimento.js';
 import { criarSite } from '../src/site.js';
 import { normalizarTelefoneBR } from '../src/util.js';
 
@@ -32,6 +33,7 @@ const config = {
   maxIdadeLeadHoras: 48,
   economiaMinParaReuniao: 5000,
   listaTeste: [],
+  assistenteNome: 'Lia',
 };
 
 // --------------------------------------------------------------------------- simulações
@@ -158,7 +160,7 @@ function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {} } = {}
   };
   const client = clienteFalso(roteiro);
   const cfgFinal = { ...config, ...cfg };
-  const cerebro = criarCerebro({ modelo: 'teste', config: cfgFinal, client });
+  const cerebro = criarCerebro({ modelo: 'teste', config: cfgFinal, client, conhecimento: carregarConhecimento() });
   const site =
     siteFalso ||
     criarSite({
@@ -244,7 +246,8 @@ await teste('todas as variantes de abertura passam nas travas e se apresentam co
   for (const l of casos) {
     const a = montarAbertura(l);
     variantes.add(a.variante);
-    assert.match(a.texto, /assistente virtual do Gabriel Zaneloti/);
+    assert.match(a.texto, /Aqui é Lia, assistente do Gabriel Zaneloti/);
+    assert.doesNotMatch(a.texto, /virtual/i);
     assert.equal(validarSaida(a.texto, l).ok, true, `${a.variante}: ${validarSaida(a.texto, l).motivo}`);
     assert.doesNotMatch(a.texto, /12%|honor[aá]rio/i, 'abertura não fala de honorário');
   }
@@ -283,7 +286,7 @@ await teste('lead novo recebe a abertura uma única vez e vai para "contatado"',
   const l = lead();
   const c = await abrir(ctx, l);
   assert.equal(ctx.wa.enviados.length, 1);
-  assert.match(ctx.wa.enviados[0].texto, /assistente virtual/);
+  assert.match(ctx.wa.enviados[0].texto, /Aqui é Lia, assistente do Gabriel/);
   assert.equal(c.estado, 'ativa');
   assert.equal(ctx.store.leads.get(l.id).status, 'contatado');
   // Reinício do bot / nova varredura: não duplica
@@ -348,8 +351,7 @@ await teste('lead pergunta o custo: assistente responde (12% sobre economia comp
   ctx.bot.pararTimers();
   assert.equal(ctx.wa.enviados.length, 3); // abertura + 2 mensagens
   assert.match(ctx.wa.enviados[1].texto, /12%/);
-  const aviso = ctx.avisos.find((a) => a.tipo === 'Lead respondeu ao assistente');
-  assert.ok(aviso, 'avisou que o lead respondeu');
+  assert.equal(ctx.avisos.length, 0, 'não manda e-mail só porque o lead respondeu');
   // O modelo recebeu o histórico e as ferramentas
   const chamada = ctx.client.chamadas[0];
   assert.ok(chamada.tools.length === 5);
@@ -515,6 +517,57 @@ await teste('economia pequena: o prompt enviado ao Claude proíbe oferecer reuni
   await ctx.bot.responder(c.id);
   ctx.bot.pararTimers();
   assert.match(ctx.client.chamadas[0].system, /NÃO ofereça reunião/);
+});
+
+
+console.log('\nConhecimento');
+
+await teste('pasta de conhecimento é carregada e os valores nela podem ser citados', () => {
+  const k = carregarConhecimento();
+  assert.ok(k.arquivos.length >= 3, 'leu os arquivos');
+  assert.ok(!k.arquivos.some((f) => f.startsWith('_')), 'ignora arquivos que começam com _');
+  assert.match(k.texto, /60 parcelas/);
+  assert.ok(k.valores.includes(200) && k.valores.includes(500));
+  const l = lead();
+  const resposta = 'Dá para parcelar sim, em até 60 parcelas. A parcela mínima é de R$ 200 para pessoa física e R$ 500 para empresa.';
+  assert.equal(validarSaida(resposta, l).ok, false, 'sem o conhecimento, os valores seriam bloqueados');
+  assert.equal(validarSaida(resposta, l, k.valores).ok, true);
+});
+
+await teste('conhecimento vai para o prompt e a resposta sobre parcelamento sai', async () => {
+  const resposta = 'Dá para parcelar sim. O saldo do INSS da obra pode ser parcelado em até 60 vezes, com parcela mínima de R$ 200 para pessoa física, e eu mesmo faço o parcelamento no final da obra.\n\nVocê está pensando em parcelar o INSS ou o honorário?';
+  const ctx = montar({ roteiro: [texto(resposta)] });
+  const c = await abrir(ctx, lead());
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'dá pra parcelar?' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.match(ctx.client.chamadas[0].system, /CONHECIMENTO DO GABRIEL/);
+  assert.match(ctx.client.chamadas[0].system, /50% no início do contrato/);
+  assert.match(ctx.wa.enviados[1].texto, /60 vezes/);
+  assert.equal(ctx.avisos.length, 0, 'sem e-mail quando o bot resolve sozinho');
+});
+
+await teste('pergunta fora do conhecimento: o prompt manda passar para o Gabriel em vez de inventar', () => {
+  const s = montarSistema(lead(), config, carregarConhecimento().texto);
+  assert.match(s, /NÃO invente: use passar_para_gabriel/);
+  assert.match(s, /Nunca afirme ser uma pessoa/);
+  assert.match(s, /Você é Lia, assistente do Gabriel/);
+});
+
+await teste('e-mail só quando você precisa agir', async () => {
+  // Pedir para parar não gera e-mail
+  const a = montar();
+  const ca = await abrir(a, lead());
+  await a.bot.aoReceber({ telefone: telefoneDe(ca), texto: 'pare' });
+  assert.equal(a.avisos.length, 0);
+  // Encerrar a conversa (lead sem interesse) não gera e-mail
+  const b = montar({ roteiro: [[...texto('Tudo bem, obrigado pelo seu tempo.'), uso('encerrar_conversa', { motivo: 'sem interesse' })]] });
+  const cb = await abrir(b, lead());
+  await b.bot.aoReceber({ telefone: telefoneDe(cb), texto: 'não tenho interesse, obrigado' });
+  await b.bot.responder(cb.id);
+  b.bot.pararTimers();
+  assert.equal(b.store.conversas[0].estado, 'encerrada');
+  assert.equal(b.avisos.length, 0);
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

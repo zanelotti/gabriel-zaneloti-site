@@ -4,6 +4,7 @@
 import { existsSync } from 'node:fs';
 import { criarBot } from './bot.js';
 import { criarCerebro } from './brain.js';
+import { carregarConhecimento } from './conhecimento.js';
 import { config, validarConfig } from './config.js';
 import { criarNotificador } from './notify.js';
 import { criarSite } from './site.js';
@@ -28,7 +29,9 @@ const parado = () => process.env.BOT_ATIVO === '0' || existsSync(config.arquivoP
 const store = criarStore({ url: config.supabaseUrl, key: config.supabaseKey });
 const site = criarSite({ siteUrl: config.siteUrl });
 const notificar = criarNotificador({ resendKey: config.resendKey, para: config.emailAviso, log });
-const cerebro = criarCerebro({ apiKey: config.anthropicKey, modelo: config.modelo, config });
+const conhecimento = carregarConhecimento();
+log.info(`Conhecimento carregado: ${conhecimento.arquivos.length ? conhecimento.arquivos.join(', ') : 'nenhum arquivo'}`);
+const cerebro = criarCerebro({ apiKey: config.anthropicKey, modelo: config.modelo, config, conhecimento });
 
 let bot;
 const wa = criarWhatsApp({

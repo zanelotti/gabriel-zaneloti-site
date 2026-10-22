@@ -55,7 +55,7 @@ export function valoresPermitidos(lead) {
 /**
  * @returns {{ok: true} | {ok: false, motivo: string}}
  */
-export function validarSaida(texto, lead) {
+export function validarSaida(texto, lead, valoresExtras = []) {
   const t = String(texto ?? '');
   if (!t.trim()) return { ok: false, motivo: 'mensagem vazia' };
   if (t.length > 900) return { ok: false, motivo: 'mensagem longa demais para WhatsApp (resuma)' };
@@ -64,7 +64,7 @@ export function validarSaida(texto, lead) {
     if (regex.test(t)) return { ok: false, motivo: `contém ${nome}, que é proibido` };
   }
 
-  const permitidos = valoresPermitidos(lead);
+  const permitidos = [...valoresPermitidos(lead), ...valoresExtras];
   for (const v of extrairValoresReais(t)) {
     const confere = permitidos.some((p) => Math.abs(p - v) <= 1);
     if (!confere) {

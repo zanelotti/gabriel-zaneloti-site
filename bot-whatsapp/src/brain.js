@@ -96,14 +96,14 @@ export function montarHistorico(historico) {
   return base;
 }
 
-export function criarCerebro({ apiKey, modelo, config, client }) {
+export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { texto: '', valores: [] } }) {
   const anthropic = client || new Anthropic({ apiKey });
 
   /**
    * @returns {Promise<{mensagens: string[], acao: null | {tipo: 'passar'|'encerrar', motivo: string, resumo?: string}}>}
    */
   async function gerarResposta({ lead, historico, ferramentas, log = console }) {
-    const system = montarSistema(lead, config);
+    const system = montarSistema(lead, config, conhecimento.texto);
     const messages = montarHistorico(historico);
     let acao = null;
     let bloqueios = 0;
@@ -149,7 +149,7 @@ export function criarCerebro({ apiKey, modelo, config, client }) {
 
         if (acao) {
           // Ação terminal: usa o texto que o modelo escreveu junto (se passar nas travas) ou um padrão seguro.
-          const v = texto ? validarSaida(texto, lead) : { ok: false };
+          const v = texto ? validarSaida(texto, lead, conhecimento.valores) : { ok: false };
           const msgs = v.ok ? dividirMensagens(texto) : [TEXTO_PADRAO[acao.tipo]];
           return { mensagens: msgs, acao };
         }
@@ -157,7 +157,7 @@ export function criarCerebro({ apiKey, modelo, config, client }) {
       }
 
       // Resposta final em texto
-      const v = validarSaida(texto, lead);
+      const v = validarSaida(texto, lead, conhecimento.valores);
       if (v.ok) return { mensagens: dividirMensagens(texto), acao };
 
       bloqueios += 1;

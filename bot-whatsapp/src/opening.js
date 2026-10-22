@@ -1,7 +1,7 @@
 /**
  * Primeira mensagem enviada ao lead (a mesma lógica do aviso por e-mail do site,
- * em notify-lead.js), com uma diferença deliberada: o bot se apresenta como
- * ASSISTENTE VIRTUAL do Gabriel, e não como se fosse o próprio Gabriel.
+ * em notify-lead.js), com uma diferença deliberada: o bot se apresenta pelo nome
+ * (ASSISTENTE_NOME) como assistente do Gabriel, e não como se fosse o próprio Gabriel.
  *
  * Regras de conteúdo (alinhadas com o Gabriel): nada de "só paga se economizar",
  * sem mencionar honorários na abertura, e sem as palavras "legal", "jurídico",
@@ -14,12 +14,12 @@ const ECONOMIA_GRANDE_MIN = 30000;
 const REDUCAO_GRANDE_MIN = 70;
 const ECONOMIA_PEQUENA_MAX = 5000;
 
-export function montarAbertura(lead) {
+export function montarAbertura(lead, nomeAssistente = 'Lia') {
   const isPJ = lead.responsavel === 'PJ';
   const primeiro = primeiroNome(lead.nome);
   const saudacao = primeiro
-    ? `Oi, ${primeiro}, tudo bem? Sou o assistente virtual do Gabriel Zaneloti, da regularização de INSS de obra.`
-    : 'Oi, tudo bem? Sou o assistente virtual do Gabriel Zaneloti, da regularização de INSS de obra.';
+    ? `Oi, ${primeiro}, tudo bem? Aqui é ${nomeAssistente}, assistente do Gabriel Zaneloti, da regularização de INSS de obra.`
+    : `Oi, tudo bem? Aqui é ${nomeAssistente}, assistente do Gabriel Zaneloti, da regularização de INSS de obra.`;
 
   const area = Number(lead.area_principal);
   const obra = Number.isFinite(area) && area > 0 ? `a obra de ${formatarArea(area)}` : 'a sua obra';

@@ -85,7 +85,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     const conversa = await store.criarConversa({ lead_id: lead.id, telefone: digitosJid, jid });
     if (!conversa) return; // já criada por outra execução
 
-    const abertura = montarAbertura(lead);
+    const abertura = montarAbertura(lead, config.assistenteNome);
     const v = validarSaida(abertura.texto, lead);
     if (!v.ok) {
       await store.setEstado(conversa.id, 'encerrada', `abertura bloqueada: ${v.motivo}`);
@@ -149,12 +149,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       await enviar(conversa, 'Tudo bem, não te envio mais mensagens. Obrigado pelo seu tempo!');
       await store.setEstado(conversa.id, 'optout', 'pediu para parar');
       await store.atualizarLead(conversa.lead_id, { status: 'perdido', nota: 'Pediu para não receber mais mensagens.' });
-      await notificar.avisar({ tipo: 'Pediu para parar', lead, telefone: conversa.telefone, motivo: 'O lead pediu para não receber mais mensagens. O bot encerrou o contato.', historico });
       return;
-    }
-
-    if (historico.filter((m) => m.direcao === 'lead').length === 1) {
-      await notificar.avisar({ tipo: 'Lead respondeu ao assistente', lead, telefone: conversa.telefone, motivo: 'O assistente vai continuar a conversa. Se quiser assumir, é só responder pelo seu WhatsApp: o bot se cala.', historico });
     }
 
     if (tipo !== 'texto' && !(texto && texto.trim())) {
@@ -275,8 +270,6 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       } else if (acao?.tipo === 'encerrar') {
         await store.setEstado(conversaId, 'encerrada', acao.motivo);
         await store.atualizarLead(lead.id, { status: 'perdido', nota: `Conversa encerrada pelo bot: ${acao.motivo}` });
-        const hist = await store.historico(conversaId);
-        await notificar.avisar({ tipo: 'Conversa encerrada', lead, telefone: conversa.telefone, motivo: acao.motivo, historico: hist });
       }
     } finally {
       emAndamento.delete(conversaId);

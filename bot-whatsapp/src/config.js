@@ -45,6 +45,9 @@ export const config = {
   modoTeste: process.env.MODO_TESTE === '1',
 
   arquivoParar: process.env.ARQUIVO_PARAR || 'PARAR.txt',
+
+  // Nome do assistente nas conversas (aparece na primeira mensagem).
+  assistenteNome: process.env.ASSISTENTE_NOME || 'Lia',
 };
 
 export function validarConfig() {
