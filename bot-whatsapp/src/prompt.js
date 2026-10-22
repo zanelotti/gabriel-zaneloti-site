@@ -94,10 +94,13 @@ function descreverLead(lead, config) {
   return `# DADOS DO LEAD (única fonte de números que você pode citar)\n${linhas.map((l) => `- ${l}`).join('\n')}\n\n${politica}`;
 }
 
-export function montarSistema(lead, config, conhecimento = '') {
+export function montarSistema(lead, config, conhecimento = '', trechos = '') {
   const base = montarBase(config.assistenteNome || 'Lia');
   const bloco = conhecimento
     ? `\n# CONHECIMENTO DO GABRIEL (fonte oficial)\nUse este material para responder dúvidas sobre parcelamento, o que está incluído no serviço, o processo e quem é o Gabriel. Não o contradiga. Se a pergunta não estiver coberta aqui nem nos dados do lead, NÃO invente: use passar_para_gabriel.\n\n${conhecimento}\n`
     : '';
-  return `${base}\n${descreverLead(lead, config)}\n${bloco}`;
+  const blocoDocs = trechos
+    ? `\n# TRECHOS DE DOCUMENTOS OFICIAIS (normativa / manual), encontrados para a pergunta atual\nUse SÓ se ajudarem a responder o que a pessoa perguntou. Explique em linguagem simples, curta, sem citar número de artigo nem copiar o texto. Não aplique a norma ao caso dela como se fosse conclusão ("no seu caso você vai pagar...") nem prometa resultado: o caso só se confirma na análise do Gabriel. Se os trechos não responderem com segurança, use passar_para_gabriel.\n\n${trechos}\n`
+    : '';
+  return `${base}\n${descreverLead(lead, config)}\n${bloco}${blocoDocs}`;
 }

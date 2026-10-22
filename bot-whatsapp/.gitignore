@@ -4,3 +4,7 @@ auth/
 node_modules/
 PARAR.txt
 *.log
+# Documentos de consulta e índice (ficam só neste computador)
+documentos/*
+!documentos/_LEIA-ME.md
+cache/

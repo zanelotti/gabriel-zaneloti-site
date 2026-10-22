@@ -44,6 +44,14 @@ Apague o valor de `LISTA_TESTE` no `.env`, salve e reinicie o `iniciar.bat` (fec
 
 Tudo que está nos arquivos `.md` e `.txt` da pasta **`conhecimento`** é lido pelo bot ao ligar (parcelamento, serviços incluídos, sua história). Para ensinar algo novo, crie ou edite um arquivo lá, salve e reinicie o bot (feche a janela do `iniciar.bat` e abra de novo). Se a resposta não estiver lá, o bot não inventa: passa a conversa para você. Confira principalmente o arquivo `01-parcelamento.md`, que tem a forma de pagamento dos honorários que o bot vai falar.
 
+## Documentos grandes: a pasta `documentos`
+
+Para normativa, manuais e outros arquivos grandes (por exemplo a IN RFB 2.021/2021 e o Manual do SERO), use a pasta **`documentos`** (dentro de `bot-whatsapp`). Copie para lá os arquivos em PDF, Word (.docx) ou .txt. Depois feche a janela do bot e abra o `iniciar.bat` de novo.
+
+O bot não lê o documento inteiro a cada conversa: quando o lead faz uma pergunta, ele procura só os trechos relacionados e usa para responder em linguagem simples. Na primeira vez, arquivos grandes levam alguns minutos para serem lidos (aparece "lendo..." na tela); depois fica rápido. PDF escaneado (foto de página) não tem texto: nesse caso a tela avisa e você precisa de uma versão em texto. Se a norma não responder com segurança, o bot passa a conversa para você. Importante: se você trocar de versão da norma, tire a antiga da pasta para o bot não misturar as duas.
+
+Regra prática: coisas curtas e suas (preço, forma de pagamento, como você trabalha) vão na pasta `conhecimento`; textos longos oficiais vão na pasta `documentos`.
+
 ## No dia a dia
 
 - **Assumir uma conversa:** é só responder pelo seu WhatsApp no celular. O bot percebe e se cala naquela conversa.
@@ -75,6 +83,6 @@ Tudo que está nos arquivos `.md` e `.txt` da pasta **`conhecimento`** é lido p
 
 ## Limitações atuais
 
-- Foi testado por simulação (27 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
+- Foi testado por simulação (37 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
 - Áudios e imagens do lead não são lidos: o bot pede que escreva e te avisa.
 - Não é feito para contatos em grupo.

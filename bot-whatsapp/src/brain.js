@@ -5,6 +5,7 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { dividirMensagens, validarSaida } from './guards.js';
+import { formatarTrechos } from './documentos.js';
 import { montarSistema } from './prompt.js';
 
 export const FERRAMENTAS = [
@@ -96,14 +97,29 @@ export function montarHistorico(historico) {
   return base;
 }
 
-export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { texto: '', valores: [] } }) {
+export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { texto: '', valores: [] }, documentos = null }) {
   const anthropic = client || new Anthropic({ apiKey });
 
   /**
    * @returns {Promise<{mensagens: string[], acao: null | {tipo: 'passar'|'encerrar', motivo: string, resumo?: string}}>}
    */
   async function gerarResposta({ lead, historico, ferramentas, log = console }) {
-    const system = montarSistema(lead, config, conhecimento.texto);
+    // Busca nos documentos grandes (normativa, manual) os trechos ligados ao que o lead disse por último.
+    let trechos = { texto: '', valores: [] };
+    if (documentos && documentos.total > 0) {
+      try {
+        const consulta = historico
+          .filter((m) => m.direcao === 'lead')
+          .slice(-3)
+          .map((m) => m.texto)
+          .join(' ');
+        trechos = formatarTrechos(documentos.buscar(consulta, { k: 4 }));
+      } catch (e) {
+        log.warn(`[cerebro] busca nos documentos falhou: ${e.message}`);
+      }
+    }
+    const valoresExtras = [...conhecimento.valores, ...trechos.valores];
+    const system = montarSistema(lead, config, conhecimento.texto, trechos.texto);
     const messages = montarHistorico(historico);
     let acao = null;
     let bloqueios = 0;
@@ -149,7 +165,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
 
         if (acao) {
           // Ação terminal: usa o texto que o modelo escreveu junto (se passar nas travas) ou um padrão seguro.
-          const v = texto ? validarSaida(texto, lead, conhecimento.valores) : { ok: false };
+          const v = texto ? validarSaida(texto, lead, valoresExtras) : { ok: false };
           const msgs = v.ok ? dividirMensagens(texto) : [TEXTO_PADRAO[acao.tipo]];
           return { mensagens: msgs, acao };
         }
@@ -157,7 +173,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
       }
 
       // Resposta final em texto
-      const v = validarSaida(texto, lead, conhecimento.valores);
+      const v = validarSaida(texto, lead, valoresExtras);
       if (v.ok) return { mensagens: dividirMensagens(texto), acao };
 
       bloqueios += 1;

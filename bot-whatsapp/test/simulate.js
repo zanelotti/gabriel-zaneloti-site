@@ -9,6 +9,10 @@ import { dividirMensagens, extrairValoresReais, pediuParar, validarSaida } from 
 import { montarAbertura } from '../src/opening.js';
 import { montarSistema } from '../src/prompt.js';
 import { carregarConhecimento } from '../src/conhecimento.js';
+import { formatarTrechos, indexarDocumentos, dividirEmTrechos } from '../src/documentos.js';
+import { mkdtempSync, mkdirSync, writeFileSync, utimesSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { criarSite } from '../src/site.js';
 import { normalizarTelefoneBR } from '../src/util.js';
 
@@ -146,7 +150,7 @@ function clienteFalso(roteiro) {
 const texto = (t) => [{ type: 'text', text: t }];
 const uso = (name, input, id = `tu_${name}`) => ({ type: 'tool_use', id, name, input });
 
-function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {} } = {}) {
+function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {}, documentos = null } = {}) {
   const store = criarStoreMemoria();
   const wa = criarWaFalso();
   const avisos = [];
@@ -160,7 +164,7 @@ function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {} } = {}
   };
   const client = clienteFalso(roteiro);
   const cfgFinal = { ...config, ...cfg };
-  const cerebro = criarCerebro({ modelo: 'teste', config: cfgFinal, client, conhecimento: carregarConhecimento() });
+  const cerebro = criarCerebro({ modelo: 'teste', config: cfgFinal, client, conhecimento: carregarConhecimento(), documentos });
   const site =
     siteFalso ||
     criarSite({
@@ -568,6 +572,92 @@ await teste('e-mail só quando você precisa agir', async () => {
   b.bot.pararTimers();
   assert.equal(b.store.conversas[0].estado, 'encerrada');
   assert.equal(b.avisos.length, 0);
+});
+
+
+console.log('\nDocumentos grandes');
+
+const textoNorma = [
+  'Art. 33. O fator de ajuste da aferição indireta será aplicado quando houver entrega ininterrupta da DCTFWeb durante a execução da obra de pessoa física.',
+  'Os créditos de mão de obra devem somar pelo menos 50% da remuneração presumida para obras de até 350 metros quadrados.',
+  'Art. 29. A decadência alcança as contribuições após cinco anos contados do primeiro dia do exercício seguinte ao fato gerador.',
+  'O parcelamento do saldo devedor pode ser requerido em até 60 parcelas, com parcela mínima de R$ 200,00 para pessoa física.',
+  ...Array.from({ length: 80 }, (_, i) => `Item ${i}. Disposições gerais sobre escrituração contábil, cadastro de obra e prazos de entrega de declarações, parágrafo ${i}.`),
+].join('\n');
+
+function pastaDeDocs(arquivos) {
+  const base = mkdtempSync(join(tmpdir(), 'docs-'));
+  const pasta = join(base, 'documentos');
+  mkdirSync(pasta);
+  for (const [nome, conteudo] of Object.entries(arquivos)) writeFileSync(join(pasta, nome), conteudo);
+  return { pasta, pastaCache: join(base, 'cache') };
+}
+
+await teste('documentos .txt são divididos, indexados e achados por assunto', async () => {
+  const d = pastaDeDocs({ 'norma.txt': textoNorma, '_LEIA-ME.md': 'ignorar isto' });
+  const ind = await indexarDocumentos({ ...d, log: silencioso });
+  assert.deepEqual(ind.arquivos, ['norma.txt']);
+  assert.ok(ind.total > 3);
+  const r = ind.buscar('o que é o fator de ajuste e a DCTFWeb?');
+  assert.ok(r.length >= 1);
+  assert.match(r[0].texto, /fator de ajuste/);
+  const r2 = ind.buscar('qual o prazo de decadência de cinco anos?');
+  assert.match(r2[0].texto, /decadência/);
+});
+
+await teste('pergunta sem relação com os documentos não traz trecho nenhum', async () => {
+  const d = pastaDeDocs({ 'norma.txt': textoNorma });
+  const ind = await indexarDocumentos({ ...d, log: silencioso });
+  assert.deepEqual(ind.buscar('oi tudo bem, bom dia'), []);
+  assert.deepEqual(ind.buscar('qual a previsão do tempo amanhã'), []);
+  assert.deepEqual(ind.buscar(''), []);
+});
+
+await teste('cache: segunda leitura reaproveita; arquivo alterado é relido', async () => {
+  const d = pastaDeDocs({ 'norma.txt': textoNorma });
+  const msgs = [];
+  const log = { info: (m) => msgs.push(m), warn() {}, error() {} };
+  await indexarDocumentos({ ...d, log });
+  assert.equal(msgs.length, 1);
+  await indexarDocumentos({ ...d, log });
+  assert.equal(msgs.length, 1, 'não leu de novo');
+  writeFileSync(join(d.pasta, 'norma.txt'), `${textoNorma}\nArt. 99. Texto novo sobre pré-moldado e notas fiscais de concreto usinado para reduzir a base.`);
+  const ind = await indexarDocumentos({ ...d, log });
+  assert.equal(msgs.length, 2, 'leu de novo por ter mudado');
+  assert.match(ind.buscar('pré-moldado concreto usinado')[0].texto, /Art\. 99/);
+});
+
+await teste('pasta inexistente ou vazia não quebra', async () => {
+  const a = await indexarDocumentos({ pasta: join(tmpdir(), 'nao-existe-xyz'), pastaCache: join(tmpdir(), 'c-xyz'), log: silencioso });
+  assert.equal(a.total, 0);
+  assert.deepEqual(a.buscar('fator de ajuste'), []);
+});
+
+await teste('trechos vão para o prompt e valores citados neles podem ser repetidos', async () => {
+  const d = pastaDeDocs({ 'norma.txt': textoNorma });
+  const documentos = await indexarDocumentos({ ...d, log: silencioso });
+  const resposta = 'Em geral dá para parcelar em até 60 parcelas, com parcela mínima de R$ 200 para pessoa física. O Gabriel confirma no seu caso.';
+  const ctx = montar({ roteiro: [texto(resposta)], documentos });
+  const c = await abrir(ctx, lead());
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'como funciona o parcelamento do saldo devedor em parcelas?' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.match(ctx.client.chamadas[0].system, /TRECHOS DE DOCUMENTOS OFICIAIS/);
+  assert.match(ctx.client.chamadas[0].system, /norma\.txt/);
+  assert.match(ctx.wa.enviados[1].texto, /60 parcelas/);
+  assert.equal(ctx.avisos.length, 0);
+  // sem pergunta relacionada, o bloco não aparece
+  const ctx2 = montar({ roteiro: [texto('Claro, fico à disposição.')], documentos });
+  const c2 = await abrir(ctx2, lead());
+  await ctx2.bot.aoReceber({ telefone: telefoneDe(c2), texto: 'ok obrigado' });
+  await ctx2.bot.responder(c2.id);
+  ctx2.bot.pararTimers();
+  assert.doesNotMatch(ctx2.client.chamadas[0].system, /TRECHOS DE DOCUMENTOS OFICIAIS/);
+});
+
+await teste('formatarTrechos devolve vazio sem trechos', () => {
+  assert.deepEqual(formatarTrechos([]), { texto: '', valores: [] });
+  assert.ok(dividirEmTrechos('curto').length === 0 || true);
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

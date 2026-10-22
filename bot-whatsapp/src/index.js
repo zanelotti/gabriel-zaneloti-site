@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { criarBot } from './bot.js';
 import { criarCerebro } from './brain.js';
 import { carregarConhecimento } from './conhecimento.js';
+import { indexarDocumentos } from './documentos.js';
 import { config, validarConfig } from './config.js';
 import { criarNotificador } from './notify.js';
 import { criarSite } from './site.js';
@@ -31,7 +32,18 @@ const site = criarSite({ siteUrl: config.siteUrl });
 const notificar = criarNotificador({ resendKey: config.resendKey, para: config.emailAviso, log });
 const conhecimento = carregarConhecimento();
 log.info(`Conhecimento carregado: ${conhecimento.arquivos.length ? conhecimento.arquivos.join(', ') : 'nenhum arquivo'}`);
-const cerebro = criarCerebro({ apiKey: config.anthropicKey, modelo: config.modelo, config, conhecimento });
+let documentos = null;
+try {
+  documentos = await indexarDocumentos({ log });
+  log.info(
+    documentos.arquivos.length
+      ? `Documentos indexados: ${documentos.arquivos.join(', ')} (${documentos.total} trechos)`
+      : 'Documentos: nenhum arquivo na pasta "documentos" (opcional).'
+  );
+} catch (e) {
+  log.warn(`Não consegui indexar a pasta documentos (o bot segue sem ela): ${e.message}`);
+}
+const cerebro = criarCerebro({ apiKey: config.anthropicKey, modelo: config.modelo, config, conhecimento, documentos });
 
 let bot;
 const wa = criarWhatsApp({
