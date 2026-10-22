@@ -1297,6 +1297,40 @@ await teste('chamada ao Claude desliga o pensamento; se a API recusar o parâmet
   assert.deepEqual(ok[0].thinking, { type: 'disabled' });
 });
 
+console.log('\nAbertura com os números do site');
+
+await teste('abertura traz o valor da Receita, o valor com planejamento, a economia em R$ e o percentual (pessoa física)', () => {
+  const l = lead({ area_principal: 180, inss_estimado: 16760, valor_apos_reducao: 9311, economia_estimada: 7449, percentual_reducao: 44.4 });
+  const a = montarAbertura(l, 'Lia');
+  assert.equal(
+    a.texto.replace(/\u00a0/g, ' '),
+    'Oi, Maria, tudo bem? Aqui é Lia, assistente do Gabriel Zaneloti, especialista em regularização de INSS de obra. Vi que você simulou a obra de 180 m² aqui no site, e a estimativa do valor cobrado pela Receita Federal foi de R$ 16.760. Com nosso planejamento o INSS da obra ficaria em R$ 9.311; isso representa R$ 7.449 (cerca de 44,4%) de economia. Posso te explicar rapidinho de onde vêm esses números?', 'texto exatamente como o Gabriel pediu');
+  assert.equal(validarSaida(a.texto, l).ok, true, 'passa nas travas');
+  assert.doesNotMatch(a.texto, /honor[aá]rio|12%/i);
+});
+
+await teste('abertura calcula o percentual quando o site não trouxe e mantém o texto antigo se faltar valor', () => {
+  const sem = montarAbertura(lead({ inss_estimado: 20000, valor_apos_reducao: 10000, economia_estimada: 10000, percentual_reducao: null }), 'Lia');
+  assert.match(sem.texto, /cerca de 50%\) de economia/);
+  const faltando = montarAbertura(lead({ inss_estimado: 20000, economia_estimada: 10000, valor_apos_reducao: null }), 'Lia');
+  assert.doesNotMatch(faltando.texto, /Com nosso planejamento/);
+  assert.match(faltando.texto, /economia ficou em torno de R\$\s10\.000/);
+});
+
+await teste('a abertura nova vale para economia grande, média e pequena', () => {
+  for (const eco of [3000, 9000, 40000]) {
+    const l = lead({ inss_estimado: eco * 2, valor_apos_reducao: eco, economia_estimada: eco, percentual_reducao: 50 });
+    const a = montarAbertura(l, 'Lia');
+    assert.match(a.texto, /Com nosso planejamento o INSS da obra ficaria em/);
+    assert.equal(validarSaida(a.texto, l).ok, true);
+  }
+});
+
+await teste('empresa nunca recebe valores na abertura', () => {
+  const a = montarAbertura(lead({ responsavel: 'PJ', inss_estimado: 17000, economia_estimada: 9000, valor_apos_reducao: 8000 }), 'Lia');
+  assert.doesNotMatch(a.texto, /R\$/);
+});
+
 console.log('\nAprendizado automático');
 
 const itemBom = {

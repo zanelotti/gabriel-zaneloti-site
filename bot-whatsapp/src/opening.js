@@ -27,8 +27,8 @@ function corpoComValores(lead, obra) {
   const eco = Number(lead.economia_estimada);
   let pct = numeroOk(lead.percentual_reducao) ? Number(lead.percentual_reducao) : NaN;
   if (!Number.isFinite(pct) && sem > 0) pct = (eco / sem) * 100;
-  const pctTxt = Number.isFinite(pct) && pct > 0 ? ` (cerca de ${pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% de economia)` : '';
-  return `Vi que você simulou ${obra} aqui no site, e a estimativa do valor cobrado pela Receita Federal foi de ${formatarReaisInteiros(sem)}. Com nosso planejamento o INSS da obra ficaria em ${formatarReaisInteiros(com)}; isso representa ${formatarReaisInteiros(eco)}${pctTxt}. Esta é uma hora ruim para eu te explicar de onde vêm esses números?`;
+  const pctTxt = Number.isFinite(pct) && pct > 0 ? ` (cerca de ${pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%) de economia` : '';
+  return `Vi que você simulou ${obra} aqui no site, e a estimativa do valor cobrado pela Receita Federal foi de ${formatarReaisInteiros(sem)}. Com nosso planejamento o INSS da obra ficaria em ${formatarReaisInteiros(com)}; isso representa ${formatarReaisInteiros(eco)}${pctTxt}. Posso te explicar rapidinho de onde vêm esses números?`;
 }
 
 export function montarAbertura(lead, nomeAssistente = 'Lia') {
