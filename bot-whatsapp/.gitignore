@@ -1,0 +1,6 @@
+# Segredos e sessão do WhatsApp: NUNCA enviar ao GitHub
+.env
+auth/
+node_modules/
+PARAR.txt
+*.log

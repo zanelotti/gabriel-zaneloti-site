@@ -1,0 +1,22 @@
+{
+  "name": "bot-whatsapp-gabriel",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Assistente de WhatsApp (QR code) que aborda leads da calculadora de INSS de obra",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node test/simulate.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
+    "@supabase/supabase-js": "^2.118.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "dotenv": "^18.0.9",
+    "pino": "^10.4.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
