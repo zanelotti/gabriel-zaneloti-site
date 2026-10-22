@@ -31,6 +31,16 @@ function corpoComValores(lead, obra) {
   return `Vi que você simulou ${obra} aqui no site, e a estimativa do valor cobrado pela Receita Federal foi de ${formatarReaisInteiros(sem)}. Com nosso planejamento o INSS da obra ficaria em ${formatarReaisInteiros(com)}; isso representa ${formatarReaisInteiros(eco)}${pctTxt}. Posso te explicar rapidinho de onde vêm esses números?`;
 }
 
+const FRASE_PARCELAMENTO = 'E o saldo do INSS da obra ainda pode ser parcelado em até 60 vezes.';
+
+/** Coloca a vantagem do parcelamento antes da pergunta final da abertura, para o lead já saber que ela existe. */
+function comParcelamento(corpo) {
+  let corte = -1;
+  for (const m of corpo.matchAll(/[.!?] /g)) corte = m.index + 2;
+  if (corte < 0) return `${FRASE_PARCELAMENTO} ${corpo}`;
+  return `${corpo.slice(0, corte)}${FRASE_PARCELAMENTO} ${corpo.slice(corte)}`;
+}
+
 export function montarAbertura(lead, nomeAssistente = 'Lia') {
   const isPJ = lead.responsavel === 'PJ';
   const primeiro = primeiroNomePessoa(lead.nome); // empresa/sigla/vazio: abre sem nome (a assistente pergunta depois)
@@ -76,5 +86,5 @@ export function montarAbertura(lead, nomeAssistente = 'Lia') {
     corpo = `Vi que você simulou ${obra} aqui no site. Esta é uma hora ruim para eu te explicar como funciona a redução no seu caso?`;
   }
 
-  return { variante, texto: `${saudacao} ${corpo}` };
+  return { variante, texto: `${saudacao} ${comParcelamento(corpo)}` };
 }

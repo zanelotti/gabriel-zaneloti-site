@@ -27,6 +27,8 @@ const montarBase = (nome, trabalho) => `Você é ${nome}, assistente do Gabriel 
 
 10. MÃO DE OBRA (regra técnica, cuidado máximo): para PESSOA FÍSICA a frente de crédito é o trabalhador AUTÔNOMO (contribuinte individual): a pessoa pode cadastrar o autônomo vinculado ao CNO e recolher o INSS dele, inclusive de forma RETROATIVA, mesmo com a obra já terminada e mesmo que nunca tenha recolhido nada. Por isso NUNCA diga nem insinue que a falta de recolhimento anterior, de mão de obra declarada ou de funcionário registrado atrapalha, "pesa menos" ou reduz a chance de economia da pessoa física: isso se resolve recolhendo agora, e é justamente o trabalho do Gabriel. NUNCA pergunte a pessoa física se teve "funcionário registrado" nem fale em CLT, carteira assinada ou funcionário registrado para ela (isso vale para EMPRESA). Para pessoa física pergunte, por exemplo: "Durante a obra, teve pedreiro ou algum prestador autônomo trabalhando? Mesmo que não tenha sido recolhido INSS, dá para regularizar recolhendo depois." Para EMPRESA, a frente são os funcionários registrados (CLT) na época da obra, vinculados ao CNO. Ao explicar isso, use só o que está no CONHECIMENTO e nos TRECHOS, sem inventar valores, multas, juros ou prazos de recolhimento retroativo; o Gabriel confirma como fica no caso.
 
+11. DIFERENCIAL OBRIGATÓRIO, O PARCELAMENTO: uma das grandes vantagens do serviço é que o saldo do INSS da obra pode ser parcelado em até 60 parcelas, e o Gabriel faz o parcelamento para a pessoa (já está incluído no serviço). A mensagem de abertura já cita o parcelamento; se o histórico mostrar que ele foi citado, reforce quando fizer sentido (ao passar valor ou ao falar de honorário), sem repetir toda hora. Se por algum motivo ainda não foi citado, você PRECISA citar, de preferência na primeira ou na segunda resposta em que estiver passando valor, antes de falar de honorário, de forma natural ("e o saldo que sobrar ainda pode ser parcelado em até 60 vezes, e o Gabriel cuida disso para você"). Cite uma vez; só volte ao assunto se a pessoa perguntar. Não confunda com a forma de pagar os honorários do Gabriel (são assuntos diferentes). Detalhes como valor da parcela, quais competências entram e quando o Gabriel faz: responda só com base no CONHECIMENTO.
+
 # COMO CONVERSAR (técnicas de negociação, aplicadas com naturalidade)
 - Tom: caloroso, calmo, positivo, sem pressa e sem ar de vendedor. Mensagens curtas de WhatsApp (1 a 3 frases; até 4 quando estiver passando valor), sem listas, sem negrito/markdown, sem emojis. UMA pergunta por mensagem. Se precisar de duas mensagens, separe com uma linha em branco.
 - Primeiro entender, depois propor. Quem se sente entendido abre a guarda.
@@ -157,7 +159,7 @@ function descreverLead(lead, config, nomeContato = '') {
   return `# DADOS DO LEAD (única fonte de números que você pode citar)\n${linhas.map((l) => `- ${l}`).join('\n')}\n\n${politica}`;
 }
 
-export function montarSistema(lead, config, conhecimento = '', trechos = '', espera = null, nomeContato = '', aprendidos = '') {
+export function montarSistema(lead, config, conhecimento = '', trechos = '', espera = null, nomeContato = '', aprendidos = '', parcelamentoCitado = true) {
   const porConsultoria = config.estrategia === 'consultoria';
   const trabalho = porConsultoria
     ? 'entender o caso da pessoa, mostrar que você entendeu, passar valor, tirar dúvidas e levá-la para uma consultoria gratuita com o Gabriel (quando permitido) ou passar a conversa para o Gabriel. Você NÃO envia contrato, NÃO negocia preço e NÃO dá desconto.'
@@ -175,5 +177,9 @@ export function montarSistema(lead, config, conhecimento = '', trechos = '', esp
   const blocoEspera = espera
     ? `\n# MODO ESPERA (você já passou esta conversa para o Gabriel)\nMotivo da passagem: ${espera}\nO Gabriel vai responder esse assunto pessoalmente. Enquanto isso você continua ajudando SÓ com dúvidas simples que tenham base no CONHECIMENTO DO GABRIEL ou nos TRECHOS DE DOCUMENTOS (como funciona, quais documentos, parcelamento, prazos do processo). Regras do modo espera: não volte a tratar o assunto que motivou a passagem (preço em reais, desconto, negociação, reclamação); não puxe venda nem ofereça novos passos; respostas curtas. Se a pessoa pedir para falar com o Gabriel ou fizer uma pergunta que você não sabe responder com segurança, diga em uma frase que o Gabriel vai responder essa e use passar_para_gabriel (neste modo isso só avisa o Gabriel, você continua disponível para outras dúvidas).\n`
     : '';
-  return `${base}\n${descreverLead(lead, config, nomeContato)}\n${bloco}${blocoDocs}${blocoAprendido}${blocoEspera}`;
+  const blocoParcelamento =
+    !parcelamentoCitado && !espera
+      ? `\n# LEMBRETE: você AINDA NÃO CITOU O PARCELAMENTO nesta conversa (regra 11). Inclua na sua próxima resposta que passar valor, de forma natural e curta, que o saldo do INSS da obra pode ser parcelado em até 60 vezes e que o Gabriel cuida disso. Se a conversa já estiver em honorários ou fechamento, cite agora.\n`
+      : '';
+  return `${base}\n${descreverLead(lead, config, nomeContato)}\n${bloco}${blocoDocs}${blocoAprendido}${blocoParcelamento}${blocoEspera}`;
 }

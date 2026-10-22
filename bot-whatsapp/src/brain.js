@@ -161,11 +161,13 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
         log.warn(`[cerebro] busca no aprendizado falhou: ${e.message}`);
       }
     }
+    // O parcelamento é um diferencial que a assistente precisa citar em algum momento (a abertura não fala dele).
+    const parcelamentoCitado = historico.some((m) => m.direcao !== 'lead' && /parcel/i.test(m.texto || ''));
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
     const temBusca = (documentos && documentos.total > 0) || (aprendizado && aprendizado.total > 0);
     const ferramentasApi = temBusca ? [...FERRAMENTAS, FERRAMENTA_DOCUMENTOS] : FERRAMENTAS;
     let consultas = 0;
-    const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato, aprendidos);
+    const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato, aprendidos, parcelamentoCitado);
     const messages = montarHistorico(historico);
     let acao = null;
     const consumo = { entrada: 0, saida: 0 };

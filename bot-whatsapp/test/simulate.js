@@ -1304,7 +1304,7 @@ await teste('abertura traz o valor da Receita, o valor com planejamento, a econo
   const a = montarAbertura(l, 'Lia');
   assert.equal(
     a.texto.replace(/\u00a0/g, ' '),
-    'Oi, Maria, tudo bem? Aqui é Lia, assistente do Gabriel Zaneloti, especialista em regularização de INSS de obra. Vi que você simulou a obra de 180 m² aqui no site, e a estimativa do valor cobrado pela Receita Federal foi de R$ 16.760. Com nosso planejamento o INSS da obra ficaria em R$ 9.311; isso representa R$ 7.449 (cerca de 44,4%) de economia. Posso te explicar rapidinho de onde vêm esses números?', 'texto exatamente como o Gabriel pediu');
+    'Oi, Maria, tudo bem? Aqui é Lia, assistente do Gabriel Zaneloti, especialista em regularização de INSS de obra. Vi que você simulou a obra de 180 m² aqui no site, e a estimativa do valor cobrado pela Receita Federal foi de R$ 16.760. Com nosso planejamento o INSS da obra ficaria em R$ 9.311; isso representa R$ 7.449 (cerca de 44,4%) de economia. E o saldo do INSS da obra ainda pode ser parcelado em até 60 vezes. Posso te explicar rapidinho de onde vêm esses números?', 'texto exatamente como o Gabriel pediu');
   assert.equal(validarSaida(a.texto, l).ok, true, 'passa nas travas');
   assert.doesNotMatch(a.texto, /honor[aá]rio|12%/i);
 });
@@ -1410,6 +1410,51 @@ await teste('texto corrigido do conhecimento substitui a versão antiga do CRM s
   store.conhecimentoRemoto[0].conteudo = 'o Gabriel editou isto';
   await mk().preparar();
   assert.equal(store.conhecimentoRemoto[0].conteudo, 'o Gabriel editou isto', 'edição do Gabriel é preservada');
+});
+
+console.log('\nParcelamento como diferencial');
+
+await teste('prompt manda citar o parcelamento (até 60 parcelas, Gabriel cuida) e lembra enquanto ainda não foi citado', () => {
+  const base = montarSistema(lead(), config);
+  assert.match(base, /DIFERENCIAL OBRIGATÓRIO, O PARCELAMENTO/);
+  assert.match(base, /até 60 parcelas/);
+  assert.doesNotMatch(base, /AINDA NÃO CITOU O PARCELAMENTO/, 'por padrão não há lembrete');
+  const lembrete = montarSistema(lead(), config, '', '', null, '', '', false);
+  assert.match(lembrete, /AINDA NÃO CITOU O PARCELAMENTO/);
+  assert.doesNotMatch(montarSistema(lead(), config, '', '', 'preço', '', '', false), /AINDA NÃO CITOU/, 'em modo espera não cobra');
+});
+
+await teste('cérebro só lembra o parcelamento até o bot citá-lo (a abertura não conta)', async () => {
+  const mk = () => {
+    const chamadas = [];
+    return { chamadas, messages: { async create(p) { chamadas.push(p); return { content: [{ type: 'text', text: 'Claro, vamos ver isso.' }], stop_reason: 'end_turn' }; } } };
+  };
+  const c1 = mk();
+  const r1 = criarCerebro({ modelo: 't', config, client: c1 });
+  await r1.gerarResposta({ lead: lead(), historico: [{ direcao: 'bot', texto: 'Oi, sou a Lia. Posso te explicar de onde vêm esses números?' }, { direcao: 'lead', texto: 'pode' }], ferramentas: {}, log: silencioso });
+  assert.match(c1.chamadas[0].system, /AINDA NÃO CITOU O PARCELAMENTO/);
+  const c2 = mk();
+  const r2 = criarCerebro({ modelo: 't', config, client: c2 });
+  await r2.gerarResposta({ lead: lead(), historico: [{ direcao: 'bot', texto: 'O saldo ainda pode ser parcelado em até 60 vezes e o Gabriel cuida disso.' }, { direcao: 'lead', texto: 'legal, e como funciona?' }], ferramentas: {}, log: silencioso });
+  assert.doesNotMatch(c2.chamadas[0].system, /AINDA NÃO CITOU O PARCELAMENTO/);
+});
+
+await teste('toda abertura cita o parcelamento (até 60 vezes) antes da pergunta final', () => {
+  const casos = [
+    lead({ inss_estimado: 16760, valor_apos_reducao: 9311, economia_estimada: 7449, percentual_reducao: 44 }),
+    lead({ inss_estimado: 16760, valor_apos_reducao: 9311, economia_estimada: 40000, percentual_reducao: 80 }),
+    lead({ inss_estimado: 16760, valor_apos_reducao: 9311, economia_estimada: 3000 }),
+    lead({ responsavel: 'PJ', economia_estimada: null, inss_estimado: null }),
+    lead({ data_inicio: '2019-05-01' }),
+    lead({ inss_estimado: null, economia_estimada: null }),
+    lead({ nome: '' }),
+  ];
+  for (const l of casos) {
+    const a = montarAbertura(l, 'Lia');
+    assert.match(a.texto, /E o saldo do INSS da obra ainda pode ser parcelado em até 60 vezes\./, a.variante);
+    assert.match(a.texto, /parcelado em até 60 vezes\. [^.!?]*\?$/, `parcelamento vem antes da pergunta final (${a.variante})`);
+    assert.equal(validarSaida(a.texto, l).ok, true, `${a.variante}: ${validarSaida(a.texto, l).motivo}`);
+  }
 });
 
 console.log('\nAprendizado automático');
