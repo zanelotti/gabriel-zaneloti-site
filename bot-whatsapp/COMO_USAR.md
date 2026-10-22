@@ -57,6 +57,15 @@ Para funcionar, o computador do bot precisa estar ligado com a janela do `inicia
 
 Primeira vez: rode o arquivo `supabase_bot_painel.sql` no Supabase (SQL Editor), depois feche e abra o `iniciar.bat`. A partir daí as configurações do `.env` (nome, limites, LISTA_TESTE) servem só como valor inicial; o que vale é o que está no painel.
 
+## Estratégia de venda (CRM → Bot → Configurações)
+
+Duas opções, trocáveis a qualquer momento (vale em até 15 segundos, sem reiniciar):
+
+- **Vender pela conversa (padrão):** a Lia entende o caso (perguntas calibradas, procura o que realmente importa para a pessoa), passa o máximo de valor do serviço antes de falar de honorário (o que a Receita faz sem planejamento, as frentes de redução que cabem na obra, tudo o que você entrega, o custo de não agir), usa as técnicas do livro (espelho, rótulo, auditoria de acusações, perguntas "como/o que", "isso mesmo", aversão à perda só com fatos reais) e conduz a pessoa até decidir. Quando ela decide contratar, a Lia passa a conversa para você formalizar. A consultoria gratuita vira **plano B**: caso complexo, dúvida que ela não sabe responder, pedido do lead, ou quando ela percebe que a pessoa não vai fechar só pela conversa ("vou pensar" repetido, precisa falar com sócio ou contador, desconfiança, esfriou).
+- **Levar para a consultoria:** a Lia entende o caso, passa valor e propõe a consultoria gratuita como próximo passo.
+
+Em qualquer das duas: nada de desconto ou negociação (vai para você), e abaixo da economia mínima configurada ela não oferece reunião.
+
 ## Honorários que a Lia informa
 
 Se o lead perguntar quanto custa, a Lia responde com o valor calculado pelo próprio sistema (ela não faz conta):
@@ -123,6 +132,6 @@ Regra prática: coisas curtas e suas (preço, forma de pagamento, como você tra
 
 ## Limitações atuais
 
-- Foi testado por simulação (71 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
+- Foi testado por simulação (76 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
 - Áudios e imagens do lead não são lidos: o bot pede que escreva e te avisa.
 - Não é feito para contatos em grupo.

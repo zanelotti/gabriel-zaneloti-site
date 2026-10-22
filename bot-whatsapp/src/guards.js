@@ -75,7 +75,7 @@ function podeFalarMinimo(lead) {
 export function validarSaida(texto, lead, valoresExtras = []) {
   const t = String(texto ?? '');
   if (!t.trim()) return { ok: false, motivo: 'mensagem vazia' };
-  if (t.length > 900) return { ok: false, motivo: 'mensagem longa demais para WhatsApp (resuma)' };
+  if (t.length > 1200) return { ok: false, motivo: 'mensagem longa demais para WhatsApp (resuma)' };
 
   const liberaMinimo = podeFalarMinimo(lead || {});
   for (const [regex, nome] of PROIBIDAS) {

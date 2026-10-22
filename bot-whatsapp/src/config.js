@@ -55,6 +55,7 @@ export const config = {
   horarioInicio: '08:00',
   horarioFim: '20:00',
   cambio: 5.5, // dólar → real, só para estimar custo no painel
+  estrategia: 'conversa', // 'conversa' = vende pela conversa (consultoria é plano B); 'consultoria' = leva para a consultoria
   aprendizadoAtivo: true, // aprende com as respostas do Gabriel (ver aprendizado.js)
 };
 

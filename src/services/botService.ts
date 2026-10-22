@@ -24,6 +24,9 @@ function requireClient() {
 export type BotEstadoConversa = 'ativa' | 'humano' | 'encerrada' | 'optout';
 export type BotDirecao = 'lead' | 'bot' | 'humano';
 
+/** 'conversa' = a assistente vende pela conversa e usa a consultoria como plano B; 'consultoria' = leva o lead para a consultoria. */
+export type BotEstrategia = 'conversa' | 'consultoria';
+
 export interface BotConfig {
   ativo: boolean;
   assistenteNome: string;
@@ -35,6 +38,7 @@ export interface BotConfig {
   horarioFim: string;
   cambioUsdBrl: number;
   aprendizadoAtivo: boolean;
+  estrategia: BotEstrategia;
 }
 
 interface BotConfigRow {
@@ -48,6 +52,7 @@ interface BotConfigRow {
   horario_fim: string;
   cambio_usd_brl: number;
   aprendizado_ativo?: boolean | null;
+  estrategia?: string | null;
 }
 
 export interface BotHeartbeat {
@@ -163,6 +168,7 @@ function rowToConfig(r: BotConfigRow): BotConfig {
     horarioFim: r.horario_fim,
     cambioUsdBrl: Number(r.cambio_usd_brl),
     aprendizadoAtivo: r.aprendizado_ativo !== false,
+    estrategia: r.estrategia === 'consultoria' ? 'consultoria' : 'conversa',
   };
 }
 
@@ -178,6 +184,7 @@ function configToRow(c: Partial<BotConfig>): Partial<BotConfigRow> & { atualizad
   if (c.horarioFim !== undefined) row.horario_fim = c.horarioFim;
   if (c.cambioUsdBrl !== undefined) row.cambio_usd_brl = c.cambioUsdBrl;
   if (c.aprendizadoAtivo !== undefined) row.aprendizado_ativo = c.aprendizadoAtivo;
+  if (c.estrategia !== undefined) row.estrategia = c.estrategia;
   return row;
 }
 

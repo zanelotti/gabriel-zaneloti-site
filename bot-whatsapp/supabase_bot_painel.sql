@@ -132,3 +132,9 @@ drop policy if exists "crm altera bot_aprendizado" on public.bot_aprendizado;
 create policy "crm altera bot_aprendizado" on public.bot_aprendizado for update to authenticated using (true) with check (true);
 drop policy if exists "crm apaga bot_aprendizado" on public.bot_aprendizado;
 create policy "crm apaga bot_aprendizado" on public.bot_aprendizado for delete to authenticated using (true);
+
+-- ----------------------------------------------------------------------------
+-- 8) Estratégia de venda da assistente: 'conversa' (vende pela conversa; consultoria é o plano B)
+--    ou 'consultoria' (leva o lead para a consultoria gratuita).
+-- ----------------------------------------------------------------------------
+alter table public.bot_config add column if not exists estrategia text not null default 'conversa';

@@ -1184,6 +1184,52 @@ await teste('fluxo: lead PF pergunta o custo e a Lia responde com o valor calcul
   assert.equal(ctx.store.conversas[0].estado, 'ativa');
 });
 
+console.log('\nEstratégia de venda');
+
+await teste('estratégia "conversa" (padrão): vende pela conversa, passa valor antes do honorário e usa a consultoria como plano B', () => {
+  const sis = montarSistema(lead(), { ...config, estrategia: 'conversa' });
+  assert.match(sis, /VENDER PELA CONVERSA/);
+  assert.match(sis, /PASSAR VALOR antes de falar de honorário/);
+  assert.match(sis, /plano B/);
+  assert.match(sis, /ARSENAL DE TÉCNICAS/);
+  assert.match(sis, /não vai fechar só pela conversa/);
+  assert.match(sis, /SOMENTE nos casos previstos/);
+  assert.doesNotMatch(sis, /LEVAR PARA A CONSULTORIA/);
+  const semCampo = montarSistema(lead(), config);
+  assert.match(semCampo, /VENDER PELA CONVERSA/, 'sem o campo, o padrão é vender pela conversa');
+});
+
+await teste('estratégia "consultoria": leva para a consultoria, mas também passa valor antes do honorário', () => {
+  const sis = montarSistema(lead(), { ...config, estrategia: 'consultoria' });
+  assert.match(sis, /LEVAR PARA A CONSULTORIA/);
+  assert.match(sis, /sempre passe valor/);
+  assert.doesNotMatch(sis, /VENDER PELA CONVERSA/);
+  assert.match(sis, /POLÍTICA DE REUNIÃO: pode oferecer a consultoria gratuita/);
+});
+
+await teste('economia pequena continua sem oferecer reunião, em qualquer estratégia', () => {
+  for (const estrategia of ['conversa', 'consultoria']) {
+    const sis = montarSistema(lead({ economia_estimada: 3000 }), { ...config, estrategia });
+    assert.match(sis, /NÃO ofereça reunião/);
+  }
+});
+
+await teste('painel: estratégia vem do CRM, valor inválido é ignorado, e vai na linha inicial', () => {
+  const cfg = { ...config, estrategia: 'conversa' };
+  aplicarConfigRemota(cfg, { estrategia: 'consultoria' });
+  assert.equal(cfg.estrategia, 'consultoria');
+  aplicarConfigRemota(cfg, { estrategia: 'qualquer coisa' });
+  assert.equal(cfg.estrategia, 'consultoria');
+  assert.equal(configParaLinha({ ...config, estrategia: 'consultoria' }).estrategia, 'consultoria');
+  assert.equal(configParaLinha({ ...config }).estrategia, 'conversa');
+});
+
+await teste('mensagens de valor um pouco mais longas passam (até 1.200 caracteres no total), acima disso são bloqueadas', () => {
+  const l = lead();
+  assert.equal(validarSaida('Sem planejamento a Receita assume o pior cenário. '.repeat(18), l).ok, true);
+  assert.equal(validarSaida('Sem planejamento a Receita assume o pior cenário. '.repeat(30), l).ok, false);
+});
+
 console.log('\nAprendizado automático');
 
 const itemBom = {

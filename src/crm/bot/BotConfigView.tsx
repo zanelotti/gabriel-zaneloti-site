@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { botService, type BotConfig } from '@/services/botService';
+import { botService, type BotConfig, type BotEstrategia } from '@/services/botService';
 
 interface BotConfigViewProps {
   config: BotConfig | null;
@@ -15,6 +15,7 @@ interface Form {
   horarioInicio: string;
   horarioFim: string;
   cambioUsdBrl: string;
+  estrategia: BotEstrategia;
 }
 
 function paraForm(c: BotConfig): Form {
@@ -27,6 +28,7 @@ function paraForm(c: BotConfig): Form {
     horarioInicio: c.horarioInicio,
     horarioFim: c.horarioFim,
     cambioUsdBrl: String(c.cambioUsdBrl),
+    estrategia: c.estrategia,
   };
 }
 
@@ -71,6 +73,7 @@ export function BotConfigView({ config, onChange }: BotConfigViewProps) {
         horarioInicio: form.horarioInicio,
         horarioFim: form.horarioFim,
         cambioUsdBrl: cambio,
+        estrategia: form.estrategia,
       });
       await onChange();
       setMsg({ tipo: 'ok', texto: 'Salvo. O bot aplica em até 15 segundos, sem precisar reiniciar.' });
@@ -88,6 +91,46 @@ export function BotConfigView({ config, onChange }: BotConfigViewProps) {
           <label className="field-label">Nome da assistente</label>
           <input className="field-input" value={form.assistenteNome} onChange={(e) => set('assistenteNome', e.target.value)} />
           <p className="mt-1 text-xs text-navy-400">Aparece na primeira mensagem: "Aqui é Lia, assistente do Gabriel…".</p>
+        </div>
+
+        <div className="rounded-xl border border-navy-100 p-4">
+          <label className="field-label">Estratégia de venda</label>
+          <div className="mt-2 grid gap-3">
+            <label className="flex items-start gap-3 text-sm text-navy-700">
+              <input
+                type="radio"
+                name="estrategia"
+                checked={form.estrategia === 'conversa'}
+                onChange={() => set('estrategia', 'conversa')}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <strong>Vender pela conversa (recomendado)</strong>
+                <br />
+                <span className="text-xs text-navy-400">
+                  A assistente entende o caso, passa o máximo de valor do serviço, usa todas as técnicas de negociação e conduz até a decisão. A
+                  consultoria vira plano B: casos complexos, dúvidas que ela não sabe responder, pedido do lead ou quando percebe que a pessoa não vai
+                  fechar só pela conversa.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 text-sm text-navy-700">
+              <input
+                type="radio"
+                name="estrategia"
+                checked={form.estrategia === 'consultoria'}
+                onChange={() => set('estrategia', 'consultoria')}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <strong>Levar para a consultoria</strong>
+                <br />
+                <span className="text-xs text-navy-400">
+                  A assistente entende o caso, passa valor e propõe a consultoria gratuita com você como próximo passo.
+                </span>
+              </span>
+            </label>
+          </div>
         </div>
 
         <div>
