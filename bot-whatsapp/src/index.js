@@ -5,6 +5,7 @@ import { criarBot } from './bot.js';
 import { criarCerebro } from './brain.js';
 import { arquivosParaSemear, carregarConhecimento } from './conhecimento.js';
 import { criarControleDePausa, criarPainel } from './painel.js';
+import { criarAprendizado } from './aprendizado.js';
 import { indexarDocumentos } from './documentos.js';
 import { config, validarConfig } from './config.js';
 import { criarNotificador } from './notify.js';
@@ -44,7 +45,8 @@ try {
 } catch (e) {
   log.warn(`Não consegui indexar a pasta documentos (o bot segue sem ela): ${e.message}`);
 }
-const cerebro = criarCerebro({ apiKey: config.anthropicKey, modelo: config.modelo, config, conhecimento, documentos });
+const aprendizadoIndice = { buscar: () => [], total: 0 }; // atualizado pelo painel a cada sincronização
+const cerebro = criarCerebro({ apiKey: config.anthropicKey, modelo: config.modelo, config, conhecimento, documentos, aprendizado: aprendizadoIndice });
 
 let bot;
 const wa = criarWhatsApp({
@@ -64,7 +66,8 @@ const wa = criarWhatsApp({
 });
 
 bot = criarBot({ store, wa, cerebro, site, notificar, config, log, parado });
-const painel = criarPainel({ store, wa, bot, config, conhecimento, conhecimentoArquivos: arquivosParaSemear(), log, controle });
+const painel = criarPainel({ store, wa, bot, config, conhecimento, conhecimentoArquivos: arquivosParaSemear(), aprendizado: aprendizadoIndice, log, controle });
+const aprendizado = criarAprendizado({ store, modelo: config.modelo, apiKey: config.anthropicKey, config, log });
 
 async function principal() {
   log.info('Iniciando o bot de WhatsApp do Gabriel...');
@@ -73,6 +76,10 @@ async function principal() {
   await wa.iniciar();
   await painel.preparar(); // configurações e conhecimento vindos do CRM
   painel.iniciar();
+  // Aprendizado automático: a cada 5 min lê as conversas em que o Gabriel respondeu e que ficaram paradas.
+  setInterval(() => {
+    if (!controle.parado()) aprendizado.processarPendentes().catch((e) => log.warn(`[aprendizado] ${e.message}`));
+  }, 5 * 60 * 1000);
   log.info(`Painel do CRM ligado. Assistente: ${config.assistenteNome}.${config.ativo ? '' : ' (desligado pelo painel)'}`);
 
   let avisouParado = false;

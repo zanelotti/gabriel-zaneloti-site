@@ -100,3 +100,26 @@ export function regimeApuracao(dataInicio) {
   if (dataInicio >= '2021-01-01') return 'esocial_ajustado';
   return 'gfip_anterior_2021';
 }
+
+// --- Honorários -------------------------------------------------------------
+export const HONORARIO_PERCENTUAL = 0.12;
+export const HONORARIO_MINIMO_PF = 600;
+export const HONORARIO_BASE_PJ = 1000;
+
+/**
+ * Honorário do Gabriel calculado em código (o modelo nunca faz essa conta):
+ *  - Pessoa física: 12% da economia estimada pela calculadora; se der menos de R$ 600, fica R$ 600.
+ *  - Pessoa jurídica: R$ 1.000 mais 12% sobre a economia que for conseguida (confirmada só na análise).
+ */
+export function calcularHonorario(lead) {
+  if (lead?.responsavel === 'PJ') return { tipo: 'PJ', base: HONORARIO_BASE_PJ };
+  const eco = lead?.economia_estimada;
+  if (eco === null || eco === undefined || eco === '' || !Number.isFinite(Number(eco))) {
+    return { tipo: 'PF', economiaConhecida: false, minimoAplicado: false };
+  }
+  const bruto = Number(eco) * HONORARIO_PERCENTUAL;
+  if (bruto < HONORARIO_MINIMO_PF) {
+    return { tipo: 'PF', economiaConhecida: true, valor: HONORARIO_MINIMO_PF, doze: Math.round(bruto), minimoAplicado: true };
+  }
+  return { tipo: 'PF', economiaConhecida: true, valor: Math.round(bruto), minimoAplicado: false };
+}

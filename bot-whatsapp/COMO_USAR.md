@@ -57,6 +57,32 @@ Para funcionar, o computador do bot precisa estar ligado com a janela do `inicia
 
 Primeira vez: rode o arquivo `supabase_bot_painel.sql` no Supabase (SQL Editor), depois feche e abra o `iniciar.bat`. A partir daí as configurações do `.env` (nome, limites, LISTA_TESTE) servem só como valor inicial; o que vale é o que está no painel.
 
+## Honorários que a Lia informa
+
+Se o lead perguntar quanto custa, a Lia responde com o valor calculado pelo próprio sistema (ela não faz conta):
+
+- **Pessoa física:** 12% da economia estimada pela calculadora. Só quando 12% der menos de R$ 600 o honorário fica em R$ 600, e só nesse caso ela explica o piso. Se 12% der R$ 600 ou mais, ela não fala em mínimo.
+- **Empresa (CNPJ):** R$ 1.000 mais 12% sobre a economia que for conseguida (notas de pré-moldado, vinculação de créditos de mão de obra registrada etc.). Ela não cita valor de economia para empresa.
+- Desconto, negociação ou outra condição: a Lia passa a conversa para você.
+- A trava de segurança bloqueia qualquer outro valor em reais e a palavra "mínimo" fora desses casos.
+- O texto do arquivo `01-parcelamento.md` que já está no CRM (aba Conhecimento) pode ainda dizer "nunca em reais fixos". A regra acima vale mais, mas, se quiser, edite essa linha no CRM e **não escreva R$ 600 nem R$ 1.000 no texto de conhecimento** (isso liberaria a Lia a citar esses números para todos).
+
+## Aprendizado automático (aba "Aprendizado" do CRM)
+
+Quando você responde um lead (pelo WhatsApp do celular ou pelo CRM) e a conversa fica parada por cerca de 30 minutos, o bot lê a conversa sozinho e guarda o que você ensinou de **geral**: a dúvida e a sua resposta, reescritas sem nome, valor, cidade ou dado do cliente. Nas próximas conversas, quando um lead perguntar algo parecido, a assistente usa isso para explicar (e diz que você confirma no caso dele).
+
+Travas de segurança, tudo automático:
+
+- Só aprende das mensagens **suas**, nunca do lead nem do próprio bot.
+- Descarta o que for específico de uma obra, preço, honorário, desconto ou promessa.
+- Descarta qualquer item com telefone, e-mail, CPF/CNPJ/CNO, link, valor em R$, nome do cliente ou palavras proibidas.
+- Não guarda duas vezes a mesma dúvida.
+- O aprendizado é só complemento: as regras do negócio e a aba **Conhecimento** sempre valem mais.
+- Na aba **Aprendizado** você vê tudo o que foi aprendido e pode corrigir o texto, **desativar** (o bot para de usar) ou **apagar**. Há também a chave para ligar/desligar o aprendizado inteiro.
+- Custa uma chamada curta à API por conversa analisada (centavos).
+
+Para funcionar, rode de novo o `supabase_bot_painel.sql` no Supabase (é seguro rodar mais de uma vez) e reinicie o `iniciar.bat`.
+
 ## Documentos grandes: a pasta `documentos`
 
 Para normativa, manuais e outros arquivos grandes (por exemplo a IN RFB 2.021/2021 e o Manual do SERO), use a pasta **`documentos`** (dentro de `bot-whatsapp`). Copie para lá os arquivos em PDF, Word (.docx) ou .txt. Depois feche a janela do bot e abra o `iniciar.bat` de novo.
@@ -77,7 +103,7 @@ Regra prática: coisas curtas e suas (preço, forma de pagamento, como você tra
 
 - Fala com quem não preencheu a calculadora.
 - Cita valores que o site não mostrou ao lead, ou valor de economia para pessoa jurídica.
-- Diz "só paga se economizar", "risco zero", garante resultado, fala de valor mínimo ou usa as palavras "legal", "jurídico", "direito", "advogado". Se o Claude escrever algo assim, a mensagem é bloqueada e reescrita; se não conseguir, o bot passa a conversa para você.
+- Diz "só paga se economizar", "risco zero", garante resultado, fala de valor mínimo de honorário fora dos casos abaixo ou usa as palavras "legal", "jurídico", "direito", "advogado". Se o Claude escrever algo assim, a mensagem é bloqueada e reescrita; se não conseguir, o bot passa a conversa para você.
 - Dá desconto ou negocia o percentual (12% sobre a economia comprovada).
 - Oferece reunião quando a economia estimada é menor que o valor definido em `ECONOMIA_MIN_PARA_REUNIAO` (padrão R$ 5.000): nesses casos passa para você conversar por texto.
 - Continua depois que o lead pede para parar.
@@ -97,6 +123,6 @@ Regra prática: coisas curtas e suas (preço, forma de pagamento, como você tra
 
 ## Limitações atuais
 
-- Foi testado por simulação (48 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
+- Foi testado por simulação (71 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
 - Áudios e imagens do lead não são lidos: o bot pede que escreva e te avisa.
 - Não é feito para contatos em grupo.

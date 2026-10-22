@@ -6,6 +6,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { dividirMensagens, validarSaida } from './guards.js';
 import { formatarTrechos } from './documentos.js';
+import { formatarAprendidos } from './aprendizado.js';
 import { montarSistema } from './prompt.js';
 
 export const FERRAMENTAS = [
@@ -121,7 +122,7 @@ export function montarHistorico(historico) {
   return base;
 }
 
-export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { texto: '', valores: [] }, documentos = null }) {
+export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { texto: '', valores: [] }, documentos = null, aprendizado = null }) {
   const anthropic = client || new Anthropic({ apiKey });
 
   /**
@@ -142,10 +143,25 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
         log.warn(`[cerebro] busca nos documentos falhou: ${e.message}`);
       }
     }
+    // Respostas que o Gabriel já deu a dúvidas parecidas (aprendidas das conversas dele com outros leads).
+    let aprendidos = '';
+    if (aprendizado && aprendizado.total > 0) {
+      try {
+        const consultaL = historico
+          .filter((m) => m.direcao === 'lead')
+          .slice(-3)
+          .map((m) => m.texto)
+          .join(' ');
+        aprendidos = formatarAprendidos(aprendizado.buscar(consultaL, { k: 3 }));
+      } catch (e) {
+        log.warn(`[cerebro] busca no aprendizado falhou: ${e.message}`);
+      }
+    }
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
-    const ferramentasApi = documentos && documentos.total > 0 ? [...FERRAMENTAS, FERRAMENTA_DOCUMENTOS] : FERRAMENTAS;
+    const temBusca = (documentos && documentos.total > 0) || (aprendizado && aprendizado.total > 0);
+    const ferramentasApi = temBusca ? [...FERRAMENTAS, FERRAMENTA_DOCUMENTOS] : FERRAMENTAS;
     let consultas = 0;
-    const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato);
+    const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato, aprendidos);
     const messages = montarHistorico(historico);
     let acao = null;
     const consumo = { entrada: 0, saida: 0 };
@@ -178,13 +194,16 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
           if (uso.name === 'consultar_documentos') {
             consultas += 1;
             let saida;
-            if (!documentos || documentos.total === 0) saida = { erro: 'sem documentos disponíveis' };
+            if (!temBusca) saida = { erro: 'sem documentos disponíveis' };
             else if (consultas > MAX_CONSULTAS) saida = { erro: 'limite de consultas atingido; responda com o que já tem ou use passar_para_gabriel' };
             else {
-              const achados = formatarTrechos(documentos.buscar(String(uso.input?.termos || ''), { k: 4 }));
+              const termos = String(uso.input?.termos || '');
+              const achados = documentos && documentos.total > 0 ? formatarTrechos(documentos.buscar(termos, { k: 4 })) : { texto: '', valores: [] };
               valoresExtras.push(...achados.valores);
-              saida = achados.texto
-                ? { trechos: achados.texto }
+              const jaResp = aprendizado && aprendizado.total > 0 ? formatarAprendidos(aprendizado.buscar(termos, { k: 2 })) : '';
+              const partes = [achados.texto, jaResp ? `Respostas anteriores do Gabriel a dúvidas parecidas:\n${jaResp}` : ''].filter(Boolean);
+              saida = partes.length
+                ? { trechos: partes.join('\n\n') }
                 : { trechos: 'Nada encontrado com esses termos. Tente outras palavras-chave técnicas ou use o CONHECIMENTO.' };
             }
             resultados.push({ type: 'tool_result', tool_use_id: uso.id, content: JSON.stringify(saida) });

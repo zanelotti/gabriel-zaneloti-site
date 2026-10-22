@@ -74,7 +74,7 @@ async function extrairTexto(caminho) {
   return '';
 }
 
-function criarIndice(chunks) {
+export function criarIndice(chunks) {
   const docs = chunks.map((c) => {
     const tf = new Map();
     for (const t of tokenizar(c.texto)) tf.set(t, (tf.get(t) || 0) + 1);

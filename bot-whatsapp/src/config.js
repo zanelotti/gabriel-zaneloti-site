@@ -55,6 +55,7 @@ export const config = {
   horarioInicio: '08:00',
   horarioFim: '20:00',
   cambio: 5.5, // dólar → real, só para estimar custo no painel
+  aprendizadoAtivo: true, // aprende com as respostas do Gabriel (ver aprendizado.js)
 };
 
 export function validarConfig() {

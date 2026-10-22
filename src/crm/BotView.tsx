@@ -8,18 +8,20 @@ import {
   type BotUso,
 } from '@/services/botService';
 import type { Lead } from '@/types/lead';
+import { BotAprendizadoView } from './bot/BotAprendizadoView';
 import { BotConfigView } from './bot/BotConfigView';
 import { BotConhecimentoView } from './bot/BotConhecimentoView';
 import { BotConversasView } from './bot/BotConversasView';
 import { BotPainelView } from './bot/BotPainelView';
 
-type SubTab = 'painel' | 'conversas' | 'config' | 'conhecimento';
+type SubTab = 'painel' | 'conversas' | 'config' | 'conhecimento' | 'aprendizado';
 
 const SUBTABS: { id: SubTab; label: string }[] = [
   { id: 'painel', label: 'Painel' },
   { id: 'conversas', label: 'Conversas' },
   { id: 'config', label: 'Configurações' },
   { id: 'conhecimento', label: 'Conhecimento' },
+  { id: 'aprendizado', label: 'Aprendizado' },
 ];
 
 /** Dias de histórico carregados para métricas e para o resumo da lista de conversas. */
@@ -131,6 +133,7 @@ export function BotView({ leads }: BotViewProps) {
       )}
       {!loading && !error && sub === 'config' && <BotConfigView config={config} onChange={refreshAll} />}
       {!loading && !error && sub === 'conhecimento' && <BotConhecimentoView />}
+      {!loading && !error && sub === 'aprendizado' && <BotAprendizadoView config={config} onChange={refreshAll} />}
     </div>
   );
 }

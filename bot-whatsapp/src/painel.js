@@ -10,6 +10,7 @@
  */
 import { existsSync } from 'node:fs';
 import { extrairValoresReais } from './guards.js';
+import { criarIndiceAprendizado } from './aprendizado.js';
 
 const FUSO = 'America/Sao_Paulo';
 const EXPIRA_COMANDO_MS = 10 * 60 * 1000;
@@ -50,6 +51,7 @@ export function configParaLinha(config) {
     horario_inicio: config.horarioInicio,
     horario_fim: config.horarioFim,
     cambio_usd_brl: config.cambio,
+    aprendizado_ativo: config.aprendizadoAtivo !== false,
   };
 }
 
@@ -71,6 +73,7 @@ export function aplicarConfigRemota(config, linha) {
   if (fim) config.horarioFim = fim;
   const cambio = Number(linha.cambio_usd_brl);
   if (Number.isFinite(cambio) && cambio > 0) config.cambio = cambio;
+  if (typeof linha.aprendizado_ativo === 'boolean') config.aprendizadoAtivo = linha.aprendizado_ativo;
   return config;
 }
 
@@ -105,7 +108,7 @@ export function montarConhecimentoDeLinhas(linhas) {
   return { texto, valores: extrairValoresReais(texto), arquivos: ativas.map((l) => l.titulo) };
 }
 
-export function criarPainel({ store, wa, bot, config, conhecimento, conhecimentoArquivos = { itens: [] }, log = console, controle, agora = () => Date.now() }) {
+export function criarPainel({ store, wa, bot, config, conhecimento, conhecimentoArquivos = { itens: [] }, aprendizado = null, log = console, controle, agora = () => Date.now() }) {
   const timers = [];
   let processando = false;
   let comandosOk = true;
@@ -146,6 +149,10 @@ export function criarPainel({ store, wa, bot, config, conhecimento, conhecimento
       if (linha) aplicarConfigRemota(config, linha);
       const linhas = await store.listarConhecimento();
       if (linhas) Object.assign(conhecimento, montarConhecimentoDeLinhas(linhas));
+      if (aprendizado && store.listarAprendizado) {
+        const itens = await store.listarAprendizado();
+        if (itens) Object.assign(aprendizado, criarIndiceAprendizado(itens));
+      }
     } catch (e) {
       log.warn(`[painel] falha ao sincronizar configurações: ${e.message}`);
     }

@@ -107,7 +107,7 @@ export function criarStore({ url, key }) {
       const linhas = checar(
         await db
           .from('bot_mensagens')
-          .select('direcao,texto,criado_em')
+          .select('id,direcao,texto,criado_em')
           .eq('conversa_id', conversaId)
           .order('criado_em', { ascending: false })
           .limit(limite),
@@ -190,6 +190,50 @@ export function criarStore({ url, key }) {
       return (
         checar(await db.from('bot_conversas').select('*').eq('estado', 'ativa').order('atualizado_em', { ascending: false }).limit(100), 'conversas ativas') || []
       );
+    },
+
+    // ----------------------------------------------------------------------- aprendizado automático
+    /**
+     * Conversas em que o Gabriel respondeu e que ainda têm mensagens por aprender,
+     * paradas há pelo menos `ociosoMs`. Devolve { conversa, historico } (histórico com ids).
+     */
+    async conversasParaAprender(ociosoMs, limite = 5) {
+      const humanas =
+        checar(
+          await db.from('bot_mensagens').select('id,conversa_id').eq('direcao', 'humano').order('id', { ascending: false }).limit(300),
+          'mensagens do Gabriel'
+        ) || [];
+      const maxPorConversa = new Map();
+      for (const m of humanas) if (!maxPorConversa.has(m.conversa_id)) maxPorConversa.set(m.conversa_id, m.id);
+      if (maxPorConversa.size === 0) return [];
+      const conversas =
+        checar(await db.from('bot_conversas').select('*').in('id', [...maxPorConversa.keys()]), 'conversas para aprender') || [];
+      const saida = [];
+      for (const c of conversas) {
+        if ((c.aprendido_ate ?? 0) >= maxPorConversa.get(c.id)) continue;
+        const historico = await this.historico(c.id, 80);
+        const ultima = historico[historico.length - 1];
+        if (!ultima || Date.now() - Date.parse(ultima.criado_em) < ociosoMs) continue;
+        saida.push({ conversa: c, historico });
+        if (saida.length >= limite) break;
+      }
+      return saida;
+    },
+
+    async marcarAprendido(conversaId, ateId) {
+      checar(await db.from('bot_conversas').update({ aprendido_ate: ateId }).eq('id', conversaId), 'marcar aprendido');
+    },
+
+    async salvarAprendizados(conversaId, itens) {
+      if (!itens.length) return;
+      checar(
+        await db.from('bot_aprendizado').insert(itens.map((i) => ({ conversa_id: conversaId, topico: i.topico || null, pergunta: i.pergunta, resposta: i.resposta }))),
+        'salvar aprendizado'
+      );
+    },
+
+    async listarAprendizado() {
+      return checar(await db.from('bot_aprendizado').select('*').eq('ativo', true).order('id', { ascending: true }).limit(2000), 'aprendizado');
     },
 
     /** Atualiza o funil do CRM sem passar por cima de leads já fechados. */

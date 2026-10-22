@@ -3,6 +3,8 @@
  * bot pretende enviar. Nada sai para o lead sem passar por `validarSaida`.
  */
 
+import { calcularHonorario, HONORARIO_MINIMO_PF } from './util.js';
+
 /** O lead pediu para não receber mais mensagens? */
 export function pediuParar(texto) {
   const t = String(texto ?? '')
@@ -20,7 +22,8 @@ export function pediuParar(texto) {
 // Palavras e promessas que o Gabriel NÃO quer em texto enviado a lead.
 const PROIBIDAS = [
   [/\b(legal|legais|legalmente|ilegal|ilegais)\b/i, 'palavra "legal"'],
-  [/\bjur[ií]dic[oa]s?\b/i, 'palavra "jurídico/jurídica" (use "empresa")'],
+  // "pessoa jurídica" é o termo correto para empresa e pode; o que fica proibido é "jurídico/jurídica" em outro sentido (assessoria jurídica etc.).
+  [/(?<!pessoas?\s)\bjur[ií]dic[oa]s?\b/i, 'palavra "jurídico/jurídica" fora de "pessoa jurídica"'],
   [/\bdireitos?\b/i, 'palavra "direito"'],
   [/\badvogad[oa]s?\b/i, 'palavra "advogado"'],
   [/s[oó]\s+paga/i, 'frase "só paga se economizar"'],
@@ -46,10 +49,24 @@ export function extrairValoresReais(texto) {
 
 /** Valores que o bot pode citar: somente os que o próprio site mostrou ao lead. */
 export function valoresPermitidos(lead) {
-  if (lead.responsavel === 'PJ') return [];
-  return [lead.inss_estimado, lead.economia_estimada, lead.valor_apos_reducao]
+  const h = calcularHonorario(lead);
+  if (h.tipo === 'PJ') return [h.base]; // empresa: nunca valor de economia; só a base do honorário
+  const extras = [];
+  if (h.economiaConhecida) {
+    extras.push(h.valor);
+    if (h.minimoAplicado) extras.push(h.doze);
+  } else {
+    extras.push(HONORARIO_MINIMO_PF); // sem economia estimada: pode explicar a regra de R$ 600
+  }
+  return [lead.inss_estimado, lead.economia_estimada, lead.valor_apos_reducao, ...extras]
     .map((v) => (v === null || v === undefined ? NaN : Number(v)))
     .filter((v) => Number.isFinite(v));
+}
+
+/** A palavra "mínimo" (valor mínimo de honorário) só pode aparecer quando a regra de piso se aplica ao lead. */
+function podeFalarMinimo(lead) {
+  const h = calcularHonorario(lead);
+  return h.tipo === 'PJ' || h.minimoAplicado === true || h.economiaConhecida === false;
 }
 
 /**
@@ -60,7 +77,9 @@ export function validarSaida(texto, lead, valoresExtras = []) {
   if (!t.trim()) return { ok: false, motivo: 'mensagem vazia' };
   if (t.length > 900) return { ok: false, motivo: 'mensagem longa demais para WhatsApp (resuma)' };
 
+  const liberaMinimo = podeFalarMinimo(lead || {});
   for (const [regex, nome] of PROIBIDAS) {
+    if (liberaMinimo && nome === 'menção a valor mínimo') continue;
     if (regex.test(t)) return { ok: false, motivo: `contém ${nome}, que é proibido` };
   }
 

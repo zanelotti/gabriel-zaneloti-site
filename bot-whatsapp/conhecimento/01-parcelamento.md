@@ -9,6 +9,6 @@
 - O Gabriel faz o parcelamento do INSS da obra para o cliente, quando solicitado, no final da obra. Isso já está incluído no serviço.
 
 ## Pagamento dos honorários do Gabriel
-- O honorário é de 12% sobre a economia comprovada (nunca em reais fixos e sem desconto).
+- O honorário é de 12% sobre a economia comprovada, sem desconto. O valor em reais de cada pessoa vem nos dados do lead (existe um piso para casos de economia pequena e uma base para empresas); nunca calcule por conta própria.
 - Forma de pagamento que o Gabriel costuma oferecer: à vista, ou dividido em duas partes: 50% no início do contrato e o restante ao final do trabalho.
 - Qualquer outra divisão (mais parcelas, cartão, outras datas) quem combina é o próprio Gabriel: nesses casos, passe a conversa para ele.

@@ -103,3 +103,32 @@ drop policy if exists "crm le bot_comandos" on public.bot_comandos;
 create policy "crm le bot_comandos" on public.bot_comandos for select to authenticated using (true);
 drop policy if exists "crm cria bot_comandos" on public.bot_comandos;
 create policy "crm cria bot_comandos" on public.bot_comandos for insert to authenticated with check (status = 'pendente');
+
+-- ----------------------------------------------------------------------------
+-- 7) Aprendizado automático: respostas do Gabriel viram conhecimento (anônimo e geral).
+-- ----------------------------------------------------------------------------
+create table if not exists public.bot_aprendizado (
+  id bigint generated always as identity primary key,
+  conversa_id uuid references public.bot_conversas (id) on delete set null,
+  topico text,
+  pergunta text not null,
+  resposta text not null,
+  ativo boolean not null default true,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists bot_aprendizado_ativo_idx on public.bot_aprendizado (ativo, criado_em desc);
+
+-- Até qual mensagem de cada conversa o bot já aprendeu.
+alter table public.bot_conversas add column if not exists aprendido_ate bigint;
+
+-- Chave geral do aprendizado automático (ligada por padrão).
+alter table public.bot_config add column if not exists aprendizado_ativo boolean not null default true;
+
+alter table public.bot_aprendizado enable row level security;
+drop policy if exists "crm le bot_aprendizado" on public.bot_aprendizado;
+create policy "crm le bot_aprendizado" on public.bot_aprendizado for select to authenticated using (true);
+drop policy if exists "crm altera bot_aprendizado" on public.bot_aprendizado;
+create policy "crm altera bot_aprendizado" on public.bot_aprendizado for update to authenticated using (true) with check (true);
+drop policy if exists "crm apaga bot_aprendizado" on public.bot_aprendizado;
+create policy "crm apaga bot_aprendizado" on public.bot_aprendizado for delete to authenticated using (true);

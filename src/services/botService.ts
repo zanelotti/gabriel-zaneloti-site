@@ -34,6 +34,7 @@ export interface BotConfig {
   horarioInicio: string;
   horarioFim: string;
   cambioUsdBrl: number;
+  aprendizadoAtivo: boolean;
 }
 
 interface BotConfigRow {
@@ -46,6 +47,7 @@ interface BotConfigRow {
   horario_inicio: string;
   horario_fim: string;
   cambio_usd_brl: number;
+  aprendizado_ativo?: boolean | null;
 }
 
 export interface BotHeartbeat {
@@ -111,6 +113,26 @@ export interface BotUso {
   criadoEm: string;
 }
 
+export interface BotAprendizado {
+  id: number;
+  conversaId: string | null;
+  topico: string;
+  pergunta: string;
+  resposta: string;
+  ativo: boolean;
+  criadoEm: string;
+}
+
+interface BotAprendizadoRow {
+  id: number;
+  conversa_id: string | null;
+  topico: string | null;
+  pergunta: string;
+  resposta: string;
+  ativo: boolean;
+  criado_em: string;
+}
+
 export type BotComandoTipo = 'enviar' | 'assumir' | 'devolver';
 export type BotComandoStatus = 'pendente' | 'feito' | 'erro';
 
@@ -140,6 +162,7 @@ function rowToConfig(r: BotConfigRow): BotConfig {
     horarioInicio: r.horario_inicio,
     horarioFim: r.horario_fim,
     cambioUsdBrl: Number(r.cambio_usd_brl),
+    aprendizadoAtivo: r.aprendizado_ativo !== false,
   };
 }
 
@@ -154,6 +177,7 @@ function configToRow(c: Partial<BotConfig>): Partial<BotConfigRow> & { atualizad
   if (c.horarioInicio !== undefined) row.horario_inicio = c.horarioInicio;
   if (c.horarioFim !== undefined) row.horario_fim = c.horarioFim;
   if (c.cambioUsdBrl !== undefined) row.cambio_usd_brl = c.cambioUsdBrl;
+  if (c.aprendizadoAtivo !== undefined) row.aprendizado_ativo = c.aprendizadoAtivo;
   return row;
 }
 
@@ -328,6 +352,47 @@ export const botService = {
   async deleteConhecimento(id: number): Promise<void> {
     const client = requireClient();
     const { error } = await client.from('bot_conhecimento').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  /** Conhecimento que o bot aprendeu sozinho com as respostas do Gabriel (mais novos primeiro). */
+  async listAprendizado(): Promise<BotAprendizado[]> {
+    const client = requireClient();
+    const { data, error } = await client
+      .from('bot_aprendizado')
+      .select('*')
+      .order('id', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    return (data as BotAprendizadoRow[]).map((r) => ({
+      id: r.id,
+      conversaId: r.conversa_id,
+      topico: r.topico ?? '',
+      pergunta: r.pergunta,
+      resposta: r.resposta,
+      ativo: r.ativo,
+      criadoEm: r.criado_em,
+    }));
+  },
+
+  async saveAprendizado(item: Pick<BotAprendizado, 'id' | 'topico' | 'pergunta' | 'resposta' | 'ativo'>): Promise<void> {
+    const client = requireClient();
+    const { error } = await client
+      .from('bot_aprendizado')
+      .update({
+        topico: item.topico,
+        pergunta: item.pergunta,
+        resposta: item.resposta,
+        ativo: item.ativo,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq('id', item.id);
+    if (error) throw error;
+  },
+
+  async deleteAprendizado(id: number): Promise<void> {
+    const client = requireClient();
+    const { error } = await client.from('bot_aprendizado').delete().eq('id', id);
     if (error) throw error;
   },
 };

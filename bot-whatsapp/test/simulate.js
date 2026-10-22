@@ -15,7 +15,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { criarSite } from '../src/site.js';
 import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel, dentroDoHorario, montarConhecimentoDeLinhas } from '../src/painel.js';
-import { limparNomeInformado, nomeParecePessoa, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
+import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAprendizado } from '../src/aprendizado.js';
+import { calcularHonorario, limparNomeInformado, nomeParecePessoa, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
 
 let passou = 0;
 const teste = async (nome, fn) => {
@@ -100,7 +101,7 @@ function criarStoreMemoria() {
       if (obs !== undefined) c.observacao = obs;
     },
     async addMensagem(m) {
-      mensagens.push({ ...m, criado_em: new Date().toISOString() });
+      mensagens.push({ id: mensagens.length + 1, ...m, criado_em: new Date().toISOString() });
     },
     async historico(id) {
       return mensagens.filter((m) => m.conversa_id === id);
@@ -160,6 +161,29 @@ function criarStoreMemoria() {
     },
     async conversasAtivas() {
       return conversas.filter((c) => c.estado === 'ativa');
+    },
+    // --- aprendizado automático
+    aprendizado: [],
+    async conversasParaAprender(ociosoMs, limite = 5) {
+      const saida = [];
+      for (const c of conversas) {
+        const h = mensagens.filter((m) => m.conversa_id === c.id);
+        const ultimaHumana = h.filter((m) => m.direcao === 'humano').map((m) => m.id).pop();
+        if (!ultimaHumana || (c.aprendido_ate ?? 0) >= ultimaHumana) continue;
+        const ult = h[h.length - 1];
+        if (Date.now() - Date.parse(ult.criado_em) < ociosoMs) continue;
+        saida.push({ conversa: c, historico: h });
+      }
+      return saida.slice(0, limite);
+    },
+    async marcarAprendido(id, ate) {
+      conversas.find((c) => c.id === id).aprendido_ate = ate;
+    },
+    async salvarAprendizados(id, itens) {
+      for (const i of itens) this.aprendizado.push({ id: this.aprendizado.length + 1, conversa_id: id, ativo: true, ...i });
+    },
+    async listarAprendizado() {
+      return this.aprendizado.filter((a) => a.ativo);
     },
   };
 }
@@ -1101,6 +1125,188 @@ await teste('conhecimento: arquivo novo na pasta é copiado uma vez; o apagado n
   store.conhecimentoRemoto.pop(); // Gabriel apaga o novo
   await mk(itens).preparar();
   assert.equal(store.conhecimentoRemoto.length, 1, 'não ressuscita');
+});
+
+console.log('\nHonorários');
+
+await teste('cálculo do honorário: PF 12% com piso de R$ 600; PJ R$ 1.000 + 12%', () => {
+  assert.deepEqual(calcularHonorario(lead({ economia_estimada: 42000 })), { tipo: 'PF', economiaConhecida: true, valor: 5040, minimoAplicado: false });
+  const baixo = calcularHonorario(lead({ economia_estimada: 3000 }));
+  assert.equal(baixo.valor, 600);
+  assert.equal(baixo.doze, 360);
+  assert.equal(baixo.minimoAplicado, true);
+  assert.equal(calcularHonorario(lead({ economia_estimada: 0 })).valor, 600, 'sem economia: piso');
+  assert.equal(calcularHonorario(lead({ economia_estimada: 5000 })).minimoAplicado, false, '12% de 5.000 já é 600: sem piso');
+  assert.equal(calcularHonorario(lead({ economia_estimada: null })).economiaConhecida, false);
+  assert.deepEqual(calcularHonorario(lead({ responsavel: 'PJ' })), { tipo: 'PJ', base: 1000 });
+});
+
+await teste('PF com 12% acima de R$ 600: pode citar o honorário; não pode falar em mínimo nem em R$ 600', () => {
+  const l = lead({ economia_estimada: 42000 });
+  assert.equal(validarSaida('Pelo valor estimado de R$ 42.000, o honorário seria de R$ 5.040 (12%), confirmado na análise.', l).ok, true);
+  assert.equal(validarSaida('O honorário tem um valor mínimo de R$ 600.', l).ok, false);
+  assert.equal(validarSaida('O honorário seria de R$ 5.500.', l).ok, false, 'valor inventado');
+  const sistema = montarSistema(l, config);
+  assert.match(sistema, /HONORÁRIO: R\$\s5\.040/);
+  assert.match(sistema, /NÃO fale em valor mínimo/);
+});
+
+await teste('PF com economia pequena: honorário fica em R$ 600 e a Lia pode explicar o piso', () => {
+  const l = lead({ economia_estimada: 3000, inss_estimado: 9000, valor_apos_reducao: 6000 });
+  assert.equal(validarSaida('12% da estimativa daria R$ 360, então o honorário fica em R$ 600, que é o valor mínimo.', l).ok, true);
+  assert.equal(validarSaida('O honorário fica em R$ 700.', l).ok, false);
+  assert.match(montarSistema(l, config), /fica em R\$\s600/);
+});
+
+await teste('PF sem economia estimada: pode explicar a regra dos R$ 600 sem inventar outros valores', () => {
+  const l = lead({ economia_estimada: null, inss_estimado: 50000 });
+  assert.equal(validarSaida('São 12% sobre a economia comprovada; se der menos de R$ 600, o honorário fica em R$ 600.', l).ok, true);
+  assert.equal(validarSaida('O honorário será de R$ 6.000.', l).ok, false);
+});
+
+await teste('empresa: R$ 1.000 mais 12% da economia conseguida; nunca valor de economia nem R$ 600', () => {
+  const l = lead({ responsavel: 'PJ', economia_estimada: null, inss_estimado: null });
+  assert.equal(validarSaida('Para empresa o honorário é R$ 1.000 mais 12% sobre a economia que a gente conseguir com notas de pré-moldado e créditos de mão de obra.', l).ok, true);
+  assert.equal(validarSaida('O honorário é R$ 600.', l).ok, false);
+  assert.equal(validarSaida('Você economiza R$ 42.000.', l).ok, false);
+  assert.match(montarSistema(l, config), /HONORÁRIO \(empresa\): R\$\s1\.000 mais 12%/);
+});
+
+await teste('fluxo: lead PF pergunta o custo e a Lia responde com o valor calculado pelo sistema', async () => {
+  const ctx = montar({
+    roteiro: [texto('Pela estimativa da calculadora, o honorário seria de R$ 5.040, que é 12% da economia. O valor final a gente confirma na análise do Gabriel. Faz sentido?')],
+  });
+  const c = await abrir(ctx, lead({ economia_estimada: 42000 }));
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'quanto custa o seu serviço?' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.match(ctx.wa.enviados.at(-1).texto, /R\$ 5\.040/);
+  assert.equal(ctx.store.conversas[0].estado, 'ativa');
+});
+
+console.log('\nAprendizado automático');
+
+const itemBom = {
+  topico: 'pré-moldado',
+  pergunta: 'Notas de pré-moldado em vigas e colunas ajudam a reduzir o INSS da obra?',
+  resposta: 'Sim, quando as notas fiscais de pré-moldado somam pelo menos 40% do custo da área, a remuneração daquela área pode ser reduzida em 70%. Vale guardar todas as notas da obra.',
+};
+
+await teste('filtros: item geral passa; telefone, R$, nome do cliente, preço e palavra proibida são barrados', () => {
+  const ctxv = { lead: lead({ nome: 'Carlos Pereira' }), nomeContato: '' };
+  assert.equal(validarAprendizado(itemBom, ctxv).ok, true);
+  const ruim = (resposta, extra = {}) => validarAprendizado({ ...itemBom, resposta, ...extra }, ctxv);
+  assert.equal(ruim('Me chama no 11 91234 5678 que eu te explico como funciona a regra toda.').ok, false, 'telefone');
+  assert.equal(ruim('A economia costuma ficar em R$ 30.000 quando as notas somam 40% do custo da obra.').ok, false, 'R$');
+  assert.equal(ruim('No caso do Carlos a nota de pré-moldado reduz a remuneração da área toda.').ok, false, 'nome do lead');
+  assert.equal(ruim('Nosso honorário é calculado sobre a economia que a gente consegue comprovar.').ok, false, 'honorário');
+  assert.equal(ruim('Você tem direito a reduzir quando as notas somam 40% do custo da obra, é só juntar.').ok, false, 'palavra proibida');
+  assert.equal(ruim('Escreva para mim em contato@exemplo.com com as notas fiscais para eu analisar a obra.').ok, false, 'e-mail');
+  assert.equal(ruim('Curto demais.').ok, false, 'curto');
+  assert.equal(validarAprendizado({ ...itemBom, resposta: 'Para pessoa jurídica, os funcionários registrados na época da obra podem ser vinculados ao CNO da obra para abater o recolhimento.' }, ctxv).ok, true, 'pessoa jurídica é permitido');
+});
+
+await teste('índice: dúvida parecida encontra o item aprendido e o prompt recebe o bloco; sem item não há bloco', async () => {
+  const ind = criarIndiceAprendizado([{ ...itemBom, ativo: true }, { ...itemBom, pergunta: 'Outra dúvida sobre decadência de cinco anos na obra antiga?', resposta: 'A decadência vale cinco anos contados do ano seguinte ao fato gerador, e precisa de prova da época da obra.', topico: 'decadência', ativo: false }]);
+  assert.equal(ind.total, 1, 'item inativo fica de fora');
+  const achados = ind.buscar('as notas de pré-moldado reduzem o inss?');
+  assert.equal(achados.length, 1);
+  const texto = formatarAprendidos(achados);
+  assert.match(texto, /Dúvida parecida/);
+  const com = montarSistema(lead(), config, '', '', null, '', texto);
+  assert.match(com, /O QUE O GABRIEL JÁ RESPONDEU/);
+  assert.match(com, /40% do custo/);
+  assert.doesNotMatch(montarSistema(lead(), config), /O QUE O GABRIEL JÁ RESPONDEU/);
+});
+
+await teste('cérebro: usa o aprendizado ao responder e a ferramenta de consulta passa a existir', async () => {
+  const ind = criarIndiceAprendizado([{ ...itemBom, ativo: true }]);
+  const store = criarStoreMemoria();
+  const client = clienteFalso([texto('Em geral sim: se as notas de pré-moldado somam 40% do custo, reduz 70% da remuneração daquela área. O Gabriel confirma no seu caso. Teve notas?')]);
+  const cerebro = criarCerebro({ modelo: 'teste', config, client, aprendizado: ind });
+  const r = await cerebro.gerarResposta({ lead: lead(), historico: [{ direcao: 'lead', texto: 'nota de pré-moldado reduz o inss?' }], ferramentas: {}, log: silencioso });
+  assert.equal(r.acao, null);
+  assert.match(client.chamadas[0].system, /O QUE O GABRIEL JÁ RESPONDEU/);
+  assert.ok(client.chamadas[0].tools.some((t) => t.name === 'consultar_documentos'));
+  assert.ok(store);
+});
+
+function conversaComGabriel(ctx, c) {
+  return (async () => {
+    await ctx.store.addMensagem({ conversa_id: c.id, direcao: 'lead', texto: 'Notas de pré-moldado ajudam a reduzir?' });
+    await ctx.store.addMensagem({ conversa_id: c.id, direcao: 'humano', texto: 'Ajudam sim. Se as notas somarem 40% do custo da área, a remuneração dela cai 70%. Mas no seu caso preciso ver as notas.' });
+  })();
+}
+
+await teste('extração: conversa parada com resposta do Gabriel gera itens; marca como aprendida; não repete', async () => {
+  const ctx = montar({});
+  const c = await abrir(ctx, lead({ nome: 'Carlos Pereira' }));
+  ctx.bot.pararTimers();
+  await conversaComGabriel(ctx, c);
+  const client = clienteFalso([[uso('registrar_aprendizados', { itens: [itemBom, { ...itemBom, pergunta: 'Qual o honorário do Gabriel por esse serviço de redução?', resposta: 'O honorário é um percentual sobre a economia comprovada na análise.' }] })]]);
+  const ap = criarAprendizado({ store: ctx.store, modelo: 'teste', client, config: { aprendizadoAtivo: true }, log: silencioso, ociosoMs: 0 });
+  const n = await ap.processarPendentes();
+  assert.equal(n, 1, 'o item de honorário foi descartado');
+  assert.equal(ctx.store.aprendizado.length, 1);
+  assert.equal(ctx.store.conversas[0].aprendido_ate, 3);
+  assert.match(client.chamadas[0].messages[0].content, /GABRIEL: Ajudam sim/);
+  assert.equal(client.chamadas[0].tool_choice.name, 'registrar_aprendizados');
+  assert.equal(await ap.processarPendentes(), 0, 'segunda passada não reanalisa');
+  assert.equal(client.chamadas.length, 1);
+});
+
+await teste('extração: item parecido com um existente é descartado; lista vazia só marca como lida', async () => {
+  const ctx = montar({});
+  const c = await abrir(ctx, lead());
+  ctx.bot.pararTimers();
+  await conversaComGabriel(ctx, c);
+  ctx.store.aprendizado.push({ id: 1, ativo: true, ...itemBom });
+  const client = clienteFalso([[uso('registrar_aprendizados', { itens: [{ ...itemBom, resposta: 'Ajudam sim, desde que as notas somem 40% do custo da área e sejam guardadas.' }] })]]);
+  const ap = criarAprendizado({ store: ctx.store, modelo: 'teste', client, config: { aprendizadoAtivo: true }, log: silencioso, ociosoMs: 0 });
+  assert.equal(await ap.processarPendentes(), 0);
+  assert.equal(ctx.store.aprendizado.length, 1);
+  assert.equal(ctx.store.conversas[0].aprendido_ate, 3);
+});
+
+await teste('extração só começa depois da conversa ficar parada e respeita a chave geral', async () => {
+  const ctx = montar({});
+  const c = await abrir(ctx, lead());
+  ctx.bot.pararTimers();
+  await conversaComGabriel(ctx, c);
+  const client = clienteFalso([[uso('registrar_aprendizados', { itens: [] })]]);
+  const parada = criarAprendizado({ store: ctx.store, modelo: 'teste', client, config: { aprendizadoAtivo: true }, log: silencioso, ociosoMs: 30 * 60 * 1000 });
+  assert.equal(await parada.processarPendentes(), 0);
+  assert.equal(client.chamadas.length, 0, 'conversa recente: ainda não analisa');
+  const desligado = criarAprendizado({ store: ctx.store, modelo: 'teste', client, config: { aprendizadoAtivo: false }, log: silencioso, ociosoMs: 0 });
+  await desligado.processarPendentes();
+  assert.equal(client.chamadas.length, 0, 'chave geral desligada: não analisa');
+  assert.equal(ctx.store.conversas[0].aprendido_ate, undefined);
+});
+
+await teste('sem mensagem do Gabriel nada é analisado; falha da API não derruba nem marca como aprendida', async () => {
+  const ctx = montar({});
+  const c = await abrir(ctx, lead());
+  ctx.bot.pararTimers();
+  await ctx.store.addMensagem({ conversa_id: c.id, direcao: 'lead', texto: 'oi' });
+  const client = clienteFalso([]);
+  const ap = criarAprendizado({ store: ctx.store, modelo: 'teste', client, config: { aprendizadoAtivo: true }, log: silencioso, ociosoMs: 0 });
+  assert.equal(await ap.processarPendentes(), 0);
+  await conversaComGabriel(ctx, c);
+  assert.equal(await ap.processarPendentes(), 0, 'roteiro vazio lança erro dentro do try');
+  assert.equal(ctx.store.conversas[0].aprendido_ate, undefined, 'tenta de novo depois');
+});
+
+await teste('painel: sincronizar carrega o aprendizado ativo no índice e o config remoto liga/desliga', async () => {
+  const store = criarStoreMemoria();
+  store.aprendizado.push({ id: 1, ativo: true, ...itemBom }, { id: 2, ativo: false, ...itemBom, pergunta: 'Pergunta antiga desativada pelo Gabriel sobre algo?' });
+  const cfg = { ...config, ativo: true, listaTeste: [], horarioInicio: '08:00', horarioFim: '20:00', cambio: 5.5, arquivoParar: 'x.txt', aprendizadoAtivo: true };
+  const indice = { buscar: () => [], total: 0 };
+  const p = criarPainel({ store, wa: criarWaFalso(), bot: {}, config: cfg, conhecimento: { texto: '', valores: [], arquivos: [] }, aprendizado: indice, log: silencioso, controle: criarControleDePausa(cfg) });
+  store.configRemota = { aprendizado_ativo: false };
+  await p.sincronizar();
+  assert.equal(indice.total, 1);
+  assert.equal(cfg.aprendizadoAtivo, false);
+  assert.equal(configParaLinha({ ...cfg, aprendizadoAtivo: true }).aprendizado_ativo, true);
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);
