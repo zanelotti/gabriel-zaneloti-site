@@ -1,10 +1,10 @@
 /**
  * Ponto de entrada do bot: `npm start` (ou iniciar.bat no Windows).
  */
-import { existsSync } from 'node:fs';
 import { criarBot } from './bot.js';
 import { criarCerebro } from './brain.js';
-import { carregarConhecimento } from './conhecimento.js';
+import { arquivosParaSemear, carregarConhecimento } from './conhecimento.js';
+import { criarControleDePausa, criarPainel } from './painel.js';
 import { indexarDocumentos } from './documentos.js';
 import { config, validarConfig } from './config.js';
 import { criarNotificador } from './notify.js';
@@ -25,7 +25,8 @@ if (faltando.length) {
   process.exit(10); // 10 = precisa de ação sua; o iniciar.bat não reinicia sozinho
 }
 
-const parado = () => process.env.BOT_ATIVO === '0' || existsSync(config.arquivoParar);
+const controle = criarControleDePausa(config);
+const parado = controle.parado;
 
 const store = criarStore({ url: config.supabaseUrl, key: config.supabaseKey });
 const site = criarSite({ siteUrl: config.siteUrl });
@@ -63,20 +64,29 @@ const wa = criarWhatsApp({
 });
 
 bot = criarBot({ store, wa, cerebro, site, notificar, config, log, parado });
+const painel = criarPainel({ store, wa, bot, config, conhecimento, conhecimentoArquivos: arquivosParaSemear(), log, controle });
 
 async function principal() {
   log.info('Iniciando o bot de WhatsApp do Gabriel...');
   if (config.listaTeste.length) log.warn(`LISTA_TESTE ativa: o bot só fala com ${config.listaTeste.join(', ')}.`);
   if (config.modoTeste) log.warn('MODO_TESTE ativo: nenhuma mensagem será enviada de verdade.');
   await wa.iniciar();
+  await painel.preparar(); // configurações e conhecimento vindos do CRM
+  painel.iniciar();
+  log.info(`Painel do CRM ligado. Assistente: ${config.assistenteNome}.${config.ativo ? '' : ' (desligado pelo painel)'}`);
 
   let avisouParado = false;
   for (;;) {
     try {
-      if (parado()) {
-        if (!avisouParado) log.warn(`Bot PARADO (arquivo ${config.arquivoParar} existe ou BOT_ATIVO=0). Nada será enviado.`);
+      const motivo = controle.motivo();
+      if (motivo) {
+        if (!avisouParado) log.warn(`Bot PARADO (${motivo}). Nada será enviado.`);
         avisouParado = true;
       } else {
+        if (avisouParado) {
+          log.info('Bot voltou a funcionar.');
+          await bot.retomarPendentes();
+        }
         avisouParado = false;
         await bot.processarNovosLeads();
       }
@@ -91,6 +101,7 @@ process.on('unhandledRejection', (e) => log.error('Erro não tratado:', e?.messa
 process.on('SIGINT', async () => {
   log.info('Encerrando...');
   bot.pararTimers();
+  painel.parar();
   await wa.encerrar();
   process.exit(0);
 });

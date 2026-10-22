@@ -16,6 +16,7 @@ import { aleatorio, dormir, normalizarTelefoneBR } from './util.js';
 
 const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
 const TRINTA_MIN = 30 * 60 * 1000;
+const MARCA_ESPERA = 'ESPERA_GABRIEL: '; // guardada em observacao: a conversa segue 'ativa', mas já foi passada ao Gabriel
 
 export function criarBot({ store, wa, cerebro, site, notificar, config, log = console, dormirFn = dormir, parado = () => false }) {
   const timers = new Map(); // conversaId -> timeout do "espera o lead terminar de escrever"
@@ -227,7 +228,14 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
           inicio,
           observacoes: 'Agendado pela assistente de WhatsApp.',
         });
-        if (r.ok) await store.atualizarLead(lead.id, { status: 'decidindo', nota: `Consultoria agendada pelo bot para ${r.confirmado_para}.` });
+        if (r.ok) {
+          await store.atualizarLead(lead.id, { status: 'decidindo', nota: `Consultoria agendada pelo bot para ${r.confirmado_para}.` });
+          try {
+            await store.marcarAgendou(conversa.id);
+          } catch (e) {
+            log.warn(`[bot] não consegui marcar o agendamento no painel: ${e.message}`);
+          }
+        }
         return r;
       },
       passar_para_gabriel: async () => ({ ok: true }),
@@ -259,10 +267,20 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       const ultima = historico[historico.length - 1];
       if (!ultima || ultima.direcao !== 'lead') return; // nada novo para responder
 
+      const emEspera = String(conversa.observacao || '').startsWith(MARCA_ESPERA);
+      const motivoEspera = emEspera ? conversa.observacao.slice(MARCA_ESPERA.length) : '';
+
       let resultado;
       try {
-        resultado = await cerebro.gerarResposta({ lead, historico, ferramentas: montarFerramentas(conversa, lead), log });
+        resultado = await cerebro.gerarResposta({ lead, historico, ferramentas: montarFerramentas(conversa, lead), log, espera: emEspera ? motivoEspera : null });
         falhasResposta.delete(conversaId);
+        if (resultado.uso && (resultado.uso.entrada || resultado.uso.saida)) {
+          try {
+            await store.registrarUso({ conversa_id: conversaId, entrada: resultado.uso.entrada, saida: resultado.uso.saida });
+          } catch (e) {
+            log.warn(`[bot] não consegui registrar o consumo: ${e.message}`);
+          }
+        }
       } catch (e) {
         const n = (falhasResposta.get(conversaId) || 0) + 1;
         falhasResposta.set(conversaId, n);
@@ -287,10 +305,22 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
       const acao = resultado.acao;
       if (acao?.tipo === 'passar') {
-        await store.setEstado(conversaId, 'humano', acao.motivo);
-        await store.atualizarLead(lead.id, { nota: `Passou para o Gabriel: ${acao.motivo}. ${acao.resumo || ''}`.trim() });
         const hist = await store.historico(conversaId);
-        await notificar.avisar({ tipo: 'Passou para você', lead, telefone: conversa.telefone, motivo: `${acao.motivo}${acao.resumo ? ` — ${acao.resumo}` : ''}`, historico: hist });
+        const detalhe = `${acao.motivo}${acao.resumo ? ` — ${acao.resumo}` : ''}`;
+        if (emEspera) {
+          // Já tinha passado antes: o bot continua disponível; só avisa o Gabriel (no máximo 1x a cada 30 min).
+          const ultimo = avisosEspera.get(conversaId) || 0;
+          if (Date.now() - ultimo >= TRINTA_MIN) {
+            avisosEspera.set(conversaId, Date.now());
+            await notificar.avisar({ tipo: 'Lead com nova dúvida para você', lead, telefone: conversa.telefone, motivo: detalhe, historico: hist });
+          }
+        } else {
+          // A conversa segue ativa (o bot ainda responde dúvidas simples); só para de vez quando o Gabriel responder.
+          await store.setEstado(conversaId, 'ativa', `${MARCA_ESPERA}${acao.motivo}`);
+          await store.atualizarLead(lead.id, { nota: `Passou para o Gabriel: ${acao.motivo}. ${acao.resumo || ''}`.trim() });
+          avisosEspera.set(conversaId, Date.now());
+          await notificar.avisar({ tipo: 'Passou para você', lead, telefone: conversa.telefone, motivo: detalhe, historico: hist });
+        }
       } else if (acao?.tipo === 'encerrar') {
         await store.setEstado(conversaId, 'encerrada', acao.motivo);
         await store.atualizarLead(lead.id, { status: 'perdido', nota: `Conversa encerrada pelo bot: ${acao.motivo}` });
@@ -300,10 +330,48 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // 4) Ações pedidas pelo painel do CRM
+  // ---------------------------------------------------------------------------
+  async function assumir(conversaId, observacao = 'Assumida pelo CRM') {
+    cancelarTimer(conversaId);
+    await store.setEstado(conversaId, 'humano', observacao);
+  }
+
+  async function devolver(conversaId) {
+    await store.setEstado(conversaId, 'ativa', null);
+    const historico = await store.historico(conversaId);
+    const ultima = historico[historico.length - 1];
+    // Se o lead ficou sem resposta, o bot retoma de onde parou.
+    if (ultima && ultima.direcao === 'lead') agendarResposta(conversaId, 3000);
+  }
+
+  async function enviarComoGabriel(conversa, texto) {
+    const waId = await wa.enviarTexto(conversa.jid, texto);
+    await store.addMensagem({ conversa_id: conversa.id, direcao: 'humano', texto, wa_id: waId });
+    if (conversa.estado === 'ativa') await assumir(conversa.id, 'Gabriel enviou mensagem pelo CRM');
+  }
+
+  /** Depois de uma pausa (painel, horário ou PARAR.txt): responde quem escreveu enquanto o bot estava parado. */
+  async function retomarPendentes() {
+    const conversas = await store.conversasAtivas();
+    let n = 0;
+    for (const c of conversas) {
+      const historico = await store.historico(c.id);
+      const ultima = historico[historico.length - 1];
+      if (!ultima || ultima.direcao !== 'lead') continue;
+      if (Date.now() - Date.parse(ultima.criado_em) > config.maxIdadeLeadHoras * 3600 * 1000) continue;
+      agendarResposta(c.id, aleatorio(2000, 8000));
+      n += 1;
+    }
+    if (n) log.info(`[bot] retomando ${n} conversa(s) que ficaram sem resposta durante a pausa.`);
+    return n;
+  }
+
   function pararTimers() {
     for (const t of timers.values()) clearTimeout(t);
     timers.clear();
   }
 
-  return { processarNovosLeads, aoReceber, aoHumano, responder, pararTimers, _dividir: dividirMensagens };
+  return { processarNovosLeads, aoReceber, aoHumano, responder, assumir, devolver, enviarComoGabriel, retomarPendentes, pararTimers, _dividir: dividirMensagens };
 }

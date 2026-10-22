@@ -4,11 +4,12 @@ import type { PageView } from '@/services/crmService';
 import type { Agendamento, GuiaLead, Lead } from '@/types/lead';
 import { AgendamentosView } from './AgendamentosView';
 import { BoardView } from './BoardView';
+import { BotView } from './BotView';
 import { DashboardView } from './DashboardView';
 import { GuiaLeadsView } from './GuiaLeadsView';
 import { TrafficView } from './TrafficView';
 
-type Tab = 'quadro' | 'dashboard' | 'agenda' | 'guia' | 'trafego';
+type Tab = 'quadro' | 'dashboard' | 'agenda' | 'guia' | 'trafego' | 'bot';
 
 export function MainShell() {
   const [tab, setTab] = useState<Tab>('quadro');
@@ -100,6 +101,14 @@ export function MainShell() {
               Guia
             </button>
             <button
+              onClick={() => setTab('bot')}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                tab === 'bot' ? 'bg-navy-900 text-white' : 'text-navy-500 hover:bg-navy-100'
+              }`}
+            >
+              Bot
+            </button>
+            <button
               onClick={() => setTab('trafego')}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                 tab === 'trafego' ? 'bg-navy-900 text-white' : 'text-navy-500 hover:bg-navy-100'
@@ -131,6 +140,7 @@ export function MainShell() {
         )}
         {!loading && !error && tab === 'guia' && <GuiaLeadsView guiaLeads={guiaLeads} onChange={reload} />}
         {!loading && !error && tab === 'trafego' && <TrafficView pageViews={pageViews} />}
+        {!loading && !error && tab === 'bot' && <BotView leads={leads} />}
       </main>
     </div>
   );

@@ -14,6 +14,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { criarSite } from '../src/site.js';
+import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel, dentroDoHorario, montarConhecimentoDeLinhas } from '../src/painel.js';
 import { normalizarTelefoneBR } from '../src/util.js';
 
 let passou = 0;
@@ -113,6 +114,50 @@ function criarStoreMemoria() {
       if (status) l.status = status;
       if (nota) l.notas = `${l.notas ? `${l.notas}\n` : ''}${nota}`;
     },
+    // --- painel do CRM
+    configRemota: null,
+    conhecimentoRemoto: [],
+    heartbeat: null,
+    comandos: [],
+    usos: [],
+    agendou: [],
+    estados: {},
+    async lerEstado(k) {
+      return this.estados[k] ?? null;
+    },
+    async gravarEstado(k, v) {
+      this.estados[k] = v;
+    },
+    async lerConfigRemota() {
+      return this.configRemota;
+    },
+    async criarConfigRemota(l) {
+      if (!this.configRemota) this.configRemota = l;
+    },
+    async gravarHeartbeat(o) {
+      this.heartbeat = o;
+    },
+    async comandosPendentes() {
+      return this.comandos.filter((c) => c.status === 'pendente');
+    },
+    async marcarComando(id, { status, erro = null }) {
+      Object.assign(this.comandos.find((c) => c.id === id), { status, erro });
+    },
+    async listarConhecimento() {
+      return this.conhecimentoRemoto;
+    },
+    async semearConhecimento(itens) {
+      for (const i of itens) if (!this.conhecimentoRemoto.some((x) => x.chave === i.chave)) this.conhecimentoRemoto.push({ ativo: true, ...i });
+    },
+    async registrarUso(u) {
+      this.usos.push(u);
+    },
+    async marcarAgendou(id) {
+      this.agendou.push(id);
+    },
+    async conversasAtivas() {
+      return conversas.filter((c) => c.estado === 'ativa');
+    },
   };
 }
 
@@ -150,7 +195,7 @@ function clienteFalso(roteiro) {
 const texto = (t) => [{ type: 'text', text: t }];
 const uso = (name, input, id = `tu_${name}`) => ({ type: 'tool_use', id, name, input });
 
-function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {}, documentos = null } = {}) {
+function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {}, documentos = null, conhecimentoObj = null } = {}) {
   const store = criarStoreMemoria();
   const wa = criarWaFalso();
   const avisos = [];
@@ -164,7 +209,7 @@ function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {}, docum
   };
   const client = clienteFalso(roteiro);
   const cfgFinal = { ...config, ...cfg };
-  const cerebro = criarCerebro({ modelo: 'teste', config: cfgFinal, client, conhecimento: carregarConhecimento(), documentos });
+  const cerebro = criarCerebro({ modelo: 'teste', config: cfgFinal, client, conhecimento: conhecimentoObj || carregarConhecimento(), documentos });
   const site =
     siteFalso ||
     criarSite({
@@ -172,7 +217,7 @@ function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {}, docum
       fetchImpl: async () => ({ ok: true, json: async () => ({ dias: [] }) }),
     });
   const bot = criarBot({ store, wa, cerebro, site, notificar, config: cfgFinal, log: silencioso, dormirFn: async () => {}, parado });
-  return { store, wa, avisos, client, bot };
+  return { store, wa, avisos, client, bot, config: cfgFinal };
 }
 
 async function abrir(ctx, l) {
@@ -438,6 +483,7 @@ await teste('agendamento: ver_horarios → agendar_consultoria → confirmação
   assert.equal(corpo.whatsapp, '11912345678');
   assert.equal(corpo.inicio, '2026-10-24T15:00:00.000Z');
   assert.equal(ctx.store.leads.get(l.id).status, 'decidindo');
+  assert.equal(ctx.store.agendou.length, 1, 'painel sabe que a consultoria foi marcada pelo bot');
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /marcado/);
 });
 
@@ -721,6 +767,191 @@ await teste('prompt: dúvida técnica geral é respondida e passar_para_gabriel 
   assert.match(s, /você responde de forma geral e simples/);
   assert.match(s, /você NÃO responde mais nessa conversa/);
   assert.match(s, /consultoria já está agendada/);
+});
+
+
+console.log('\nPainel do CRM');
+
+await teste('configuração do painel: valida campos e ignora valores ruins', () => {
+  const c = { assistenteNome: 'Lia', tetoMensagens24h: 120, economiaMinParaReuniao: 5000, listaTeste: [], horarioInicio: '08:00', horarioFim: '20:00', cambio: 5.5 };
+  aplicarConfigRemota(c, {
+    ativo: false,
+    assistente_nome: '  Bia ',
+    teto_mensagens_24h: 200,
+    economia_min_reuniao: '8000',
+    lista_teste: '(21) 99999-1111, 11988887777',
+    horario_ativo: true,
+    horario_inicio: '09:30',
+    horario_fim: '18:00',
+    cambio_usd_brl: 5.8,
+  });
+  assert.equal(c.ativo, false);
+  assert.equal(c.assistenteNome, 'Bia');
+  assert.equal(c.tetoMensagens24h, 200);
+  assert.equal(c.economiaMinParaReuniao, 8000);
+  assert.deepEqual(c.listaTeste, ['21999991111', '11988887777']);
+  assert.equal(c.horarioAtivo, true);
+  assert.equal(c.horarioInicio, '09:30');
+  assert.equal(c.cambio, 5.8);
+  aplicarConfigRemota(c, { assistente_nome: '', teto_mensagens_24h: -5, economia_min_reuniao: 'abc', horario_inicio: '25:99', cambio_usd_brl: 0 });
+  assert.equal(c.assistenteNome, 'Bia');
+  assert.equal(c.tetoMensagens24h, 200);
+  assert.equal(c.economiaMinParaReuniao, 8000);
+  assert.equal(c.horarioInicio, '09:30');
+  assert.equal(c.cambio, 5.8);
+  assert.equal(configParaLinha({ ...c, ativo: true }).lista_teste, '21999991111,11988887777');
+});
+
+await teste('horário de funcionamento (Brasília), inclusive janela que vira a noite', () => {
+  const c = { horarioInicio: '08:00', horarioFim: '20:00' };
+  assert.equal(dentroDoHorario(c, new Date('2026-10-22T14:00:00Z')), true, '11h BRT');
+  assert.equal(dentroDoHorario(c, new Date('2026-10-22T23:30:00Z')), false, '20:30 BRT');
+  assert.equal(dentroDoHorario(c, new Date('2026-10-22T10:59:00Z')), false, '07:59 BRT');
+  assert.equal(dentroDoHorario(c, new Date('2026-10-22T11:00:00Z')), true, '08:00 BRT');
+  const noite = { horarioInicio: '22:00', horarioFim: '06:00' };
+  assert.equal(dentroDoHorario(noite, new Date('2026-10-23T02:00:00Z')), true, '23h BRT');
+  assert.equal(dentroDoHorario(noite, new Date('2026-10-22T15:00:00Z')), false, '12h BRT');
+});
+
+await teste('pausa: painel desligado ou fora do horário param o bot; motivo aparece', () => {
+  const c = { ativo: true, horarioAtivo: false, horarioInicio: '08:00', horarioFim: '20:00', arquivoParar: 'nao-existe-parar.txt' };
+  const ctl = criarControleDePausa(c);
+  assert.equal(ctl.parado(), false);
+  c.ativo = false;
+  assert.equal(ctl.motivo(), 'desligado pelo painel');
+  c.ativo = true;
+  c.horarioAtivo = true;
+  c.horarioInicio = '00:00';
+  c.horarioFim = '00:01';
+  const m = ctl.motivo();
+  assert.ok(m === null || /fora do horário/.test(m));
+});
+
+await teste('painel prepara: cria configuração a partir do .env, copia conhecimento, aplica e responde com o texto editado no CRM', async () => {
+  const store = criarStoreMemoria();
+  const cfg = { ...config, ativo: true, listaTeste: ['21997341731'], horarioInicio: '08:00', horarioFim: '20:00', cambio: 5.5, arquivoParar: 'x.txt' };
+  const conhecimento = { texto: '', valores: [], arquivos: [] };
+  const wa = criarWaFalso();
+  const painel = criarPainel({
+    store, wa, bot: {}, config: cfg, conhecimento,
+    conhecimentoArquivos: { itens: [{ chave: '01-parcelamento.md', titulo: 'parcelamento', conteudo: 'Parcelamos em até 60 vezes.', ordem: 10 }] },
+    log: silencioso, controle: criarControleDePausa(cfg),
+  });
+  await painel.preparar();
+  assert.equal(store.configRemota.lista_teste, '21997341731', 'linha criada a partir do .env');
+  assert.match(conhecimento.texto, /até 60 vezes/);
+  // Gabriel apaga o conhecimento no CRM e reinicia o bot: não volta sozinho
+  const copia = [...store.conhecimentoRemoto];
+  store.conhecimentoRemoto.length = 0;
+  await painel.preparar();
+  assert.equal(store.conhecimentoRemoto.length, 0, 'semeado só uma vez');
+  store.conhecimentoRemoto.push(...copia);
+  // Gabriel muda no CRM
+  store.configRemota.lista_teste = '';
+  store.configRemota.assistente_nome = 'Bia';
+  store.conhecimentoRemoto[0].conteudo = 'Parcelamos em até 48 vezes, parcela mínima de R$ 300.';
+  await painel.sincronizar();
+  assert.deepEqual(cfg.listaTeste, []);
+  assert.equal(cfg.assistenteNome, 'Bia');
+  assert.match(conhecimento.texto, /48 vezes/);
+  assert.ok(conhecimento.valores.includes(300), 'valor citado no texto editado passa a ser permitido');
+  // e o cérebro usa o texto novo (mesmo objeto, alterado no lugar)
+  const ctx = montar({ roteiro: [texto('Dá para parcelar sim.')], conhecimentoObj: conhecimento, cfg: { assistenteNome: 'Bia' } });
+  const c = await abrir(ctx, lead());
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'dá pra parcelar?' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.match(ctx.client.chamadas[0].system, /48 vezes/);
+  assert.match(ctx.client.chamadas[0].system, /Você é Bia/);
+});
+
+await teste('comandos do CRM: enviar mensagem assume a conversa; assumir/devolver; opt-out e expirados são recusados', async () => {
+  const ctx = montar({ roteiro: [texto('Claro! Estou por aqui para ajudar.')] });
+  const c = await abrir(ctx, lead());
+  const cfg = ctx.config;
+  const painel = criarPainel({ store: ctx.store, wa: ctx.wa, bot: ctx.bot, config: cfg, conhecimento: { texto: '', valores: [] }, log: silencioso, controle: criarControleDePausa({ ...cfg, ativo: true, arquivoParar: 'x.txt' }) });
+  const novo = (o) => ctx.store.comandos.push({ id: ctx.store.comandos.length + 1, status: 'pendente', criado_em: new Date().toISOString(), conversa_id: c.id, ...o });
+
+  novo({ tipo: 'enviar', texto: 'Oi Maria, aqui é o Gabriel.' });
+  await painel.processarComandos();
+  assert.equal(ctx.store.comandos[0].status, 'feito');
+  assert.equal(ctx.wa.enviados.at(-1).texto, 'Oi Maria, aqui é o Gabriel.');
+  assert.equal(ctx.store.mensagens.at(-1).direcao, 'humano');
+  assert.equal(ctx.store.conversas[0].estado, 'humano', 'bot se cala depois que o Gabriel escreve');
+
+  // devolver ao bot: se o lead tinha escrito por último, o bot retoma
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'obrigada, e o parcelamento?' });
+  novo({ tipo: 'devolver' });
+  await painel.processarComandos();
+  assert.equal(ctx.store.comandos[1].status, 'feito');
+  assert.equal(ctx.store.conversas[0].estado, 'ativa');
+  assert.equal(ctx.store.conversas[0].observacao, null);
+  await ctx.bot.responder(c.id);
+  assert.match(ctx.wa.enviados.at(-1).texto, /Estou por aqui/);
+
+  // assumir
+  novo({ tipo: 'assumir' });
+  await painel.processarComandos();
+  assert.equal(ctx.store.conversas[0].estado, 'humano');
+
+  // expirado
+  ctx.store.comandos.push({ id: 99, status: 'pendente', tipo: 'enviar', texto: 'velha', conversa_id: c.id, criado_em: new Date(Date.now() - 3600000).toISOString() });
+  const antes = ctx.wa.enviados.length;
+  await painel.processarComandos();
+  ctx.bot.pararTimers();
+  assert.equal(ctx.store.comandos.find((x) => x.id === 99).status, 'erro');
+  assert.match(ctx.store.comandos.find((x) => x.id === 99).erro, /expirou/);
+  assert.equal(ctx.wa.enviados.length, antes);
+
+  // lead que pediu para parar: nada é enviado
+  ctx.store.conversas[0].estado = 'optout';
+  novo({ tipo: 'enviar', texto: 'oi de novo' });
+  await painel.processarComandos();
+  const ultimo = ctx.store.comandos.at(-1);
+  assert.equal(ultimo.status, 'erro');
+  assert.match(ultimo.erro, /não receber|parar/);
+  assert.equal(ctx.wa.enviados.length, antes);
+});
+
+await teste('sinal de vida (heartbeat) informa WhatsApp, pausa e lista de teste', async () => {
+  const store = criarStoreMemoria();
+  const cfg = { ...config, ativo: false, listaTeste: ['1'], arquivoParar: 'x.txt', horarioInicio: '08:00', horarioFim: '20:00' };
+  const painel = criarPainel({ store, wa: criarWaFalso(), bot: {}, config: cfg, conhecimento: {}, log: silencioso, controle: criarControleDePausa(cfg) });
+  await painel.heartbeat();
+  assert.equal(store.heartbeat.whatsapp, true);
+  assert.equal(store.heartbeat.pausado, true);
+  assert.equal(store.heartbeat.motivo_pausa, 'desligado pelo painel');
+  assert.equal(store.heartbeat.lista_teste, 1);
+  assert.ok(Date.now() - Date.parse(store.heartbeat.ts) < 5000);
+});
+
+await teste('depois de uma pausa, o bot responde quem escreveu enquanto estava parado', async () => {
+  let pausado = true;
+  const ctx = montar({ roteiro: [texto('Desculpe a demora, já te explico.')], parado: () => pausado });
+  pausado = false;
+  const c = await abrir(ctx, lead());
+  pausado = true;
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'alguém aí?' });
+  await ctx.bot.responder(c.id); // pausado: não responde
+  assert.equal(ctx.wa.enviados.length, 1);
+  pausado = false;
+  const n = await ctx.bot.retomarPendentes();
+  assert.equal(n, 1);
+  ctx.bot.pararTimers();
+  await ctx.bot.responder(c.id);
+  assert.match(ctx.wa.enviados.at(-1).texto, /Desculpe a demora/);
+});
+
+await teste('consumo de tokens e agendamento ficam registrados para o painel', async () => {
+  const ctx = montar({ roteiro: [texto('Oi, posso ajudar.')] });
+  const c = await abrir(ctx, lead());
+  const orig = ctx.client.messages.create;
+  ctx.client.messages.create = async (p) => ({ ...(await orig(p)), usage: { input_tokens: 5000, output_tokens: 80 } });
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'oi' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.deepEqual(ctx.store.usos[0], { conversa_id: c.id, entrada: 5000, saida: 80 });
+  assert.equal(montarConhecimentoDeLinhas([{ titulo: 'a', conteudo: 'x R$ 10', ativo: false }]).texto, '');
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

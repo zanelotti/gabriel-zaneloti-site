@@ -122,6 +122,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera);
     const messages = montarHistorico(historico);
     let acao = null;
+    const consumo = { entrada: 0, saida: 0 };
     let bloqueios = 0;
     let ultimoMotivo = '';
 
@@ -134,6 +135,8 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
         messages,
       });
 
+      consumo.entrada += resp.usage?.input_tokens || 0;
+      consumo.saida += resp.usage?.output_tokens || 0;
       const blocos = resp.content || [];
       const usos = blocos.filter((b) => b.type === 'tool_use');
       const texto = blocos
@@ -167,14 +170,14 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
           // Ação terminal: usa o texto que o modelo escreveu junto (se passar nas travas) ou um padrão seguro.
           const v = texto ? validarSaida(texto, lead, valoresExtras) : { ok: false };
           const msgs = v.ok ? dividirMensagens(texto) : [TEXTO_PADRAO[acao.tipo]];
-          return { mensagens: msgs, acao };
+          return { mensagens: msgs, acao, uso: consumo };
         }
         continue;
       }
 
       // Resposta final em texto
       const v = validarSaida(texto, lead, valoresExtras);
-      if (v.ok) return { mensagens: dividirMensagens(texto), acao };
+      if (v.ok) return { mensagens: dividirMensagens(texto), acao, uso: consumo };
 
       bloqueios += 1;
       ultimoMotivo = v.motivo;
@@ -191,6 +194,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     return {
       mensagens: [TEXTO_PADRAO.passar],
       acao: { tipo: 'passar', motivo: `Resposta bloqueada pelas travas de conteúdo (${ultimoMotivo || 'sem resposta'})`, resumo: '' },
+      uso: consumo,
     };
   }
 

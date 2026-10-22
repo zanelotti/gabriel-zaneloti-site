@@ -126,6 +126,68 @@ export function criarStore({ url, key }) {
       return count || 0;
     },
 
+    // ----------------------------------------------------------------------- painel do CRM
+    async lerConfigRemota() {
+      return checar(await db.from('bot_config').select('*').eq('id', 1).maybeSingle(), 'ler configurações do painel');
+    },
+
+    async criarConfigRemota(linha) {
+      checar(await db.from('bot_config').upsert(linha, { onConflict: 'id', ignoreDuplicates: true }), 'criar configurações do painel');
+    },
+
+    async lerEstado(chave) {
+      const r = checar(await db.from('bot_estado').select('valor').eq('chave', chave).maybeSingle(), `ler ${chave}`);
+      return r?.valor ?? null;
+    },
+
+    async gravarEstado(chave, valor) {
+      checar(await db.from('bot_estado').upsert({ chave, valor }), `gravar ${chave}`);
+    },
+
+    async gravarHeartbeat(obj) {
+      checar(await db.from('bot_estado').upsert({ chave: 'heartbeat', valor: JSON.stringify(obj) }), 'sinal de vida');
+    },
+
+    async comandosPendentes() {
+      return (
+        checar(
+          await db.from('bot_comandos').select('*').eq('status', 'pendente').order('criado_em', { ascending: true }).limit(20),
+          'comandos pendentes'
+        ) || []
+      );
+    },
+
+    async marcarComando(id, { status, erro = null }) {
+      checar(
+        await db.from('bot_comandos').update({ status, erro, processado_em: new Date().toISOString() }).eq('id', id),
+        'marcar comando'
+      );
+    },
+
+    async listarConhecimento() {
+      return checar(await db.from('bot_conhecimento').select('*').order('ordem', { ascending: true }).order('id', { ascending: true }), 'conhecimento');
+    },
+
+    /** Copia para o banco os arquivos da pasta conhecimento que ainda não estão lá (não sobrescreve edições do CRM). */
+    async semearConhecimento(itens) {
+      checar(await db.from('bot_conhecimento').upsert(itens, { onConflict: 'chave', ignoreDuplicates: true }), 'semear conhecimento');
+    },
+
+    async registrarUso({ conversa_id, entrada, saida }) {
+      checar(await db.from('bot_uso').insert({ conversa_id, entrada, saida }), 'registrar uso');
+    },
+
+    async marcarAgendou(conversaId) {
+      checar(await db.from('bot_conversas').update({ agendou_em: new Date().toISOString() }).eq('id', conversaId), 'marcar agendamento');
+    },
+
+    /** Conversas ainda ativas (para retomar quem escreveu enquanto o bot estava pausado). */
+    async conversasAtivas() {
+      return (
+        checar(await db.from('bot_conversas').select('*').eq('estado', 'ativa').order('atualizado_em', { ascending: false }).limit(100), 'conversas ativas') || []
+      );
+    },
+
     /** Atualiza o funil do CRM sem passar por cima de leads já fechados. */
     async atualizarLead(leadId, { status, nota }) {
       const atual = checar(await db.from('leads').select('status,notas').eq('id', leadId).maybeSingle(), 'ler lead');

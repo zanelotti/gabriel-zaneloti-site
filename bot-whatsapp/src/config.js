@@ -48,6 +48,13 @@ export const config = {
 
   // Nome do assistente nas conversas (aparece na primeira mensagem).
   assistenteNome: process.env.ASSISTENTE_NOME || 'Lia',
+
+  // --- Controlados pelo painel do CRM (tabela bot_config). Aqui ficam só os valores iniciais. ---
+  ativo: true, // liga/desliga geral
+  horarioAtivo: false, // se true, só funciona entre horarioInicio e horarioFim (horário de Brasília)
+  horarioInicio: '08:00',
+  horarioFim: '20:00',
+  cambio: 5.5, // dólar → real, só para estimar custo no painel
 };
 
 export function validarConfig() {

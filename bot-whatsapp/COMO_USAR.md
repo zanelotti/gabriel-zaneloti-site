@@ -44,6 +44,19 @@ Apague o valor de `LISTA_TESTE` no `.env`, salve e reinicie o `iniciar.bat` (fec
 
 Tudo que está nos arquivos `.md` e `.txt` da pasta **`conhecimento`** é lido pelo bot ao ligar (parcelamento, serviços incluídos, sua história). Para ensinar algo novo, crie ou edite um arquivo lá, salve e reinicie o bot (feche a janela do `iniciar.bat` e abra de novo). Se a resposta não estiver lá, o bot não inventa: passa a conversa para você. Confira principalmente o arquivo `01-parcelamento.md`, que tem a forma de pagamento dos honorários que o bot vai falar.
 
+## Painel do bot dentro do CRM (aba "Bot")
+
+No CRM (seu site, /crm.html) existe a aba **Bot**, onde você controla tudo sem mexer em arquivos:
+
+- **Painel:** luz de status (funcionando, pausado, WhatsApp desconectado, offline), botão **Ligar/Desligar o bot**, e resultados do período (leads abordados, quantos responderam, consultorias marcadas, quantos passaram para você, custo estimado da API).
+- **Conversas:** todas as conversas em formato de chat. Dá para **assumir** uma conversa, **escrever para o lead** (a mensagem sai pelo WhatsApp do bot) e **devolver ao bot**. Quem pediu para parar nunca recebe mensagem.
+- **Configurações:** nome da assistente, lista de teste, limite de mensagens, valor mínimo para oferecer reunião, horário de funcionamento (opcional; desligado = 24 h) e câmbio. O bot aplica em até 15 segundos, sem reiniciar.
+- **Conhecimento:** edite os textos de parcelamento, serviços etc. O bot passa a usar em até 15 segundos.
+
+Para funcionar, o computador do bot precisa estar ligado com a janela do `iniciar.bat` aberta: o CRM só dá ordens, quem executa é o bot. Se o computador estiver desligado, o painel mostra "Offline" e os comandos ficam esperando (expiram em 10 minutos).
+
+Primeira vez: rode o arquivo `supabase_bot_painel.sql` no Supabase (SQL Editor), depois feche e abra o `iniciar.bat`. A partir daí as configurações do `.env` (nome, limites, LISTA_TESTE) servem só como valor inicial; o que vale é o que está no painel.
+
 ## Documentos grandes: a pasta `documentos`
 
 Para normativa, manuais e outros arquivos grandes (por exemplo a IN RFB 2.021/2021 e o Manual do SERO), use a pasta **`documentos`** (dentro de `bot-whatsapp`). Copie para lá os arquivos em PDF, Word (.docx) ou .txt. Depois feche a janela do bot e abra o `iniciar.bat` de novo.
@@ -84,6 +97,6 @@ Regra prática: coisas curtas e suas (preço, forma de pagamento, como você tra
 
 ## Limitações atuais
 
-- Foi testado por simulação (37 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
+- Foi testado por simulação (48 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
 - Áudios e imagens do lead não são lidos: o bot pede que escreva e te avisa.
 - Não é feito para contatos em grupo.
