@@ -92,6 +92,8 @@ const FERRAMENTA_DOCUMENTOS = {
   },
 };
 const MAX_CONSULTAS = 3;
+// Folga grande de propósito: se o modelo "pensar" antes de responder, esses tokens também contam, e um limite curto corta a mensagem no meio da frase.
+const MAX_TOKENS_RESPOSTA = 4000;
 
 const TEXTO_PADRAO = {
   passar: 'Vou pedir para o Gabriel continuar essa conversa com você pessoalmente, ele te responde por aqui.',
@@ -171,7 +173,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     for (let rodada = 0; rodada < 8; rodada++) {
       const resp = await anthropic.messages.create({
         model: modelo,
-        max_tokens: 700,
+        max_tokens: MAX_TOKENS_RESPOSTA,
         system,
         tools: ferramentasApi,
         messages,
@@ -235,8 +237,11 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
         continue;
       }
 
-      // Resposta final em texto
-      const v = validarSaida(texto, lead, valoresExtras);
+      // Resposta final em texto. Se foi cortada por limite de tamanho, NUNCA envia (sairia pela metade).
+      const cortada = resp.stop_reason === 'max_tokens';
+      const v = cortada
+        ? { ok: false, motivo: 'a resposta foi cortada por ser longa demais (escreva mais curta, em no máximo 3 mensagens pequenas)' }
+        : validarSaida(texto, lead, valoresExtras);
       if (v.ok) return { mensagens: dividirMensagens(texto), acao, uso: consumo };
 
       bloqueios += 1;

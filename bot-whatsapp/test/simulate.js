@@ -1230,6 +1230,48 @@ await teste('mensagens de valor um pouco mais longas passam (até 1.200 caracter
   assert.equal(validarSaida('Sem planejamento a Receita assume o pior cenário. '.repeat(30), l).ok, false);
 });
 
+console.log('\nMensagens cortadas e mensagens prontas');
+
+await teste('resposta cortada por limite de tamanho nunca é enviada: o bot pede reescrita e, se continuar cortando, passa para o Gabriel', async () => {
+  const cortado = { content: [{ type: 'text', text: 'Sobre a sua pergunta anter' }], stop_reason: 'max_tokens' };
+  const inteiro = { content: [{ type: 'text', text: 'Os dados do profissional são: nome completo, CPF e endereço. Quer que eu liste?' }], stop_reason: 'end_turn' };
+  const chamadas = [];
+  const fila = [cortado, inteiro];
+  const client = { chamadas, messages: { async create(p) { chamadas.push(JSON.parse(JSON.stringify(p))); return fila.shift(); } } };
+  const cerebro = criarCerebro({ modelo: 'teste', config, client });
+  const r = await cerebro.gerarResposta({ lead: lead(), historico: [{ direcao: 'lead', texto: 'que dados do profissional?' }], ferramentas: {}, log: silencioso });
+  assert.equal(r.acao, null);
+  assert.deepEqual(r.mensagens, ['Os dados do profissional são: nome completo, CPF e endereço. Quer que eu liste?']);
+  assert.match(chamadas[1].messages.at(-1).content, /cortada/);
+  assert.ok(chamadas[0].max_tokens >= 2000, 'limite folgado');
+  const sempre = { chamadas: [], messages: { async create() { return cortado; } } };
+  const c2 = criarCerebro({ modelo: 'teste', config, client: sempre });
+  const r2 = await c2.gerarResposta({ lead: lead(), historico: [{ direcao: 'lead', texto: 'oi' }], ferramentas: {}, log: silencioso });
+  assert.equal(r2.acao.tipo, 'passar');
+  assert.ok(!r2.mensagens.join(' ').includes('anter'), 'texto cortado não sai');
+});
+
+await teste('prompt manda usar mensagens prontas do conhecimento como estão e pedir dados do contrato', () => {
+  const sis = montarSistema(lead(), config, '## Documentos\nSe o lead perguntar quais documentos precisa, enviar essa msg:\n* Alvará');
+  assert.match(sis, /MENSAGENS PRONTAS/);
+  assert.match(sis, /COMO ESTÁ/);
+  assert.match(sis, /dados pedidos para o contrato/);
+  assert.match(sis, /Se o lead perguntar quais documentos precisa/);
+});
+
+await teste('lista pronta em uma só mensagem (sem linhas em branco) sai inteira em uma mensagem', async () => {
+  const lista = 'José, esses são os documentos que o Gabriel costuma pedir:\n* Dados do profissional\n* Procuração digital\n* Alvará\n* Projeto\n* CNO (se tiver)\n* Habite-se (se tiver)\n* Cadastro imobiliário (guia do IPTU)\n* Localização do terreno no Google Maps';
+  const ctx = montar({ roteiro: [texto(lista)] });
+  const c = await abrir(ctx, lead());
+  const antes = ctx.wa.enviados.length;
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'quais documentos preciso mandar?' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  const novas = ctx.wa.enviados.slice(antes);
+  assert.equal(novas.length, 1);
+  assert.equal(novas[0].texto, lista);
+});
+
 console.log('\nAprendizado automático');
 
 const itemBom = {
