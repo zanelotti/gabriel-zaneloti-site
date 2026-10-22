@@ -15,6 +15,7 @@ import { montarAbertura } from './opening.js';
 import { aleatorio, dormir, normalizarTelefoneBR } from './util.js';
 
 const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
+const TRINTA_MIN = 30 * 60 * 1000;
 
 export function criarBot({ store, wa, cerebro, site, notificar, config, log = console, dormirFn = dormir, parado = () => false }) {
   const timers = new Map(); // conversaId -> timeout do "espera o lead terminar de escrever"
@@ -22,6 +23,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   const vistos = new Set(); // leads já tratados nesta execução
   const falhasLead = new Map();
   const falhasResposta = new Map();
+  const avisosEspera = new Map(); // conversaId -> quando avisamos que o lead está esperando
   let inicioDoBot = null;
   let avisouTeto = false;
 
@@ -139,6 +141,10 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
     const conteudo = texto && texto.trim() ? texto.trim() : `[o lead enviou ${tipo}]`;
     await store.addMensagem({ conversa_id: conversa.id, direcao: 'lead', texto: conteudo, wa_id: waId });
+    if (conversa.estado === 'humano') {
+      await avisarLeadEsperando(conversa, conteudo);
+      return;
+    }
     if (conversa.estado !== 'ativa') return;
 
     const lead = await store.leadPorId(conversa.lead_id);
@@ -159,6 +165,24 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     }
 
     agendarResposta(conversa.id, config.debounceMs);
+  }
+
+  // Conversa passada para o Gabriel que ele ainda não respondeu: o lead escreveu de novo e está esperando.
+  // Avisa por e-mail, no máximo uma vez a cada 30 minutos por conversa.
+  async function avisarLeadEsperando(conversa, conteudo) {
+    const hist = await store.historico(conversa.id);
+    if (hist.some((m) => m.direcao === 'humano')) return; // o Gabriel já está conversando
+    const ultimo = avisosEspera.get(conversa.id) || 0;
+    if (Date.now() - ultimo < TRINTA_MIN) return;
+    avisosEspera.set(conversa.id, Date.now());
+    const lead = await store.leadPorId(conversa.lead_id);
+    await notificar.avisar({
+      tipo: 'Lead esperando resposta',
+      lead,
+      telefone: conversa.telefone,
+      motivo: `O lead escreveu de novo depois que a conversa foi passada para você e o bot não responde mais. Última mensagem: "${String(conteudo).slice(0, 300)}"`,
+      historico: hist,
+    });
   }
 
   async function aoHumano({ telefone, texto, waId = null }) {
@@ -201,7 +225,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
           email,
           whatsapp: lead.whatsapp,
           inicio,
-          observacoes: 'Agendado pelo assistente virtual de WhatsApp.',
+          observacoes: 'Agendado pela assistente de WhatsApp.',
         });
         if (r.ok) await store.atualizarLead(lead.id, { status: 'decidindo', nota: `Consultoria agendada pelo bot para ${r.confirmado_para}.` });
         return r;

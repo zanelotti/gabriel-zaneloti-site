@@ -103,7 +103,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
   /**
    * @returns {Promise<{mensagens: string[], acao: null | {tipo: 'passar'|'encerrar', motivo: string, resumo?: string}}>}
    */
-  async function gerarResposta({ lead, historico, ferramentas, log = console }) {
+  async function gerarResposta({ lead, historico, ferramentas, log = console, espera = null }) {
     // Busca nos documentos grandes (normativa, manual) os trechos ligados ao que o lead disse por último.
     let trechos = { texto: '', valores: [] };
     if (documentos && documentos.total > 0) {
@@ -119,7 +119,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
       }
     }
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
-    const system = montarSistema(lead, config, conhecimento.texto, trechos.texto);
+    const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera);
     const messages = montarHistorico(historico);
     let acao = null;
     let bloqueios = 0;
