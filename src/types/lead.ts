@@ -9,9 +9,11 @@ import type {
 
 /**
  * Etapas do funil de acompanhamento comercial (CRM), nesta ordem:
- * novo -> contatado -> sem_resposta | proposta_enviada -> decidindo -> fechado | perdido.
+ * novo -> contatado -> sem_resposta | proposta_enviada -> decidindo -> agendado -> fechado | perdido.
  * `sem_resposta` é uma coluna "de espera", separada do funil principal, para
  * leads contatados que não respondem no WhatsApp — não significa perdido.
+ * `agendado` (coluna "Agendamento") recebe os leads que marcaram a consultoria
+ * — o bot do WhatsApp move o card para lá sozinho quando agenda.
  */
 export type LeadStatus =
   | 'novo'
@@ -19,6 +21,7 @@ export type LeadStatus =
   | 'sem_resposta'
   | 'proposta_enviada'
   | 'decidindo'
+  | 'agendado'
   | 'fechado'
   | 'perdido';
 
@@ -28,6 +31,7 @@ export const LEAD_STATUS_ORDER: LeadStatus[] = [
   'sem_resposta',
   'proposta_enviada',
   'decidindo',
+  'agendado',
   'fechado',
   'perdido',
 ];
@@ -38,6 +42,7 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   sem_resposta: 'Sem resposta',
   proposta_enviada: 'Proposta enviada',
   decidindo: 'Decidindo',
+  agendado: 'Agendamento',
   fechado: 'Fechado',
   perdido: 'Perdido',
 };

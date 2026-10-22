@@ -138,3 +138,21 @@ create policy "crm apaga bot_aprendizado" on public.bot_aprendizado for delete t
 --    ou 'consultoria' (leva o lead para a consultoria gratuita).
 -- ----------------------------------------------------------------------------
 alter table public.bot_config add column if not exists estrategia text not null default 'conversa';
+
+-- ----------------------------------------------------------------------------
+-- 9) Coluna "Agendamento" no quadro do CRM: libera o status 'agendado' na tabela leads
+--    (o bot move o card para lá quando marca a consultoria).
+-- ----------------------------------------------------------------------------
+do $$
+declare r record;
+begin
+  for r in
+    select conname from pg_constraint
+    where conrelid = 'public.leads'::regclass and contype = 'c' and pg_get_constraintdef(oid) ilike '%status%'
+  loop
+    execute format('alter table public.leads drop constraint %I', r.conname);
+  end loop;
+end $$;
+
+alter table public.leads add constraint leads_status_check
+  check (status in ('novo', 'contatado', 'sem_resposta', 'proposta_enviada', 'decidindo', 'agendado', 'fechado', 'perdido'));

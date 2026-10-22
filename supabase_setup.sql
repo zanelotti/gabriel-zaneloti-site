@@ -26,7 +26,7 @@ create table if not exists public.leads (
 
   -- Campos do CRM
   status text not null default 'novo'
-    check (status in ('novo', 'contatado', 'sem_resposta', 'proposta_enviada', 'decidindo', 'fechado', 'perdido')),
+    check (status in ('novo', 'contatado', 'sem_resposta', 'proposta_enviada', 'decidindo', 'agendado', 'fechado', 'perdido')),
   notas text,
   valor_fechado numeric,
   honorarios numeric,
@@ -41,7 +41,8 @@ create table if not exists public.leads (
 -- no WhatsApp), rode estas duas linhas para liberar esse novo valor:
 -- alter table public.leads drop constraint if exists leads_status_check;
 -- alter table public.leads add constraint leads_status_check
---   check (status in ('novo', 'contatado', 'sem_resposta', 'proposta_enviada', 'decidindo', 'fechado', 'perdido'));
+--   check (status in ('novo', 'contatado', 'sem_resposta', 'proposta_enviada', 'decidindo', 'agendado', 'fechado', 'perdido'));
+-- (O status 'agendado' = coluna "Agendamento" do quadro; quem já tem a tabela libera rodando o bot-whatsapp/supabase_bot_painel.sql.)
 
 create index if not exists leads_status_idx on public.leads (status);
 create index if not exists leads_created_at_idx on public.leads (created_at desc);

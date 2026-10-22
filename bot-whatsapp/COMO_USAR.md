@@ -106,7 +106,7 @@ Regra prática: coisas curtas e suas (preço, forma de pagamento, como você tra
 - **Depois que o bot passa para você:** você recebe o e-mail "Passou para você", mas o bot continua disponível para dúvidas simples do lead (como funciona, documentos, parcelamento) até você responder. Ele não volta ao assunto que passou (preço em reais, desconto etc.). Se o lead fizer outra pergunta que o bot não sabe, ele avisa que você responde e você recebe o e-mail "Lead com nova dúvida para você" (no máximo um a cada 30 minutos por conversa).
 - **Parar tudo na hora:** crie um arquivo de texto chamado **`PARAR.txt`** nesta pasta. Para voltar, apague o arquivo.
 - **Avisos por e-mail:** só quando você precisa agir: o bot passou a conversa para você, chegou áudio ou arquivo, não foi possível contatar um lead ou algo deu errado.
-- **Funil:** o bot atualiza o status do lead no seu CRM (contatado, decidindo, perdido) e escreve uma nota em cada passo.
+- **Quadro (funil) do CRM:** o bot move os cards sozinho, sempre para a frente, e escreve uma nota em cada passo: abertura enviada = **Contatado**; falou os honorários = **Proposta enviada**; lead demonstrou interesse/pediu o contrato = **Decidindo**; consultoria marcada = **Agendamento**; sem resposta em 24h = **Sem resposta** (volta para Contatado quando o lead responde); recusou ou pediu para parar = **Perdido**. O bot nunca mexe em card **Fechado** ou **Perdido** e nunca puxa para trás um card que você arrastou à mão. Para ligar a coluna Agendamento, rode o `supabase_bot_painel.sql` de novo no Supabase.
 
 ## O que o bot nunca faz
 
@@ -132,6 +132,6 @@ Regra prática: coisas curtas e suas (preço, forma de pagamento, como você tra
 
 ## Limitações atuais
 
-- Foi testado por simulação (93 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
+- Foi testado por simulação (99 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
 - Áudios e imagens do lead não são lidos: o bot pede que escreva e te avisa.
 - Não é feito para contatos em grupo.

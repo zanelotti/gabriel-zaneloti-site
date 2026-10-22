@@ -80,6 +80,10 @@ async function principal() {
   setInterval(() => {
     if (!controle.parado()) aprendizado.processarPendentes().catch((e) => log.warn(`[aprendizado] ${e.message}`));
   }, 5 * 60 * 1000);
+  // Quadro do CRM: quem não respondeu à abertura em 24h vai para a coluna "Sem resposta".
+  setInterval(() => {
+    bot.marcarSemResposta(24).catch((e) => log.warn(`[funil] ${e.message}`));
+  }, 10 * 60 * 1000);
   log.info(`Painel do CRM ligado. Assistente: ${config.assistenteNome}.${config.ativo ? '' : ' (desligado pelo painel)'}`);
 
   let avisouParado = false;

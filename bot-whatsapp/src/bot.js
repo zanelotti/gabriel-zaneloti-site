@@ -10,6 +10,7 @@
  *      Claude e envia. O Claude pode agendar a consultoria, passar para o Gabriel ou encerrar.
  *   4. Se o Gabriel responder à mão numa conversa, o bot se cala nela.
  */
+import { citouHonorarios } from './funil.js';
 import { dividirMensagens, pediuParar, validarSaida } from './guards.js';
 import { montarAbertura } from './opening.js';
 import { aleatorio, dormir, limparNomeInformado, normalizarTelefoneBR } from './util.js';
@@ -114,6 +115,22 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     log.info(`[bot] abertura enviada para ${lead.nome || lead.id} (${abertura.variante})`);
   }
 
+  /**
+   * Leads que o bot abordou há mais de `horas` e nunca responderam vão para a coluna
+   * "Sem resposta" do CRM (ficam lá até responderem; a conversa continua ativa).
+   */
+  async function marcarSemResposta(horas = 24) {
+    const ids = await store.leadsSemResposta(horas);
+    for (const id of ids) {
+      try {
+        await store.atualizarLead(id, { status: 'sem_resposta', nota: `Lead não respondeu em ${horas}h.` });
+      } catch (e) {
+        log.warn(`[bot] não consegui mover o card para "Sem resposta": ${e.message}`);
+      }
+    }
+    return ids.length;
+  }
+
   async function processarNovosLeads() {
     if (parado() || !wa.conectado()) return;
     inicioDoBot ??= await store.inicioDoBot();
@@ -150,6 +167,15 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
     const lead = await store.leadPorId(conversa.lead_id);
     const historico = await store.historico(conversa.id);
+
+    // O lead respondeu: se o card estava em "Sem resposta", volta para "Contatado".
+    if (lead?.status === 'sem_resposta') {
+      try {
+        await store.atualizarLead(conversa.lead_id, { status: 'contatado' });
+      } catch (e) {
+        log.warn(`[bot] não consegui tirar o card de "Sem resposta": ${e.message}`);
+      }
+    }
 
     if (tipo === 'texto' && pediuParar(conteudo)) {
       cancelarTimer(conversa.id);
@@ -230,7 +256,12 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
           observacoes: 'Agendado pela assistente de WhatsApp.',
         });
         if (r.ok) {
-          await store.atualizarLead(lead.id, { status: 'decidindo', nota: `Consultoria agendada pelo bot para ${r.confirmado_para}.` });
+          try {
+            // Card vai para a coluna "Agendamento" do CRM.
+            await store.atualizarLead(lead.id, { status: 'agendado', nota: `Consultoria agendada pelo bot para ${r.confirmado_para}.` });
+          } catch (e) {
+            log.warn(`[bot] agendou, mas não consegui mover o card para "Agendamento" (rodou o supabase_bot_painel.sql de novo?): ${e.message}`);
+          }
           try {
             await store.marcarAgendou(conversa.id);
           } catch (e) {
@@ -316,6 +347,15 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
         await enviar(conversa, msg);
       }
 
+      // Falou dos honorários? Então a proposta foi apresentada: card vai para "Proposta enviada".
+      if (resultado.mensagens.some(citouHonorarios)) {
+        try {
+          await store.atualizarLead(lead.id, { status: 'proposta_enviada', nota: 'Bot apresentou os honorários ao lead.' });
+        } catch (e) {
+          log.warn(`[bot] não consegui mover o card para "Proposta enviada": ${e.message}`);
+        }
+      }
+
       const acao = resultado.acao;
       if (acao?.tipo === 'passar') {
         const hist = await store.historico(conversaId);
@@ -386,5 +426,5 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     timers.clear();
   }
 
-  return { processarNovosLeads, aoReceber, aoHumano, responder, assumir, devolver, enviarComoGabriel, retomarPendentes, pararTimers, _dividir: dividirMensagens };
+  return { processarNovosLeads, marcarSemResposta, aoReceber, aoHumano, responder, assumir, devolver, enviarComoGabriel, retomarPendentes, pararTimers, _dividir: dividirMensagens };
 }

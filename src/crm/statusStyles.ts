@@ -14,6 +14,7 @@ export const STATUS_STYLES: Record<LeadStatus, { bg: string; text: string; dot: 
   sem_resposta: { bg: 'bg-slate-200', text: 'text-slate-700', dot: 'bg-slate-400' },
   proposta_enviada: { bg: 'bg-navy-300', text: 'text-navy-900', dot: 'bg-navy-700' },
   decidindo: { bg: 'bg-amber-100', text: 'text-amber-800', dot: 'bg-amber-500' },
+  agendado: { bg: 'bg-violet-100', text: 'text-violet-800', dot: 'bg-violet-500' },
   fechado: { bg: 'bg-accent-100', text: 'text-accent-800', dot: 'bg-accent-500' },
   perdido: { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
 };

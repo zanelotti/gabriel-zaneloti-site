@@ -4,7 +4,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-const STATUS_PROTEGIDOS = ['fechado'];
+import { podeMover } from './funil.js';
 
 function carimbo() {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -240,12 +240,39 @@ export function criarStore({ url, key }) {
       return checar(await db.from('bot_aprendizado').select('*').eq('ativo', true).order('id', { ascending: true }).limit(2000), 'aprendizado');
     },
 
-    /** Atualiza o funil do CRM sem passar por cima de leads já fechados. */
+    /**
+     * Conversas ativas em que o bot abordou o lead há mais de `horas` e o lead nunca respondeu
+     * (e o card ainda está em "Contatado"). Servem para mover o card para "Sem resposta".
+     */
+    async leadsSemResposta(horas) {
+      const limite = new Date(Date.now() - horas * 3600000).toISOString();
+      const desde = new Date(Date.now() - 21 * 86400000).toISOString();
+      const conversas =
+        checar(
+          await db.from('bot_conversas').select('id,lead_id').eq('estado', 'ativa').lt('criado_em', limite).gt('criado_em', desde).limit(200),
+          'conversas sem resposta'
+        ) || [];
+      if (!conversas.length) return [];
+      const ids = conversas.map((c) => c.id);
+      const responderam = new Set(
+        (checar(await db.from('bot_mensagens').select('conversa_id').eq('direcao', 'lead').in('conversa_id', ids).limit(5000), 'mensagens do lead') || []).map(
+          (m) => m.conversa_id
+        )
+      );
+      const candidatos = conversas.filter((c) => !responderam.has(c.id));
+      if (!candidatos.length) return [];
+      const contatados = new Set(
+        (checar(await db.from('leads').select('id').eq('status', 'contatado').in('id', candidatos.map((c) => c.lead_id)), 'leads contatados') || []).map((l) => l.id)
+      );
+      return candidatos.filter((c) => contatados.has(c.lead_id)).map((c) => c.lead_id);
+    },
+
+    /** Atualiza o funil do CRM (só avança; nunca mexe em leads fechados ou perdidos — ver funil.js). */
     async atualizarLead(leadId, { status, nota }) {
       const atual = checar(await db.from('leads').select('status,notas').eq('id', leadId).maybeSingle(), 'ler lead');
       if (!atual) return;
       const patch = {};
-      if (status && !STATUS_PROTEGIDOS.includes(atual.status)) patch.status = status;
+      if (status && podeMover(atual.status, status)) patch.status = status;
       if (nota) patch.notas = `${atual.notas ? `${atual.notas}\n` : ''}[Bot WhatsApp ${carimbo()}] ${nota}`;
       if (Object.keys(patch).length === 0) return;
       checar(await db.from('leads').update(patch).eq('id', leadId), 'atualizar lead');

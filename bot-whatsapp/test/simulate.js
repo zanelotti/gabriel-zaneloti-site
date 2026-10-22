@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { criarSite } from '../src/site.js';
 import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel, dentroDoHorario, montarConhecimentoDeLinhas } from '../src/painel.js';
 import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAprendizado } from '../src/aprendizado.js';
+import { citouHonorarios, podeMover } from '../src/funil.js';
 import { calcularHonorario, criarChamador, limparNomeInformado, nomeParecePessoa, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
 
 let passou = 0;
@@ -111,9 +112,14 @@ function criarStoreMemoria() {
     },
     async atualizarLead(id, { status, nota }) {
       const l = leads.get(id);
-      if (!l || l.status === 'fechado') return;
-      if (status) l.status = status;
+      if (!l) return;
+      if (status && podeMover(l.status, status)) l.status = status;
       if (nota) l.notas = `${l.notas ? `${l.notas}\n` : ''}${nota}`;
+    },
+    async leadsSemResposta() {
+      return conversas
+        .filter((c) => c.estado === 'ativa' && leads.get(c.lead_id)?.status === 'contatado' && !mensagens.some((m) => m.conversa_id === c.id && m.direcao === 'lead'))
+        .map((c) => c.lead_id);
     },
     // --- painel do CRM
     configRemota: null,
@@ -511,7 +517,7 @@ await teste('agendamento: ver_horarios → agendar_consultoria → confirmação
   assert.equal(corpo.email, 'maria@exemplo.com');
   assert.equal(corpo.whatsapp, '11912345678');
   assert.equal(corpo.inicio, '2026-10-24T15:00:00.000Z');
-  assert.equal(ctx.store.leads.get(l.id).status, 'decidindo');
+  assert.equal(ctx.store.leads.get(l.id).status, 'agendado', 'card vai para a coluna Agendamento');
   assert.equal(ctx.store.agendou.length, 1, 'painel sabe que a consultoria foi marcada pelo bot');
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /marcado/);
 });
@@ -1580,6 +1586,97 @@ await teste('painel: sincronizar carrega o aprendizado ativo no índice e o conf
   assert.equal(indice.total, 1);
   assert.equal(cfg.aprendizadoAtivo, false);
   assert.equal(configParaLinha({ ...cfg, aprendizadoAtivo: true }).aprendizado_ativo, true);
+});
+
+console.log('\nQuadro do CRM (cards)');
+
+await teste('regras do funil: só avança, lateral em "sem resposta", fechado e perdido protegidos', () => {
+  assert.equal(podeMover('novo', 'contatado'), true);
+  assert.equal(podeMover('contatado', 'proposta_enviada'), true);
+  assert.equal(podeMover('proposta_enviada', 'decidindo'), true);
+  assert.equal(podeMover('decidindo', 'agendado'), true);
+  assert.equal(podeMover('contatado', 'agendado'), true, 'pode pular etapas ao agendar');
+  assert.equal(podeMover('agendado', 'decidindo'), false, 'nunca volta para trás');
+  assert.equal(podeMover('decidindo', 'proposta_enviada'), false);
+  assert.equal(podeMover('decidindo', 'contatado'), false);
+  assert.equal(podeMover('contatado', 'sem_resposta'), true);
+  assert.equal(podeMover('proposta_enviada', 'sem_resposta'), false, 'quem já recebeu proposta não vai para sem resposta');
+  assert.equal(podeMover('sem_resposta', 'contatado'), true, 'respondeu: volta');
+  assert.equal(podeMover('sem_resposta', 'agendado'), true);
+  assert.equal(podeMover('agendado', 'perdido'), true);
+  assert.equal(podeMover('fechado', 'perdido'), false);
+  assert.equal(podeMover('fechado', 'agendado'), false);
+  assert.equal(podeMover('perdido', 'contatado'), false, 'Gabriel mandou para perdido: o bot respeita');
+  assert.equal(podeMover('contatado', 'contatado'), false);
+  assert.equal(podeMover('contatado', 'status_inventado'), false);
+});
+
+await teste('citouHonorarios: palavra "honorários" junto de valor ou porcentagem', () => {
+  assert.equal(citouHonorarios('Os honorários são 12% sobre a economia.'), true);
+  assert.equal(citouHonorarios('Meus Honorários ficam em R$ 5.040.'), true);
+  assert.equal(citouHonorarios('Honorário mínimo de R$ 600.'), true);
+  assert.equal(citouHonorarios('Você economiza 55% no INSS da obra.'), false);
+  assert.equal(citouHonorarios('Os honorários só entram depois da análise.'), false);
+  assert.equal(citouHonorarios(''), false);
+});
+
+await teste('bot citou os honorários: card vai para "Proposta enviada"', async () => {
+  const ctx = montar({ roteiro: [texto('Os honorários são de 12% sobre a economia conseguida, em torno de R$ 5.040 no seu caso.\n\nFaz sentido para você?')] });
+  const l = lead();
+  const c = await abrir(ctx, l);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'Quanto é o seu honorário?' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.store.leads.get(l.id).status, 'proposta_enviada');
+  assert.match(ctx.store.leads.get(l.id).notas, /honorários/);
+});
+
+await teste('bot não puxa o card para trás nem mexe em card que o Gabriel fechou', async () => {
+  for (const [antes, esperado] of [['decidindo', 'decidindo'], ['agendado', 'agendado'], ['fechado', 'fechado'], ['perdido', 'perdido']]) {
+    const ctx = montar({ roteiro: [texto('Os honorários são de 12% sobre a economia conseguida.\n\nPosso te ajudar em mais algo?')] });
+    const l = lead();
+    const c = await abrir(ctx, l);
+    ctx.store.leads.get(l.id).status = antes; // Gabriel arrastou o card à mão
+    await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'e o honorário?' });
+    await ctx.bot.responder(c.id);
+    ctx.bot.pararTimers();
+    assert.equal(ctx.store.leads.get(l.id).status, esperado, `card em "${antes}" fica onde está`);
+  }
+});
+
+await teste('lead que não responde em 24h vai para "Sem resposta" e volta para "Contatado" quando responde', async () => {
+  const ctx = montar({ roteiro: [texto('Claro! Me conta: a obra já foi concluída?')] });
+  const l = lead();
+  const c = await abrir(ctx, l);
+  assert.equal(ctx.store.leads.get(l.id).status, 'contatado');
+  assert.equal(await ctx.bot.marcarSemResposta(24), 1);
+  assert.equal(ctx.store.leads.get(l.id).status, 'sem_resposta');
+  assert.equal(await ctx.bot.marcarSemResposta(24), 0, 'não repete');
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'oi, vi sua mensagem agora' });
+  assert.equal(ctx.store.leads.get(l.id).status, 'contatado', 'respondeu: sai de Sem resposta');
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(await ctx.bot.marcarSemResposta(24), 0, 'quem já respondeu nunca vai para Sem resposta');
+});
+
+await teste('se o banco ainda não aceita o status "agendado", o agendamento não quebra', async () => {
+  const site = criarSite({
+    siteUrl: 'https://exemplo.test',
+    fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true }) }),
+  });
+  const ctx = montar({ siteFalso: site, roteiro: [[uso('agendar_consultoria', { inicio: '2026-10-24T15:00:00.000Z', email: 'maria@exemplo.com' })], texto('Combinado, Maria! Deixei marcado e você vai receber a confirmação por e-mail.')] });
+  const l = lead();
+  const c = await abrir(ctx, l);
+  const original = ctx.store.atualizarLead.bind(ctx.store);
+  ctx.store.atualizarLead = async (id, patch) => {
+    if (patch.status === 'agendado') throw new Error('violates check constraint "leads_status_check"');
+    return original(id, patch);
+  };
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'pode marcar, meu email é maria@exemplo.com' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /marcado/);
+  assert.equal(ctx.store.agendou.length, 1);
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);
