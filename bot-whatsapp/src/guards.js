@@ -35,6 +35,8 @@ const PROIBIDAS = [
   [/\b(com certeza voc[eê] vai economizar|certeza de economia)\b/i, 'certeza de economia'],
 ];
 
+export const REGEX_CLT_PF = /funcion[aá]rios?\s+(registrad|com\s+carteira|contratad)|registrad[oa]s?\s+(em\s+)?(clt|na\s+carteira)|\bclt\b|carteira\s+assinada/i;
+
 /** Valores em R$ citados no texto, como números. */
 export function extrairValoresReais(texto) {
   const valores = [];
@@ -72,7 +74,7 @@ function podeFalarMinimo(lead) {
 /**
  * @returns {{ok: true} | {ok: false, motivo: string}}
  */
-export function validarSaida(texto, lead, valoresExtras = []) {
+export function validarSaida(texto, lead, valoresExtras = [], { ignorarClt = false } = {}) {
   const t = String(texto ?? '');
   if (!t.trim()) return { ok: false, motivo: 'mensagem vazia' };
   if (t.length > 1200) return { ok: false, motivo: 'mensagem longa demais para WhatsApp (resuma)' };
@@ -81,6 +83,15 @@ export function validarSaida(texto, lead, valoresExtras = []) {
   for (const [regex, nome] of PROIBIDAS) {
     if (liberaMinimo && nome === 'menção a valor mínimo') continue;
     if (regex.test(t)) return { ok: false, motivo: `contém ${nome}, que é proibido` };
+  }
+
+  // Pessoa física: a frente de mão de obra é o autônomo com recolhimento (inclusive retroativo); CLT/funcionário registrado é de empresa.
+  if (!ignorarClt && lead?.responsavel !== 'PJ' && REGEX_CLT_PF.test(t)) {
+    return {
+      ok: false,
+      motivo:
+        'fala em funcionário registrado/CLT para pessoa física. Para pessoa física a frente é o trabalhador AUTÔNOMO com INSS recolhido ligado ao CNO, inclusive de forma retroativa (mesmo que nada tenha sido recolhido); funcionário registrado é só para empresa. Reescreva sem insinuar que a falta de recolhimento atrapalha',
+    };
   }
 
   const permitidos = [...valoresPermitidos(lead), ...valoresExtras];

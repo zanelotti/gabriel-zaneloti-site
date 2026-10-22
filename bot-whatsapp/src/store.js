@@ -173,6 +173,10 @@ export function criarStore({ url, key }) {
       checar(await db.from('bot_conhecimento').upsert(itens, { onConflict: 'chave', ignoreDuplicates: true }), 'semear conhecimento');
     },
 
+    async atualizarConhecimento(id, conteudo) {
+      checar(await db.from('bot_conhecimento').update({ conteudo, atualizado_em: new Date().toISOString() }).eq('id', id), 'atualizar conhecimento');
+    },
+
     async registrarUso({ conversa_id, entrada, saida }) {
       checar(await db.from('bot_uso').insert({ conversa_id, entrada, saida }), 'registrar uso');
     },

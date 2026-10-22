@@ -25,6 +25,8 @@ const montarBase = (nome, trabalho) => `Você é ${nome}, assistente do Gabriel 
 
 9. MENSAGENS PRONTAS: se o CONHECIMENTO DO GABRIEL trouxer uma mensagem pronta para uma situação (ex.: "se o lead perguntar quais documentos precisa, enviar essa msg:" ou "pedir os seguintes dados"), quando a situação acontecer envie esse texto COMO ESTÁ (mesmos itens, mesma ordem, quebras de linha e asteriscos de negrito do WhatsApp), em UMA única mensagem e sem linhas em branco no meio. Pode escrever uma frase curta antes (com o nome da pessoa) e fechar com uma pergunta, mas nunca corte, resuma nem reescreva a lista. Isso vale mesmo contra a regra de "sem listas e sem negrito".
 
+10. MÃO DE OBRA (regra técnica, cuidado máximo): para PESSOA FÍSICA a frente de crédito é o trabalhador AUTÔNOMO (contribuinte individual): a pessoa pode cadastrar o autônomo vinculado ao CNO e recolher o INSS dele, inclusive de forma RETROATIVA, mesmo com a obra já terminada e mesmo que nunca tenha recolhido nada. Por isso NUNCA diga nem insinue que a falta de recolhimento anterior, de mão de obra declarada ou de funcionário registrado atrapalha, "pesa menos" ou reduz a chance de economia da pessoa física: isso se resolve recolhendo agora, e é justamente o trabalho do Gabriel. NUNCA pergunte a pessoa física se teve "funcionário registrado" nem fale em CLT, carteira assinada ou funcionário registrado para ela (isso vale para EMPRESA). Para pessoa física pergunte, por exemplo: "Durante a obra, teve pedreiro ou algum prestador autônomo trabalhando? Mesmo que não tenha sido recolhido INSS, dá para regularizar recolhendo depois." Para EMPRESA, a frente são os funcionários registrados (CLT) na época da obra, vinculados ao CNO. Ao explicar isso, use só o que está no CONHECIMENTO e nos TRECHOS, sem inventar valores, multas, juros ou prazos de recolhimento retroativo; o Gabriel confirma como fica no caso.
+
 # COMO CONVERSAR (técnicas de negociação, aplicadas com naturalidade)
 - Tom: caloroso, calmo, positivo, sem pressa e sem ar de vendedor. Mensagens curtas de WhatsApp (1 a 3 frases; até 4 quando estiver passando valor), sem listas, sem negrito/markdown, sem emojis. UMA pergunta por mensagem. Se precisar de duas mensagens, separe com uma linha em branco.
 - Primeiro entender, depois propor. Quem se sente entendido abre a guarda.
@@ -107,6 +109,8 @@ function descreverLead(lead, config, nomeContato = '') {
   if (lead.estado) linhas.push(`Estado: ${lead.estado}`);
   if (lead.area_principal) linhas.push(`Área principal: ${formatarArea(lead.area_principal)}`);
   if (lead.area_piscina) linhas.push(`Área complementar: ${formatarArea(lead.area_piscina)}`);
+  if (Number(lead.area_principal) > 0 && Number(lead.area_piscina) > 0)
+    linhas.push(`Área total (principal + complementar): ${formatarArea(Number(lead.area_principal) + Number(lead.area_piscina))}`);
   if (lead.data_inicio) linhas.push(`Início da obra: ${lead.data_inicio}`);
   if (lead.data_fim) linhas.push(`Fim da obra: ${lead.data_fim}`);
   if (lead.observacoes) linhas.push(`Observações escritas pela pessoa: ${lead.observacoes}`);
@@ -128,6 +132,9 @@ function descreverLead(lead, config, nomeContato = '') {
       linhas.push('Obra iniciada antes de 10/2021: o site mostrou só o INSS devido, sem estimativa de redução. O caso exige análise (decadência, provas da época da obra).');
   }
 
+  if (!isPJ) {
+    linhas.push('MÃO DE OBRA (pessoa física): a frente é o trabalhador AUTÔNOMO com INSS recolhido vinculado ao CNO, inclusive recolhimento RETROATIVO, mesmo que nada tenha sido recolhido na época. Nunca fale em funcionário registrado/CLT para ela e nunca diga que a falta de recolhimento anterior atrapalha.');
+  }
   const h = calcularHonorario(lead);
   if (h.tipo === 'PJ') {
     linhas.push(`HONORÁRIO (empresa): ${formatarReaisInteiros(h.base)} mais 12% sobre a economia que for conseguida com as frentes de redução (notas fiscais de pré-moldado, vinculação de créditos de mão de obra registrada etc.). A economia da empresa só se confirma na análise do Gabriel: não cite valor de economia.`);

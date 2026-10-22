@@ -5,7 +5,14 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { extrairValoresReais } from './guards.js';
+
+/** SHA-256 de versões antigas de arquivos que foram corrigidas. Se o texto no CRM ainda for IDÊNTICO a uma delas (ninguém editou), é trocado pelo novo automaticamente. */
+const VERSOES_ANTERIORES = {
+  '04-formas-de-reduzir.md': ['b0bd0a3827bd0556bc1d0b80307834dd21b3914e18bebe8531bec1801136ec08'],
+};
+export const sha256 = (t) => createHash('sha256').update(String(t ?? '').trim()).digest('hex');
 
 const PASTA_PADRAO = fileURLToPath(new URL('../conhecimento', import.meta.url));
 
@@ -20,7 +27,7 @@ export function carregarConhecimento(pasta = PASTA_PADRAO) {
 
 /** Arquivos da pasta no formato da tabela bot_conhecimento (para copiar para o banco na primeira vez). */
 export function arquivosParaSemear(pasta = PASTA_PADRAO) {
-  if (!existsSync(pasta)) return { itens: [] };
+  if (!existsSync(pasta)) return { itens: [], versoes: {} };
   const arquivos = readdirSync(pasta)
     .filter((f) => /\.(md|txt)$/i.test(f) && !f.startsWith('_'))
     .sort();
@@ -31,5 +38,6 @@ export function arquivosParaSemear(pasta = PASTA_PADRAO) {
       conteudo: readFileSync(join(pasta, f), 'utf8').trim(),
       ordem: (i + 1) * 10,
     })),
+    versoes: VERSOES_ANTERIORES,
   };
 }

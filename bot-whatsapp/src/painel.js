@@ -11,6 +11,7 @@
 import { existsSync } from 'node:fs';
 import { extrairValoresReais } from './guards.js';
 import { criarIndiceAprendizado } from './aprendizado.js';
+import { sha256 } from './conhecimento.js';
 
 const FUSO = 'America/Sao_Paulo';
 const EXPIRA_COMANDO_MS = 10 * 60 * 1000;
@@ -139,10 +140,29 @@ export function criarPainel({ store, wa, bot, config, conhecimento, conhecimento
           await store.gravarEstado('conhecimento_semeado', JSON.stringify([...ja, ...novos.map((n) => n.chave)]));
         }
       }
+      await atualizarTextosCorrigidos();
     } catch (e) {
       log.warn(`[painel] não consegui preparar as tabelas do painel (${e.message}). Rodou o supabase_bot_painel.sql?`);
     }
     await sincronizar();
+  }
+
+  /** Substitui no CRM os textos de conhecimento que foram corrigidos nos arquivos, mas só se ninguém os editou. */
+  async function atualizarTextosCorrigidos() {
+    const versoes = conhecimentoArquivos.versoes || {};
+    const linhas = (await store.listarConhecimento()) || [];
+    for (const item of conhecimentoArquivos.itens) {
+      const antigas = versoes[item.chave];
+      if (!antigas || !antigas.length) continue;
+      const linha = linhas.find((l) => l.chave === item.chave);
+      if (!linha || String(linha.conteudo).trim() === item.conteudo.trim()) continue;
+      if (antigas.includes(sha256(linha.conteudo))) {
+        await store.atualizarConhecimento(linha.id, item.conteudo);
+        log.info(`[painel] texto de conhecimento "${item.chave}" atualizado para a versão corrigida.`);
+      } else {
+        log.warn(`[painel] o texto "${item.chave}" foi corrigido nos arquivos, mas você editou a versão do CRM; confira na aba Conhecimento (a seção sobre mão de obra de pessoa física).`);
+      }
+    }
   }
 
   async function sincronizar() {

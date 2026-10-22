@@ -17,7 +17,8 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { criarIndice, tokenizar } from './documentos.js';
-import { validarSaida } from './guards.js';
+import { REGEX_CLT_PF, validarSaida } from './guards.js';
+import { criarChamador } from './util.js';
 
 const OCIOSO_MS = 30 * 60 * 1000; // conversa parada há 30 min
 const MAX_ITENS_POR_CONVERSA = 5;
@@ -105,9 +106,13 @@ export function validarAprendizado(item, { lead = {}, nomeContato = '' } = {}) {
     if (new RegExp(`\\b${n}\\b`).test(semAcento)) return { ok: false, motivo: 'contém nome do cliente' };
   }
   // Mesmas travas de conteúdo das mensagens enviadas ao lead (palavras e promessas proibidas).
-  const v = validarSaida(resposta, lead, []);
+  // Funcionário registrado/CLT só vale para empresa: item que fale disso tem de dizer que é de empresa.
+  if (REGEX_CLT_PF.test(junto) && !/empresa|cnpj|pessoa\s+jur[ií]dica/i.test(junto)) {
+    return { ok: false, motivo: 'fala em funcionário registrado/CLT sem dizer que é de empresa' };
+  }
+  const v = validarSaida(resposta, lead, [], { ignorarClt: true });
   if (!v.ok) return { ok: false, motivo: v.motivo };
-  const v2 = validarSaida(pergunta, lead, []);
+  const v2 = validarSaida(pergunta, lead, [], { ignorarClt: true });
   if (!v2.ok) return { ok: false, motivo: v2.motivo };
   return { ok: true };
 }
@@ -145,10 +150,11 @@ export function formatarAprendidos(achados) {
 
 export function criarAprendizado({ store, modelo, apiKey, client, config, log = console, agora = () => Date.now(), ociosoMs = OCIOSO_MS }) {
   const anthropic = client || new Anthropic({ apiKey });
+  const chamar = criarChamador(anthropic, log);
   let rodando = false;
 
   async function extrair(conversa, historico, lead) {
-    const resp = await anthropic.messages.create({
+    const resp = await chamar({
       model: modelo,
       max_tokens: 1500,
       system: INSTRUCOES,
