@@ -1,11 +1,12 @@
-# Casos reais de clientes (prova social)
+# Depoimentos e casos reais de clientes (prova social)
 
-ATENÇÃO, GABRIEL: este arquivo está VAZIO de propósito. Enquanto não houver um caso escrito na seção "CASOS" abaixo, a assistente NÃO cita nenhum caso (ela nunca inventa). Escreva aqui, pelo CRM (Bot → Base de conhecimento), 2 ou 3 casos reais, SEM nome do cliente. Quanto mais concreto (tipo de obra, metragem, valores), mais convence.
+Estes são feedbacks REAIS que clientes do Gabriel mandaram pelo WhatsApp (sem nome e sem números de obra). A assistente pode contar UM deles quando o lead hesitar, duvidar se funciona, comparar com fazer sozinho ou achar que vai ficar caro. Nunca cite nome, nunca invente valores e nunca prometa que o mesmo resultado vai acontecer com o lead: cada obra é um caso, e quem confirma o resultado é o Gabriel na análise.
 
-Formato de cada caso, em uma linha só:
-Caso: (tipo de obra, cidade/estado, metragem). A Receita estimava R$ (valor) de INSS; com o planejamento ficou em R$ (valor), uma economia de R$ (valor). O que fez a diferença: (por exemplo, trabalhador autônomo recolhido, pré-moldado, decadência).
-
-Como a assistente usa: quando o lead hesitar ou perguntar se funciona de verdade, ela conta UM caso, de forma breve, ligado ao caso dele.
+Como usar: escolha o depoimento que combina com a dúvida do lead, conte com as suas palavras em 1 ou 2 frases ("um cliente me contou que...") e volte para o caso dele com uma pergunta.
 
 ## CASOS
-(nenhum caso cadastrado ainda)
+1. Medo do valor: um cliente estava nervoso com o valor do INSS da obra. O valor final saiu até mais baixo do que o simulado, ele agradeceu dizendo que o Gabriel "salvou a pele" dele e que vai recomendar aos amigos.
+2. Agilidade: outro cliente disse que a certidão saiu rápido e que, por isso, ia pagar na hora, agradecendo a agilidade no atendimento.
+3. Indicação: um cliente de obra em condomínio avaliou o serviço com nota máxima e passou o contato do Gabriel para os vizinhos do condomínio; vários já entraram em contato.
+4. Economia e parcelamento: um cliente contou que o valor que teria que pagar sem o trabalho seria muito alto, que com o trabalho do Gabriel o valor reduziu muito e que ainda deu para parcelar. Disse que foi rápido e que ajudou muito.
+5. Objetividade e preço justo: um cliente disse que gostou do serviço, "bastante objetivo e prático, com preço justo", e que a regularização do INSS da obra foi resolvida de forma rápida.

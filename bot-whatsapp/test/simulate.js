@@ -1951,13 +1951,16 @@ await teste('valor antes do preço: o prompt traz economia × honorário × quan
   assert.doesNotMatch(montarSistema(lead({ economia_estimada: null }), config), /COMPARAÇÃO PARA APRESENTAR/);
 });
 
-await teste('prova social: regra no prompt e arquivo de casos reais começa vazio (nada inventado)', () => {
+await teste('prova social: regra no prompt e depoimentos reais (sem nome e sem valores) na base de conhecimento', () => {
   const sistema = montarSistema(lead(), config);
   assert.match(sistema, /PROVA SOCIAL/);
   assert.match(sistema, /SOMENTE se ele estiver escrito/);
   const k = carregarConhecimento();
   assert.ok(k.arquivos.includes('06-casos-de-sucesso.md'));
-  assert.match(k.texto, /nenhum caso cadastrado ainda/);
+  assert.match(k.texto, /feedbacks REAIS/);
+  const casos = k.texto.split('## Arquivo: 06-casos-de-sucesso.md')[1].split('## Arquivo:')[0];
+  assert.doesNotMatch(casos, /R\$/, 'os depoimentos não têm valores inventados');
+  assert.match(k.texto, /nunca prometa que o mesmo resultado/);
 });
 
 

@@ -11,6 +11,7 @@ import { extrairValoresReais } from './guards.js';
 /** SHA-256 de versões antigas de arquivos que foram corrigidas. Se o texto no CRM ainda for IDÊNTICO a uma delas (ninguém editou), é trocado pelo novo automaticamente. */
 const VERSOES_ANTERIORES = {
   '04-formas-de-reduzir.md': ['b0bd0a3827bd0556bc1d0b80307834dd21b3914e18bebe8531bec1801136ec08'],
+  '06-casos-de-sucesso.md': ['c54d9bc3a5435467b0c492ee603a7d3250299f0cbddcd420e84279ca1cf6e4f4'],
 };
 export const sha256 = (t) => createHash('sha256').update(String(t ?? '').trim()).digest('hex');
 
