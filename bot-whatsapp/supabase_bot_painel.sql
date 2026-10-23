@@ -156,3 +156,15 @@ end $$;
 
 alter table public.leads add constraint leads_status_check
   check (status in ('novo', 'contatado', 'sem_resposta', 'proposta_enviada', 'decidindo', 'agendado', 'fechado', 'perdido'));
+
+-- ----------------------------------------------------------------------------
+-- 10) Acompanhamento de quem some, lembretes da consultoria e motivo da perda.
+-- ----------------------------------------------------------------------------
+alter table public.bot_conversas add column if not exists followup_nivel integer not null default 0;
+alter table public.bot_conversas add column if not exists ultimo_followup_em timestamptz;
+
+alter table public.bot_config add column if not exists followup_ativo boolean not null default true;
+alter table public.bot_config add column if not exists lembretes_ativo boolean not null default true;
+
+-- Por que o lead foi perdido (o bot preenche sozinho quando sabe; o Gabriel escolhe no card do CRM).
+alter table public.leads add column if not exists motivo_perda text;

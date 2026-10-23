@@ -48,6 +48,42 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
 };
 
 /**
+ * Por que um lead foi perdido. O bot preenche sozinho quando sabe (pediu para parar, achou caro...)
+ * e o Gabriel pode escolher/corrigir no card. Serve para ver onde o funil vaza.
+ */
+export type MotivoPerda =
+  | 'preco'
+  | 'vai_fazer_sozinho'
+  | 'desconfianca'
+  | 'ja_resolveu'
+  | 'sem_resposta'
+  | 'sem_interesse'
+  | 'pediu_para_parar'
+  | 'outro';
+
+export const MOTIVO_PERDA_ORDER: MotivoPerda[] = [
+  'preco',
+  'vai_fazer_sozinho',
+  'desconfianca',
+  'ja_resolveu',
+  'sem_resposta',
+  'sem_interesse',
+  'pediu_para_parar',
+  'outro',
+];
+
+export const MOTIVO_PERDA_LABEL: Record<MotivoPerda, string> = {
+  preco: 'Achou caro',
+  vai_fazer_sozinho: 'Vai fazer sozinho',
+  desconfianca: 'Desconfiança',
+  ja_resolveu: 'Já resolveu (outro profissional)',
+  sem_resposta: 'Sumiu (sem resposta)',
+  sem_interesse: 'Sem interesse',
+  pediu_para_parar: 'Pediu para parar',
+  outro: 'Outro',
+};
+
+/**
  * Representa um lead gerado a partir de uma simulação concluída na calculadora.
  * Esta interface é o contrato usado pela camada `leadService`, independentemente
  * de onde os leads acabem sendo persistidos (localStorage, Supabase, API própria, CRM...).
@@ -89,6 +125,8 @@ export interface Lead {
   valorFechado?: number | null;
   /** Honorários efetivamente cobrados do cliente nesse lead (uso interno, nunca exibido ao cliente). */
   honorarios?: number | null;
+  /** Só faz sentido quando status = 'perdido'. */
+  motivoPerda?: MotivoPerda | null;
   updatedAt?: string;
 }
 

@@ -1,5 +1,5 @@
 import type { Lead } from '@/types/lead';
-import { LEAD_STATUS_LABEL, LEAD_STATUS_ORDER } from '@/types/lead';
+import { LEAD_STATUS_LABEL, LEAD_STATUS_ORDER, MOTIVO_PERDA_LABEL, MOTIVO_PERDA_ORDER } from '@/types/lead';
 import { BRAZILIAN_STATES } from '@/data/states';
 import { formatCurrency, formatPercent } from '@/utils/formatters';
 import { StatTile } from './charts/StatTile';
@@ -52,6 +52,20 @@ export function DashboardView({ leads }: DashboardViewProps) {
       colorClass: STATUS_STYLES[status].dot,
     };
   });
+
+  // Motivos de perda: dos leads perdidos, por que foram perdidos (o bot preenche sozinho quando sabe).
+  const motivoCounts = new Map<string, number>();
+  perdidos.forEach((l) => {
+    const motivo = l.motivoPerda ?? 'nao_informado';
+    motivoCounts.set(motivo, (motivoCounts.get(motivo) ?? 0) + 1);
+  });
+  const motivoData: HorizontalBarDatum[] = [...MOTIVO_PERDA_ORDER, 'nao_informado' as const]
+    .filter((m) => (motivoCounts.get(m) ?? 0) > 0)
+    .map((m) => ({
+      label: m === 'nao_informado' ? 'Não informado' : MOTIVO_PERDA_LABEL[m],
+      value: motivoCounts.get(m) ?? 0,
+      colorClass: 'bg-red-400',
+    }));
 
   // Leads por estado (top 8).
   const estadoCounts = new Map<string, number>();
@@ -126,6 +140,17 @@ export function DashboardView({ leads }: DashboardViewProps) {
         <h2 className="text-sm font-bold uppercase tracking-wide text-navy-500">Funil de conversão</h2>
         <div className="mt-4">
           <HorizontalBarChart data={funilData} />
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-navy-500">Por que os leads são perdidos</h2>
+        <div className="mt-4">
+          {motivoData.length > 0 ? (
+            <HorizontalBarChart data={motivoData} />
+          ) : (
+            <p className="text-sm text-navy-400">Ainda não há leads perdidos. Quando houver, o motivo aparece aqui.</p>
+          )}
         </div>
       </div>
 

@@ -10,10 +10,11 @@
  *      Claude e envia. O Claude pode agendar a consultoria, passar para o Gabriel ou encerrar.
  *   4. Se o Gabriel responder à mão numa conversa, o bot se cala nela.
  */
+import { dentroDaJanelaAutomatica, lembreteDevido, montarFollowup, montarMensagemConsultoria, proximoFollowup } from './acompanhamento.js';
 import { citouHonorarios } from './funil.js';
 import { dividirMensagens, pediuParar, validarSaida } from './guards.js';
 import { montarAbertura } from './opening.js';
-import { aleatorio, dormir, limparNomeInformado, normalizarTelefoneBR } from './util.js';
+import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, limparNomeInformado, normalizarTelefoneBR } from './util.js';
 
 const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
 const TRINTA_MIN = 30 * 60 * 1000;
@@ -26,6 +27,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   const falhasLead = new Map();
   const falhasResposta = new Map();
   const avisosEspera = new Map(); // conversaId -> quando avisamos que o lead está esperando
+  const followupsFeitos = new Set(); // 'conversa:nível:última mensagem' já enviados nesta execução (trava extra contra repetição)
+  const lembretesFeitos = new Set(); // 'lembrete:agendamento:tipo'
   let inicioDoBot = null;
   let avisouTeto = false;
 
@@ -50,6 +53,35 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   async function enviar(conversa, texto) {
     const waId = await wa.enviarTexto(conversa.jid, texto);
     await store.addMensagem({ conversa_id: conversa.id, direcao: 'bot', texto, wa_id: waId });
+  }
+
+  /** Modo de teste: só fala com os números da lista (mesma regra da abertura). */
+  function foraDaListaTeste(telefone) {
+    return config.listaTeste.length > 0 && !config.listaTeste.some((n) => String(telefone).endsWith(n) || n.endsWith(String(telefone)));
+  }
+
+  /**
+   * Lead com economia alta (acima do mesmo limite da reunião): avisa o Gabriel por e-mail, uma vez por tipo de aviso,
+   * para ele entrar pessoalmente (áudio de 1 minuto ou ligação) enquanto o lead está quente.
+   */
+  async function avisarLeadGrande(conversa, lead, tipoAviso, historico = []) {
+    try {
+      if (!lead || lead.responsavel === 'PJ') return;
+      const eco = Number(lead.economia_estimada);
+      if (!Number.isFinite(eco) || eco < config.economiaMinParaReuniao) return;
+      const chave = `grande:${conversa.id}:${tipoAviso}`;
+      if (await store.lerEstado(chave)) return;
+      await store.gravarEstado(chave, new Date().toISOString());
+      const h = calcularHonorario(lead);
+      const honor = h.economiaConhecida ? ` (honorário em torno de ${formatarReaisInteiros(h.valor)})` : '';
+      const motivo =
+        tipoAviso === 'resposta'
+          ? `Lead de valor alto acabou de responder: economia estimada de ${formatarReaisInteiros(eco)}${honor}. Vale mandar um áudio seu de 1 minuto ou ligar enquanto ele está quente.`
+          : `Lead de valor alto ficou sem responder: economia estimada de ${formatarReaisInteiros(eco)}${honor}. Vale um áudio seu de 1 minuto ou uma ligação para retomar.`;
+      await notificar.avisar({ tipo: tipoAviso === 'resposta' ? 'Lead grande respondeu' : 'Lead grande sem resposta', lead, telefone: conversa.telefone, motivo, historico });
+    } catch (e) {
+      log.warn(`[bot] não consegui avisar sobre lead grande: ${e.message}`);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -124,11 +156,112 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     for (const id of ids) {
       try {
         await store.atualizarLead(id, { status: 'sem_resposta', nota: `Lead não respondeu em ${horas}h.` });
+        const conversa = await store.conversaPorLead(id);
+        if (conversa) await avisarLeadGrande(conversa, await store.leadPorId(id), 'sumiu', await store.historico(conversa.id));
       } catch (e) {
         log.warn(`[bot] não consegui mover o card para "Sem resposta": ${e.message}`);
       }
     }
     return ids.length;
+  }
+
+  /**
+   * Acompanhamento de quem parou de responder. Quando o bot foi o último a falar e o silêncio dura ~1 dia, ~3 dias e ~7 dias,
+   * manda uma mensagem curta (modelos de acompanhamento.js). Respeita as travas (bot parado, horário 8h–20h, teto, lista de teste)
+   * e nunca insiste com quem pediu para parar, com quem já agendou ou com conversa que está com o Gabriel.
+   */
+  async function processarFollowups({ agora = new Date() } = {}) {
+    if (config.followupAtivo === false || parado() || !wa.conectado() || !dentroDaJanelaAutomatica(agora)) return 0;
+    const conversas = await store.conversasParaFollowup();
+    let enviados = 0;
+    for (const c of conversas) {
+      if (enviados >= 5 || parado()) break;
+      if ((c.observacao || '').startsWith(MARCA_ESPERA)) continue; // está esperando o Gabriel, não o lead
+      if (emAndamento.has(c.id) || timers.has(c.id)) continue;
+      if (foraDaListaTeste(c.telefone)) continue;
+      const historico = await store.historico(c.id);
+      const ultima = historico[historico.length - 1];
+      const nivel = proximoFollowup({ nivelAtual: c.followup_nivel ?? 0, ultimaDirecao: ultima?.direcao, ultimaEm: ultima?.criado_em, agora: agora.getTime() });
+      const chaveFollowup = `${c.id}:${nivel}:${ultima?.id}`; // mesma conversa, mesmo nível, mesma última mensagem = já tratado
+      if (!nivel || followupsFeitos.has(chaveFollowup)) continue;
+      const lead = await store.leadPorId(c.lead_id);
+      if (!lead || ['agendado', 'fechado', 'perdido'].includes(lead.status)) continue;
+      if (!(await abaixoDoTeto())) {
+        await avisarTeto();
+        break;
+      }
+      followupsFeitos.add(chaveFollowup);
+      try {
+        await store.registrarFollowup(c.id, nivel); // registra ANTES de enviar: se falhar aqui, não envia (evita repetir)
+      } catch (e) {
+        log.warn(`[bot] não consegui registrar o acompanhamento (rodou o supabase_bot_painel.sql de novo?): ${e.message}`);
+        continue;
+      }
+      const texto = montarFollowup({ lead, nivel, respondeuAntes: historico.some((m) => m.direcao === 'lead'), nomeContato: c.nome_contato || '' });
+      const v = validarSaida(texto, lead);
+      if (!v.ok) {
+        log.error(`[bot] acompanhamento bloqueado (${v.motivo})`);
+        continue;
+      }
+      try {
+        await enviar(c, texto);
+        enviados += 1;
+        log.info(`[bot] acompanhamento ${nivel} enviado para ${lead.nome || lead.id}`);
+      } catch (e) {
+        log.warn(`[bot] falha ao enviar acompanhamento: ${e.message}`);
+      }
+    }
+    return enviados;
+  }
+
+  /**
+   * Mensagens ligadas à consultoria gratuita (tabela agendamentos): lembrete 24h e 1h antes; pós-consultoria quando o Gabriel marca
+   * "Realizado" na aba Agenda; oferta de remarcar quando marca "Não compareceu". Só para quem já tem conversa ativa com o bot.
+   */
+  async function processarConsultorias({ agora = new Date() } = {}) {
+    if (config.lembretesAtivo === false || parado() || !wa.conectado() || !dentroDaJanelaAutomatica(agora)) return 0;
+    const lista = await store.agendamentosRecentes();
+    let enviados = 0;
+    for (const a of lista) {
+      const devidos = lembreteDevido({ status: a.status, inicio: a.inicio, fim: a.fim, criadoEm: a.created_at, agora: agora.getTime() });
+      if (!devidos.length) continue;
+      const telefone = normalizarTelefoneBR(a.whatsapp);
+      if (!telefone) continue;
+      const conversa = await store.conversaPorTelefone(telefone);
+      if (!conversa || conversa.estado !== 'ativa' || foraDaListaTeste(conversa.telefone)) continue;
+      const lead = await store.leadPorId(conversa.lead_id);
+      for (const tipo of devidos) {
+        const chave = `lembrete:${a.id}:${tipo}`;
+        if (lembretesFeitos.has(chave)) continue;
+        lembretesFeitos.add(chave);
+        if (await store.lerEstado(chave)) continue;
+        if (!(await abaixoDoTeto())) {
+          await avisarTeto();
+          lembretesFeitos.delete(chave);
+          return enviados;
+        }
+        try {
+          await store.gravarEstado(chave, new Date().toISOString()); // registra ANTES de enviar
+        } catch (e) {
+          log.warn(`[bot] não consegui registrar o lembrete: ${e.message}`);
+          continue;
+        }
+        const texto = montarMensagemConsultoria({ tipo, lead, inicio: a.inicio, nomeContato: conversa.nome_contato || '', agora });
+        const v = validarSaida(texto, lead || {});
+        if (!v.ok) {
+          log.error(`[bot] lembrete bloqueado (${v.motivo})`);
+          continue;
+        }
+        try {
+          await enviar(conversa, texto);
+          enviados += 1;
+          log.info(`[bot] mensagem da consultoria (${tipo}) enviada para ${a.nome}`);
+        } catch (e) {
+          log.warn(`[bot] falha ao enviar mensagem da consultoria: ${e.message}`);
+        }
+      }
+    }
+    return enviados;
   }
 
   async function processarNovosLeads() {
@@ -177,13 +310,24 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       }
     }
 
+    // O lead respondeu: a contagem dos acompanhamentos (24h / 3 dias / 7 dias) recomeça do zero.
+    if ((conversa.followup_nivel ?? 0) > 0) {
+      try {
+        await store.zerarFollowup(conversa.id);
+      } catch (e) {
+        log.warn(`[bot] não consegui zerar o acompanhamento: ${e.message}`);
+      }
+    }
+
     if (tipo === 'texto' && pediuParar(conteudo)) {
       cancelarTimer(conversa.id);
       await enviar(conversa, 'Tudo bem, não te envio mais mensagens. Obrigado pelo seu tempo!');
       await store.setEstado(conversa.id, 'optout', 'pediu para parar');
-      await store.atualizarLead(conversa.lead_id, { status: 'perdido', nota: 'Pediu para não receber mais mensagens.' });
+      await store.atualizarLead(conversa.lead_id, { status: 'perdido', nota: 'Pediu para não receber mais mensagens.', motivoPerda: 'pediu_para_parar' });
       return;
     }
+
+    await avisarLeadGrande(conversa, lead, 'resposta', historico);
 
     if (tipo !== 'texto' && !(texto && texto.trim())) {
       await enviar(conversa, 'Recebi o seu arquivo, mas por aqui eu consigo ler só texto. Consegue me escrever em poucas palavras?');
@@ -284,8 +428,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
         await store.atualizarLead(lead.id, { nota: `Nome informado no WhatsApp: ${limpo}` });
         return { ok: true, nome: limpo };
       },
-      registrar_status: async ({ status, nota }) => {
-        await store.atualizarLead(lead.id, { status, nota });
+      registrar_status: async ({ status, nota, motivo_perda: motivoPerda }) => {
+        await store.atualizarLead(lead.id, { status, nota, motivoPerda });
         return { ok: true };
       },
     };
@@ -376,7 +520,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
         }
       } else if (acao?.tipo === 'encerrar') {
         await store.setEstado(conversaId, 'encerrada', acao.motivo);
-        await store.atualizarLead(lead.id, { status: 'perdido', nota: `Conversa encerrada pelo bot: ${acao.motivo}` });
+        await store.atualizarLead(lead.id, { status: 'perdido', nota: `Conversa encerrada pelo bot: ${acao.motivo}`, motivoPerda: acao.motivo_perda || 'outro' });
       }
     } finally {
       emAndamento.delete(conversaId);
@@ -426,5 +570,5 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     timers.clear();
   }
 
-  return { processarNovosLeads, marcarSemResposta, aoReceber, aoHumano, responder, assumir, devolver, enviarComoGabriel, retomarPendentes, pararTimers, _dividir: dividirMensagens };
+  return { processarNovosLeads, marcarSemResposta, processarFollowups, processarConsultorias, aoReceber, aoHumano, responder, assumir, devolver, enviarComoGabriel, retomarPendentes, pararTimers, _dividir: dividirMensagens };
 }

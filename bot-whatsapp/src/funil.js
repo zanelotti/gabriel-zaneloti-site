@@ -46,3 +46,6 @@ export function citouHonorarios(texto) {
   const t = String(texto || '');
   return /honor[aá]rio/i.test(t) && /R\$\s*\d|\d\s*%/.test(t);
 }
+
+/** Motivos de perda gravados no card (o CRM mostra o nome em português; ver MOTIVO_PERDA_LABEL no site). */
+export const MOTIVOS_PERDA = ['preco', 'vai_fazer_sozinho', 'desconfianca', 'ja_resolveu', 'sem_resposta', 'sem_interesse', 'pediu_para_parar', 'outro'];

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Lead, LeadStatus } from '@/types/lead';
-import { LEAD_STATUS_LABEL, LEAD_STATUS_ORDER } from '@/types/lead';
+import type { MotivoPerda } from '@/types/lead';
+import { LEAD_STATUS_LABEL, LEAD_STATUS_ORDER, MOTIVO_PERDA_LABEL, MOTIVO_PERDA_ORDER } from '@/types/lead';
 import { crmLeadService } from '@/services/crmService';
 import { formatArea, formatCurrency, formatDateBR } from '@/utils/formatters';
 import { STATUS_STYLES } from './statusStyles';
@@ -16,6 +17,7 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
   const [notas, setNotas] = useState(lead.notas ?? '');
   const [valorFechado, setValorFechado] = useState(lead.valorFechado?.toString() ?? '');
   const [honorarios, setHonorarios] = useState(lead.honorarios?.toString() ?? '');
+  const [motivoPerda, setMotivoPerda] = useState<MotivoPerda | ''>(lead.motivoPerda ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,6 +39,9 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
       const tasks: Promise<void>[] = [];
       if (status !== (lead.status ?? 'novo')) tasks.push(crmLeadService.updateStatus(lead.id, status));
       if (notas !== (lead.notas ?? '')) tasks.push(crmLeadService.updateNotas(lead.id, notas));
+      if (status === 'perdido' && motivoPerda !== (lead.motivoPerda ?? '')) {
+        tasks.push(crmLeadService.updateMotivoPerda(lead.id, motivoPerda === '' ? null : motivoPerda));
+      }
 
       const parsedValor = parseValor(valorFechado);
       if (parsedValor !== (lead.valorFechado ?? null)) {
@@ -156,6 +161,24 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
             ))}
           </div>
         </div>
+
+        {status === 'perdido' && (
+          <div className="mt-4">
+            <label className="field-label">Por que perdeu? (ajuda a ver onde o funil vaza)</label>
+            <select
+              className="field-input"
+              value={motivoPerda}
+              onChange={(event) => setMotivoPerda(event.target.value as MotivoPerda | '')}
+            >
+              <option value="">Não informado</option>
+              {MOTIVO_PERDA_ORDER.map((motivo) => (
+                <option key={motivo} value={motivo}>
+                  {MOTIVO_PERDA_LABEL[motivo]}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {status === 'fechado' && (
           <div className="mt-4 grid grid-cols-2 gap-3">

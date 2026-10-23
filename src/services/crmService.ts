@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Agendamento, AgendamentoStatus, GuiaLead, Lead, LeadStatus } from '@/types/lead';
+import type { Agendamento, AgendamentoStatus, GuiaLead, Lead, LeadStatus, MotivoPerda } from '@/types/lead';
 
 /**
  * ============================================================================
@@ -37,6 +37,7 @@ interface LeadRow {
   notas: string | null;
   valor_fechado: number | null;
   honorarios: number | null;
+  motivo_perda?: string | null;
   updated_at: string;
 }
 
@@ -66,6 +67,7 @@ function rowToLead(row: LeadRow): Lead {
     notas: row.notas,
     valorFechado: row.valor_fechado,
     honorarios: row.honorarios,
+    motivoPerda: (row.motivo_perda ?? null) as MotivoPerda | null,
     updatedAt: row.updated_at,
   };
 }
@@ -148,6 +150,13 @@ export const crmLeadService = {
   async updateHonorarios(id: string, honorarios: number | null): Promise<void> {
     const client = requireClient();
     const { error } = await client.from('leads').update({ honorarios }).eq('id', id);
+    if (error) throw error;
+  },
+
+  /** Define por que o lead foi perdido (null limpa). Precisa da coluna `motivo_perda` (supabase_bot_painel.sql). */
+  async updateMotivoPerda(id: string, motivo: MotivoPerda | null): Promise<void> {
+    const client = requireClient();
+    const { error } = await client.from('leads').update({ motivo_perda: motivo }).eq('id', id);
     if (error) throw error;
   },
 

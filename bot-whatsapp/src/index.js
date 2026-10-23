@@ -83,7 +83,12 @@ async function principal() {
   // Quadro do CRM: quem não respondeu à abertura em 24h vai para a coluna "Sem resposta".
   setInterval(() => {
     bot.marcarSemResposta(24).catch((e) => log.warn(`[funil] ${e.message}`));
+    bot.processarFollowups().catch((e) => log.warn(`[acompanhamento] ${e.message}`));
   }, 10 * 60 * 1000);
+  // Lembretes da consultoria (24h e 1h antes), pós-consultoria e remarcação de quem faltou.
+  setInterval(() => {
+    bot.processarConsultorias().catch((e) => log.warn(`[consultoria] ${e.message}`));
+  }, 2 * 60 * 1000);
   log.info(`Painel do CRM ligado. Assistente: ${config.assistenteNome}.${config.ativo ? '' : ' (desligado pelo painel)'}`);
 
   let avisouParado = false;

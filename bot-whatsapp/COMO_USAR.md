@@ -108,6 +108,14 @@ Regra prática: coisas curtas e suas (preço, forma de pagamento, como você tra
 - **Avisos por e-mail:** só quando você precisa agir: o bot passou a conversa para você, chegou áudio ou arquivo, não foi possível contatar um lead ou algo deu errado.
 - **Quadro (funil) do CRM:** o bot move os cards sozinho, sempre para a frente, e escreve uma nota em cada passo: abertura enviada = **Contatado**; falou os honorários = **Proposta enviada**; lead demonstrou interesse/pediu o contrato = **Decidindo**; consultoria marcada = **Agendamento**; sem resposta em 24h = **Sem resposta** (volta para Contatado quando o lead responde); recusou ou pediu para parar = **Perdido**. O bot nunca mexe em card **Fechado** ou **Perdido** e nunca puxa para trás um card que você arrastou à mão. Para ligar a coluna Agendamento, rode o `supabase_bot_painel.sql` de novo no Supabase.
 
+## Para fechar mais contratos (mensagens automáticas)
+- **Acompanhamento de quem some:** se o bot foi o último a falar e o lead fica em silêncio, o bot manda uma mensagem curta depois de ~1 dia, ~3 dias e ~7 dias (a última pergunta se o lead desistiu, e depois disso ele para). Só entre 8h e 20h, no máximo 5 por rodada. Não insiste com quem pediu para parar, já agendou, fechou, perdeu ou está esperando você. Quando o lead responde, a contagem recomeça. Liga/desliga no CRM em **Bot → Configurações → Mensagens automáticas**.
+- **Lembretes da consultoria:** 1 dia e 1 hora antes, para quem agendou e já conversa com o bot. Na aba **Agenda** do CRM, marque **Realizado** depois da consultoria (o bot manda "foi um prazer" com os dados do contrato: nome completo, CPF, endereço e e-mail) ou **Não compareceu** (o bot oferece um novo horário). Sem marcar, ele não manda essas duas.
+- **Valor antes do preço:** quando fala dos honorários, o bot mostra a conta completa: quanto o lead economiza, quanto paga e quanto sobra no bolso, lembrando do parcelamento.
+- **Casos reais:** abra **Bot → Base de conhecimento → 06-casos-de-sucesso** e escreva 2 ou 3 casos reais, sem nome do cliente. Enquanto estiver vazio, o bot não cita caso nenhum (ele nunca inventa).
+- **Lead grande:** quando um lead com economia estimada acima do valor de "economia mínima para reunião" responde (ou some), você recebe um e-mail "Lead grande respondeu / sem resposta": é a hora de mandar um áudio de 1 minuto ou ligar.
+- **Motivo da perda:** ao marcar um lead como Perdido o bot já registra o motivo quando sabe (achou caro, pediu para parar...). Você escolhe ou corrige no card, e o **Dashboard** mostra "Por que os leads são perdidos".
+
 ## O que o bot nunca faz
 
 - Fala com quem não preencheu a calculadora.
@@ -132,6 +140,6 @@ Regra prática: coisas curtas e suas (preço, forma de pagamento, como você tra
 
 ## Limitações atuais
 
-- Foi testado por simulação (99 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
+- Foi testado por simulação (110 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
 - Áudios e imagens do lead não são lidos: o bot pede que escreva e te avisa.
 - Não é feito para contatos em grupo.

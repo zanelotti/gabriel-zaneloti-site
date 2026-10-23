@@ -16,6 +16,8 @@ interface Form {
   horarioFim: string;
   cambioUsdBrl: string;
   estrategia: BotEstrategia;
+  followupAtivo: boolean;
+  lembretesAtivo: boolean;
 }
 
 function paraForm(c: BotConfig): Form {
@@ -29,6 +31,8 @@ function paraForm(c: BotConfig): Form {
     horarioFim: c.horarioFim,
     cambioUsdBrl: String(c.cambioUsdBrl),
     estrategia: c.estrategia,
+    followupAtivo: c.followupAtivo,
+    lembretesAtivo: c.lembretesAtivo,
   };
 }
 
@@ -74,6 +78,8 @@ export function BotConfigView({ config, onChange }: BotConfigViewProps) {
         horarioFim: form.horarioFim,
         cambioUsdBrl: cambio,
         estrategia: form.estrategia,
+        followupAtivo: form.followupAtivo,
+        lembretesAtivo: form.lembretesAtivo,
       });
       await onChange();
       setMsg({ tipo: 'ok', texto: 'Salvo. O bot aplica em até 15 segundos, sem precisar reiniciar.' });
@@ -127,6 +133,32 @@ export function BotConfigView({ config, onChange }: BotConfigViewProps) {
                 <br />
                 <span className="text-xs text-navy-400">
                   A assistente entende o caso, passa valor e propõe a consultoria gratuita com você como próximo passo.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-navy-100 p-4">
+          <label className="field-label">Mensagens automáticas</label>
+          <div className="mt-2 grid gap-3">
+            <label className="flex items-start gap-3 text-sm text-navy-700">
+              <input type="checkbox" checked={form.followupAtivo} onChange={(e) => set('followupAtivo', e.target.checked)} className="mt-1 h-4 w-4" />
+              <span>
+                <strong>Acompanhar quem parou de responder</strong>
+                <br />
+                <span className="text-xs text-navy-400">
+                  Depois de ~1 dia, ~3 dias e ~7 dias de silêncio o bot manda uma mensagem curta e para. Só entre 8h e 20h. Não insiste com quem pediu para parar, já agendou ou está esperando você.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 text-sm text-navy-700">
+              <input type="checkbox" checked={form.lembretesAtivo} onChange={(e) => set('lembretesAtivo', e.target.checked)} className="mt-1 h-4 w-4" />
+              <span>
+                <strong>Lembretes da consultoria</strong>
+                <br />
+                <span className="text-xs text-navy-400">
+                  Lembra o lead 1 dia e 1 hora antes. Na aba Agenda, marque <strong>Realizado</strong> para o bot mandar a mensagem de pós-consultoria (com os dados do contrato) ou <strong>Não compareceu</strong> para ele oferecer um novo horário.
                 </span>
               </span>
             </label>

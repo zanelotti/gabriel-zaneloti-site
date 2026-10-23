@@ -50,7 +50,10 @@ export const FERRAMENTAS = [
     description: 'Encerra a conversa quando a pessoa deixou claro que não quer seguir ou já resolveu de outro jeito.',
     input_schema: {
       type: 'object',
-      properties: { motivo: { type: 'string' } },
+      properties: {
+        motivo: { type: 'string' },
+        motivo_perda: { type: 'string', enum: ['preco', 'vai_fazer_sozinho', 'desconfianca', 'ja_resolveu', 'sem_interesse', 'outro'], description: 'Categoria do motivo (preco = achou caro; vai_fazer_sozinho; desconfianca; ja_resolveu = já resolveu com outro profissional ou já regularizou; sem_interesse; outro).' },
+      },
       required: ['motivo'],
       additionalProperties: false,
     },
@@ -73,6 +76,7 @@ export const FERRAMENTAS = [
       properties: {
         status: { type: 'string', enum: ['contatado', 'decidindo', 'proposta_enviada', 'perdido'] },
         nota: { type: 'string', description: 'Observação curta para o Gabriel.' },
+        motivo_perda: { type: 'string', enum: ['preco', 'vai_fazer_sozinho', 'desconfianca', 'ja_resolveu', 'sem_interesse', 'outro'], description: 'Obrigatório quando status = perdido.' },
       },
       required: ['status'],
       additionalProperties: false,
@@ -225,7 +229,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
             if (uso.name === 'passar_para_gabriel') {
               acao = { tipo: 'passar', motivo: uso.input?.motivo || '', resumo: uso.input?.resumo || '' };
             } else if (uso.name === 'encerrar_conversa') {
-              acao = { tipo: 'encerrar', motivo: uso.input?.motivo || '' };
+              acao = { tipo: 'encerrar', motivo: uso.input?.motivo || '', motivo_perda: uso.input?.motivo_perda || '' };
             }
             resultados.push({ type: 'tool_result', tool_use_id: uso.id, content: JSON.stringify(saida ?? { ok: true }) });
           } catch (e) {

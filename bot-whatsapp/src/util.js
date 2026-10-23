@@ -118,10 +118,11 @@ export function calcularHonorario(lead) {
     return { tipo: 'PF', economiaConhecida: false, minimoAplicado: false };
   }
   const bruto = Number(eco) * HONORARIO_PERCENTUAL;
+  // `liquido` = quanto sobra para a pessoa depois de pagar o honorário (para mostrar o valor antes do preço).
   if (bruto < HONORARIO_MINIMO_PF) {
-    return { tipo: 'PF', economiaConhecida: true, valor: HONORARIO_MINIMO_PF, doze: Math.round(bruto), minimoAplicado: true };
+    return { tipo: 'PF', economiaConhecida: true, valor: HONORARIO_MINIMO_PF, doze: Math.round(bruto), minimoAplicado: true, liquido: Math.round(Number(eco) - HONORARIO_MINIMO_PF) };
   }
-  return { tipo: 'PF', economiaConhecida: true, valor: Math.round(bruto), minimoAplicado: false };
+  return { tipo: 'PF', economiaConhecida: true, valor: Math.round(bruto), minimoAplicado: false, liquido: Math.round(Number(eco) - Math.round(bruto)) };
 }
 
 /**

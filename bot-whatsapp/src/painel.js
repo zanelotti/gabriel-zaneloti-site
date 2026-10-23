@@ -53,6 +53,8 @@ export function configParaLinha(config) {
     horario_fim: config.horarioFim,
     cambio_usd_brl: config.cambio,
     aprendizado_ativo: config.aprendizadoAtivo !== false,
+    followup_ativo: config.followupAtivo !== false,
+    lembretes_ativo: config.lembretesAtivo !== false,
     estrategia: config.estrategia === 'consultoria' ? 'consultoria' : 'conversa',
   };
 }
@@ -76,6 +78,8 @@ export function aplicarConfigRemota(config, linha) {
   const cambio = Number(linha.cambio_usd_brl);
   if (Number.isFinite(cambio) && cambio > 0) config.cambio = cambio;
   if (typeof linha.aprendizado_ativo === 'boolean') config.aprendizadoAtivo = linha.aprendizado_ativo;
+  if (typeof linha.followup_ativo === 'boolean') config.followupAtivo = linha.followup_ativo;
+  if (typeof linha.lembretes_ativo === 'boolean') config.lembretesAtivo = linha.lembretes_ativo;
   if (linha.estrategia === 'conversa' || linha.estrategia === 'consultoria') config.estrategia = linha.estrategia;
   return config;
 }

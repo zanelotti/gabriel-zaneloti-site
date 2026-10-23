@@ -4,7 +4,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-import { podeMover } from './funil.js';
+import { MOTIVOS_PERDA, podeMover } from './funil.js';
 
 function carimbo() {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -240,6 +240,42 @@ export function criarStore({ url, key }) {
       return checar(await db.from('bot_aprendizado').select('*').eq('ativo', true).order('id', { ascending: true }).limit(2000), 'aprendizado');
     },
 
+    // ----------------------------------------------------------------------- acompanhamento e lembretes
+    /** Conversas ativas dos últimos 30 dias que ainda podem receber acompanhamento (a regra fina fica no bot). */
+    async conversasParaFollowup() {
+      const desde = new Date(Date.now() - 30 * 86400000).toISOString();
+      return (
+        checar(
+          await db.from('bot_conversas').select('*').eq('estado', 'ativa').gt('criado_em', desde).order('criado_em', { ascending: true }).limit(300),
+          'conversas para acompanhamento'
+        ) || []
+      ).filter((c) => (c.followup_nivel ?? 0) < 3);
+    },
+
+    async registrarFollowup(conversaId, nivel) {
+      checar(
+        await db.from('bot_conversas').update({ followup_nivel: nivel, ultimo_followup_em: new Date().toISOString() }).eq('id', conversaId),
+        'registrar acompanhamento'
+      );
+    },
+
+    /** O lead respondeu: o próximo silêncio recomeça a contagem dos acompanhamentos. */
+    async zerarFollowup(conversaId) {
+      checar(await db.from('bot_conversas').update({ followup_nivel: 0 }).eq('id', conversaId), 'zerar acompanhamento');
+    },
+
+    /** Consultorias (tabela agendamentos, do site/CRM) de ontem em diante, para lembretes e pós-consultoria. */
+    async agendamentosRecentes() {
+      const desde = new Date(Date.now() - 3 * 86400000).toISOString();
+      const ate = new Date(Date.now() + 2 * 86400000).toISOString();
+      return (
+        checar(
+          await db.from('agendamentos').select('id,nome,whatsapp,inicio,fim,status,created_at').gte('inicio', desde).lte('inicio', ate).limit(200),
+          'agendamentos'
+        ) || []
+      );
+    },
+
     /**
      * Conversas ativas em que o bot abordou o lead há mais de `horas` e o lead nunca respondeu
      * (e o card ainda está em "Contatado"). Servem para mover o card para "Sem resposta".
@@ -268,11 +304,16 @@ export function criarStore({ url, key }) {
     },
 
     /** Atualiza o funil do CRM (só avança; nunca mexe em leads fechados ou perdidos — ver funil.js). */
-    async atualizarLead(leadId, { status, nota }) {
-      const atual = checar(await db.from('leads').select('status,notas').eq('id', leadId).maybeSingle(), 'ler lead');
+    async atualizarLead(leadId, { status, nota, motivoPerda }) {
+      const atual = checar(await db.from('leads').select('*').eq('id', leadId).maybeSingle(), 'ler lead');
       if (!atual) return;
       const patch = {};
-      if (status && podeMover(atual.status, status)) patch.status = status;
+      if (status && podeMover(atual.status, status)) {
+        patch.status = status;
+        // Só preenche o motivo da perda se o card realmente foi para "perdido", o Gabriel ainda não escolheu um
+        // e a coluna já existe no banco (se ainda não rodou o SQL, o card vai para "perdido" do mesmo jeito).
+        if (status === 'perdido' && motivoPerda && MOTIVOS_PERDA.includes(motivoPerda) && 'motivo_perda' in atual && !atual.motivo_perda) patch.motivo_perda = motivoPerda;
+      }
       if (nota) patch.notas = `${atual.notas ? `${atual.notas}\n` : ''}[Bot WhatsApp ${carimbo()}] ${nota}`;
       if (Object.keys(patch).length === 0) return;
       checar(await db.from('leads').update(patch).eq('id', leadId), 'atualizar lead');

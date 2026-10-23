@@ -57,6 +57,7 @@ export function valoresPermitidos(lead) {
   if (h.economiaConhecida) {
     extras.push(h.valor);
     if (h.minimoAplicado) extras.push(h.doze);
+    if (h.liquido > 0) extras.push(h.liquido); // quanto sobra para a pessoa depois dos honorários
   } else {
     extras.push(HONORARIO_MINIMO_PF); // sem economia estimada: pode explicar a regra de R$ 600
   }

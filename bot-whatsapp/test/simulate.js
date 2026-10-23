@@ -16,7 +16,8 @@ import { join } from 'node:path';
 import { criarSite } from '../src/site.js';
 import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel, dentroDoHorario, montarConhecimentoDeLinhas } from '../src/painel.js';
 import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAprendizado } from '../src/aprendizado.js';
-import { citouHonorarios, podeMover } from '../src/funil.js';
+import { citouHonorarios, MOTIVOS_PERDA, podeMover } from '../src/funil.js';
+import { descreverQuando, lembreteDevido, montarFollowup, montarMensagemConsultoria, proximoFollowup } from '../src/acompanhamento.js';
 import { calcularHonorario, criarChamador, limparNomeInformado, nomeParecePessoa, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
 
 let passou = 0;
@@ -110,11 +111,27 @@ function criarStoreMemoria() {
     async contarMensagensBot() {
       return mensagens.filter((m) => m.direcao === 'bot').length;
     },
-    async atualizarLead(id, { status, nota }) {
+    async atualizarLead(id, { status, nota, motivoPerda }) {
       const l = leads.get(id);
       if (!l) return;
-      if (status && podeMover(l.status, status)) l.status = status;
+      if (status && podeMover(l.status, status)) {
+        l.status = status;
+        if (status === 'perdido' && motivoPerda && MOTIVOS_PERDA.includes(motivoPerda) && !l.motivo_perda) l.motivo_perda = motivoPerda;
+      }
       if (nota) l.notas = `${l.notas ? `${l.notas}\n` : ''}${nota}`;
+    },
+    async conversasParaFollowup() {
+      return conversas.filter((c) => c.estado === 'ativa' && (c.followup_nivel ?? 0) < 3);
+    },
+    async registrarFollowup(id, nivel) {
+      Object.assign(conversas.find((c) => c.id === id), { followup_nivel: nivel, ultimo_followup_em: new Date().toISOString() });
+    },
+    async zerarFollowup(id) {
+      conversas.find((c) => c.id === id).followup_nivel = 0;
+    },
+    agendamentos: [],
+    async agendamentosRecentes() {
+      return this.agendamentos;
     },
     async leadsSemResposta() {
       return conversas
@@ -232,9 +249,10 @@ function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {}, docum
   const store = criarStoreMemoria();
   const wa = criarWaFalso();
   const avisos = [];
+  const avisosGrandes = []; // e-mails "Lead grande ..." (aviso novo, separado para não misturar com os de "precisa agir")
   const notificar = {
     async avisar(a) {
-      avisos.push(a);
+      (/^Lead grande/.test(a.tipo) ? avisosGrandes : avisos).push(a);
     },
     async enviar(assunto) {
       avisos.push({ tipo: assunto });
@@ -250,7 +268,7 @@ function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {}, docum
       fetchImpl: async () => ({ ok: true, json: async () => ({ dias: [] }) }),
     });
   const bot = criarBot({ store, wa, cerebro, site, notificar, config: cfgFinal, log: silencioso, dormirFn: async () => {}, parado });
-  return { store, wa, avisos, client, bot, config: cfgFinal };
+  return { store, wa, avisos, avisosGrandes, client, bot, config: cfgFinal };
 }
 
 async function abrir(ctx, l) {
@@ -1136,7 +1154,7 @@ await teste('conhecimento: arquivo novo na pasta é copiado uma vez; o apagado n
 console.log('\nHonorários');
 
 await teste('cálculo do honorário: PF 12% com piso de R$ 600; PJ R$ 1.000 + 12%', () => {
-  assert.deepEqual(calcularHonorario(lead({ economia_estimada: 42000 })), { tipo: 'PF', economiaConhecida: true, valor: 5040, minimoAplicado: false });
+  assert.deepEqual(calcularHonorario(lead({ economia_estimada: 42000 })), { tipo: 'PF', economiaConhecida: true, valor: 5040, minimoAplicado: false, liquido: 36960 });
   const baixo = calcularHonorario(lead({ economia_estimada: 3000 }));
   assert.equal(baixo.valor, 600);
   assert.equal(baixo.doze, 360);
@@ -1678,5 +1696,269 @@ await teste('se o banco ainda não aceita o status "agendado", o agendamento nã
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /marcado/);
   assert.equal(ctx.store.agendou.length, 1);
 });
+
+console.log('\nAcompanhamento, lembretes e avisos');
+
+const AGORA = new Date('2026-10-24T15:00:00Z'); // 12h em Brasília
+const horasAtras = (h) => new Date(AGORA.getTime() - h * 3600000).toISOString();
+const envelhecer = (ctx, h) => ctx.store.mensagens.forEach((m) => (m.criado_em = horasAtras(h)));
+
+await teste('modelos de acompanhamento: tempos, textos e sem valor para empresa', () => {
+  const pf = lead({ economia_estimada: 42000 });
+  assert.equal(proximoFollowup({ nivelAtual: 0, ultimaDirecao: 'bot', ultimaEm: horasAtras(23), agora: AGORA.getTime() }), null);
+  assert.equal(proximoFollowup({ nivelAtual: 0, ultimaDirecao: 'bot', ultimaEm: horasAtras(25), agora: AGORA.getTime() }), 1);
+  assert.equal(proximoFollowup({ nivelAtual: 1, ultimaDirecao: 'bot', ultimaEm: horasAtras(47), agora: AGORA.getTime() }), null);
+  assert.equal(proximoFollowup({ nivelAtual: 1, ultimaDirecao: 'bot', ultimaEm: horasAtras(49), agora: AGORA.getTime() }), 2);
+  assert.equal(proximoFollowup({ nivelAtual: 2, ultimaDirecao: 'bot', ultimaEm: horasAtras(97), agora: AGORA.getTime() }), 3);
+  assert.equal(proximoFollowup({ nivelAtual: 3, ultimaDirecao: 'bot', ultimaEm: horasAtras(900), agora: AGORA.getTime() }), null, 'máximo de 3');
+  assert.equal(proximoFollowup({ nivelAtual: 0, ultimaDirecao: 'lead', ultimaEm: horasAtras(900), agora: AGORA.getTime() }), null, 'lead esperando resposta: não é caso de acompanhamento');
+  assert.match(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: false }), /economia de R\$\s42\.000/);
+  assert.match(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: true }), /Ficou alguma dúvida/);
+  assert.match(montarFollowup({ lead: pf, nivel: 2, respondeuAntes: false }), /60 vezes/);
+  assert.match(montarFollowup({ lead: pf, nivel: 3, respondeuAntes: false }), /desistiu de regularizar/);
+  for (const nivel of [1, 2, 3]) {
+    assert.doesNotMatch(montarFollowup({ lead: lead({ responsavel: 'PJ', economia_estimada: 42000 }), nivel, respondeuAntes: false }), /R\$/, 'empresa: nunca cita economia');
+    for (const l of [pf, lead({ responsavel: 'PJ' }), lead({ economia_estimada: null })]) {
+      for (const r of [true, false]) assert.equal(validarSaida(montarFollowup({ lead: l, nivel, respondeuAntes: r }), l).ok, true, `nível ${nivel} passa nas travas`);
+    }
+  }
+});
+
+await teste('acompanhamento: 1 dia, 3 dias e 7 dias de silêncio; depois para', async () => {
+  const ctx = montar();
+  const l = lead({ economia_estimada: 42000 });
+  const c = await abrir(ctx, l);
+  const enviados = () => ctx.wa.enviados.length;
+  envelhecer(ctx, 10);
+  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0, 'ainda é cedo');
+  envelhecer(ctx, 25);
+  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
+  assert.match(ctx.wa.enviados[enviados() - 1].texto, /economia de R\$\s42\.000/);
+  assert.equal(c.followup_nivel, 1);
+  envelhecer(ctx, 1);
+  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0, 'não repete');
+  envelhecer(ctx, 49);
+  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
+  assert.match(ctx.wa.enviados[enviados() - 1].texto, /60 vezes/);
+  envelhecer(ctx, 97);
+  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
+  assert.match(ctx.wa.enviados[enviados() - 1].texto, /desistiu/);
+  assert.equal(c.followup_nivel, 3);
+  envelhecer(ctx, 2000);
+  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0, 'acabou: nunca passa de 3');
+  assert.equal(enviados(), 4, 'abertura + 3 acompanhamentos');
+  assert.equal(ctx.store.mensagens.filter((m) => m.direcao === 'bot').length, 4, 'tudo fica no histórico');
+});
+
+await teste('quando o lead responde, a contagem do acompanhamento recomeça', async () => {
+  const ctx = montar({ roteiro: [texto('Claro! Me conta: a obra já foi concluída?')] });
+  const l = lead();
+  const c = await abrir(ctx, l);
+  envelhecer(ctx, 25);
+  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
+  assert.equal(c.followup_nivel, 1);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'oi, estava viajando' });
+  assert.equal(c.followup_nivel, 0);
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  envelhecer(ctx, 26);
+  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
+  assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /Ficou alguma dúvida/, 'quem já conversou recebe a versão de retomada');
+});
+
+await teste('acompanhamento não insiste: lead esperando, espera do Gabriel, agendado, fechado, optout, humano, desligado, noite, parado, lista de teste', async () => {
+  const preparar = async (extra = {}, cfg = {}, parado) => {
+    const ctx = montar({ cfg, parado });
+    const l = lead(extra);
+    const c = await abrir(ctx, l);
+    envelhecer(ctx, 30);
+    return { ctx, l, c };
+  };
+  const roda = async ({ ctx }, agora = AGORA) => ctx.bot.processarFollowups({ agora });
+  assert.equal(await roda(await preparar()), 1, 'controle: sem nenhuma trava envia');
+  let t = await preparar();
+  t.ctx.store.mensagens.push({ id: 99, conversa_id: t.c.id, direcao: 'lead', texto: 'oi', criado_em: horasAtras(30) });
+  assert.equal(await roda(t), 0, 'lead falou por último: é o bot que deve resposta');
+  t = await preparar();
+  t.c.observacao = 'ESPERA_GABRIEL: pediu desconto';
+  assert.equal(await roda(t), 0, 'esperando o Gabriel');
+  for (const status of ['agendado', 'fechado', 'perdido']) {
+    t = await preparar({ status });
+    t.ctx.store.leads.get(t.l.id).status = status;
+    assert.equal(await roda(t), 0, `card ${status}`);
+  }
+  for (const estado of ['optout', 'humano', 'encerrada']) {
+    t = await preparar();
+    t.c.estado = estado;
+    assert.equal(await roda(t), 0, `conversa ${estado}`);
+  }
+  t = await preparar({}, { followupAtivo: false });
+  assert.equal(await roda(t), 0, 'desligado no painel');
+  t = await preparar();
+  assert.equal(await roda(t, new Date('2026-10-25T01:00:00Z')), 0, 'de noite (22h em Brasília) não manda');
+  t = await preparar({}, {}, () => true);
+  assert.equal(await roda(t), 0, 'bot parado');
+  t = await preparar({}, { listaTeste: ['11999990001'] });
+  assert.equal(await roda(t), 0, 'fora da lista de teste');
+});
+
+await teste('lembretes: regras de quando cada mensagem da consultoria sai', () => {
+  const base = { inicio: new Date(AGORA.getTime() + 20 * 3600000).toISOString(), fim: new Date(AGORA.getTime() + 20.5 * 3600000).toISOString(), criadoEm: horasAtras(72), agora: AGORA.getTime() };
+  assert.deepEqual(lembreteDevido({ ...base, status: 'agendado' }), ['24h']);
+  assert.deepEqual(lembreteDevido({ ...base, status: 'agendado', criadoEm: horasAtras(2) }), [], 'acabou de marcar: a confirmação já serve');
+  assert.deepEqual(lembreteDevido({ ...base, status: 'agendado', inicio: new Date(AGORA.getTime() + 48 * 3600000).toISOString() }), [], 'ainda falta muito');
+  assert.deepEqual(lembreteDevido({ ...base, status: 'agendado', inicio: new Date(AGORA.getTime() + 3600000).toISOString() }), ['1h']);
+  assert.deepEqual(lembreteDevido({ ...base, status: 'cancelado' }), []);
+  const passou = { inicio: new Date(AGORA.getTime() - 3 * 3600000).toISOString(), fim: new Date(AGORA.getTime() - 2.5 * 3600000).toISOString(), criadoEm: horasAtras(100), agora: AGORA.getTime() };
+  assert.deepEqual(lembreteDevido({ ...passou, status: 'realizado' }), ['pos']);
+  assert.deepEqual(lembreteDevido({ ...passou, status: 'agendado' }), [], 'só manda pós-consultoria se o Gabriel marcou Realizado');
+  assert.deepEqual(lembreteDevido({ ...passou, status: 'nao_compareceu' }), ['faltou']);
+  assert.deepEqual(lembreteDevido({ ...passou, status: 'realizado', inicio: new Date(AGORA.getTime() - 100 * 3600000).toISOString(), fim: new Date(AGORA.getTime() - 99 * 3600000).toISOString() }), [], 'passou de 48h: não manda mais');
+  const a = '2026-10-24T15:00:00Z';
+  assert.equal(descreverQuando(a, AGORA), 'hoje às 12h');
+  assert.equal(descreverQuando(a, new Date('2026-10-23T15:00:00Z')), 'amanhã às 12h');
+  assert.match(descreverQuando('2026-10-27T15:30:00Z', AGORA), /^terça-feira, 27\/10, às 12h30$/);
+  const l = lead();
+  for (const tipo of ['24h', '1h', 'pos', 'faltou']) {
+    assert.equal(validarSaida(montarMensagemConsultoria({ tipo, lead: l, inicio: a, agora: AGORA }), l).ok, true, `${tipo} passa nas travas`);
+  }
+  assert.match(montarMensagemConsultoria({ tipo: 'pos', lead: l, inicio: a }), /nome completo, CPF, endereço e e-mail/);
+  assert.doesNotMatch(montarMensagemConsultoria({ tipo: 'pos', lead: lead({ responsavel: 'PJ' }), inicio: a }), /CPF/);
+});
+
+await teste('lembretes: 24h e 1h antes saem uma vez só; pós-consultoria e "não compareceu" também', async () => {
+  const ctx = montar();
+  const l = lead();
+  const c = await abrir(ctx, l);
+  const ag = (extra) => ({ id: 'ag1', nome: 'Maria', whatsapp: '11912345678', inicio: new Date(AGORA.getTime() + 20 * 3600000).toISOString(), fim: new Date(AGORA.getTime() + 20.5 * 3600000).toISOString(), status: 'agendado', created_at: horasAtras(72), ...extra });
+  const ultimo = () => ctx.wa.enviados[ctx.wa.enviados.length - 1].texto;
+  const antes = ctx.wa.enviados.length;
+  ctx.store.agendamentos = [ag()];
+  assert.equal(await ctx.bot.processarConsultorias({ agora: AGORA }), 1);
+  assert.match(ultimo(), /lembrar da nossa consultoria gratuita amanhã às 8h/);
+  assert.equal(await ctx.bot.processarConsultorias({ agora: AGORA }), 0, 'não repete');
+  ctx.store.agendamentos = [ag({ inicio: new Date(AGORA.getTime() + 3600000).toISOString(), fim: new Date(AGORA.getTime() + 5400000).toISOString() })];
+  assert.equal(await ctx.bot.processarConsultorias({ agora: AGORA }), 1);
+  assert.match(ultimo(), /Daqui a pouco, às 13h/);
+  ctx.store.agendamentos = [ag({ id: 'ag2', status: 'realizado', inicio: new Date(AGORA.getTime() - 3 * 3600000).toISOString(), fim: new Date(AGORA.getTime() - 2.5 * 3600000).toISOString() })];
+  assert.equal(await ctx.bot.processarConsultorias({ agora: AGORA }), 1);
+  assert.match(ultimo(), /Foi um prazer conversar/);
+  ctx.store.agendamentos = [ag({ id: 'ag3', status: 'nao_compareceu', inicio: new Date(AGORA.getTime() - 3 * 3600000).toISOString(), fim: new Date(AGORA.getTime() - 2.5 * 3600000).toISOString() })];
+  assert.equal(await ctx.bot.processarConsultorias({ agora: AGORA }), 1);
+  assert.match(ultimo(), /novo horário/);
+  assert.equal(ctx.wa.enviados.length - antes, 4);
+  assert.ok(Object.keys(ctx.store.estados).some((k) => k.startsWith('lembrete:ag1:24h')), 'registrou antes de enviar');
+});
+
+await teste('lembretes não vão para quem o bot não conhece, conversa parada, noite, desligado ou cancelado', async () => {
+  const montado = async (cfg = {}) => {
+    const ctx = montar({ cfg });
+    const c = await abrir(ctx, lead());
+    ctx.store.agendamentos = [{ id: 'x1', nome: 'Maria', whatsapp: '11912345678', inicio: new Date(AGORA.getTime() + 20 * 3600000).toISOString(), fim: new Date(AGORA.getTime() + 20.5 * 3600000).toISOString(), status: 'agendado', created_at: horasAtras(72) }];
+    return { ctx, c };
+  };
+  let t = await montado();
+  t.ctx.store.agendamentos[0].whatsapp = '21988887777';
+  assert.equal(await t.ctx.bot.processarConsultorias({ agora: AGORA }), 0, 'número sem conversa com o bot');
+  t = await montado();
+  t.c.estado = 'humano';
+  assert.equal(await t.ctx.bot.processarConsultorias({ agora: AGORA }), 0, 'conversa com o Gabriel');
+  t = await montado();
+  assert.equal(await t.ctx.bot.processarConsultorias({ agora: new Date('2026-10-25T01:00:00Z') }), 0, 'noite');
+  t = await montado({ lembretesAtivo: false });
+  assert.equal(await t.ctx.bot.processarConsultorias({ agora: AGORA }), 0, 'desligado no painel');
+  t = await montado();
+  t.ctx.store.agendamentos[0].status = 'cancelado';
+  assert.equal(await t.ctx.bot.processarConsultorias({ agora: AGORA }), 0, 'cancelado');
+});
+
+await teste('lead grande: avisa o Gabriel uma vez quando responde e quando fica sem resposta; lead pequeno e empresa não', async () => {
+  const ctx = montar({ roteiro: [texto('Claro! Me conta: a obra já foi concluída?'), texto('Perfeito, anotei.')] });
+  const l = lead({ economia_estimada: 42000 });
+  const c = await abrir(ctx, l);
+  assert.equal(ctx.avisosGrandes.length, 0, 'só a abertura: sem aviso');
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'oi, tenho interesse' });
+  assert.equal(ctx.avisosGrandes.length, 1);
+  assert.equal(ctx.avisosGrandes[0].tipo, 'Lead grande respondeu');
+  assert.match(ctx.avisosGrandes[0].motivo, /R\$\s42\.000/);
+  assert.match(ctx.avisosGrandes[0].motivo, /áudio/);
+  await ctx.bot.responder(c.id);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'sim, já foi concluída' });
+  assert.equal(ctx.avisosGrandes.length, 1, 'só avisa uma vez');
+  ctx.bot.pararTimers();
+
+  const pequeno = montar();
+  const cp = await abrir(pequeno, lead({ economia_estimada: 1500 }));
+  await pequeno.bot.aoReceber({ telefone: telefoneDe(cp), texto: 'oi' });
+  pequeno.bot.pararTimers();
+  assert.equal(pequeno.avisosGrandes.length, 0, 'economia abaixo do limite');
+
+  const pj = montar();
+  const cj = await abrir(pj, lead({ responsavel: 'PJ', economia_estimada: 90000 }));
+  await pj.bot.aoReceber({ telefone: telefoneDe(cj), texto: 'oi' });
+  pj.bot.pararTimers();
+  assert.equal(pj.avisosGrandes.length, 0, 'empresa não tem economia estimada confiável');
+
+  const sumiu = montar();
+  await abrir(sumiu, lead({ economia_estimada: 42000 }));
+  assert.equal(await sumiu.bot.marcarSemResposta(24), 1);
+  assert.equal(sumiu.avisosGrandes.length, 1);
+  assert.equal(sumiu.avisosGrandes[0].tipo, 'Lead grande sem resposta');
+});
+
+await teste('motivo da perda: o bot grava o motivo e não sobrescreve o que o Gabriel escolheu', async () => {
+  // pediu para parar
+  let ctx = montar();
+  let l = lead();
+  let c = await abrir(ctx, l);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'pare de me mandar mensagem' });
+  assert.equal(ctx.store.leads.get(l.id).status, 'perdido');
+  assert.equal(ctx.store.leads.get(l.id).motivo_perda, 'pediu_para_parar');
+  // recusou por preço (registrar_status)
+  ctx = montar({ roteiro: [[uso('registrar_status', { status: 'perdido', motivo_perda: 'preco', nota: 'achou caro' })], texto('Entendo, obrigada pela sinceridade.')] });
+  l = lead();
+  c = await abrir(ctx, l);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'achei caro, vou deixar' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.store.leads.get(l.id).status, 'perdido');
+  assert.equal(ctx.store.leads.get(l.id).motivo_perda, 'preco');
+  // encerrar sem motivo informado: "outro"; motivo inventado é ignorado
+  ctx = montar({ roteiro: [[uso('encerrar_conversa', { motivo: 'já resolveu com contador', motivo_perda: 'ja_resolveu' })], texto('Tudo certo, obrigada!')] });
+  l = lead();
+  c = await abrir(ctx, l);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'já resolvi com meu contador' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.store.leads.get(l.id).motivo_perda, 'ja_resolveu');
+  await ctx.store.atualizarLead(l.id, { status: 'perdido', motivoPerda: 'inventado' });
+  assert.equal(ctx.store.leads.get(l.id).motivo_perda, 'ja_resolveu');
+  // Gabriel já escolheu um motivo: o bot não troca
+  ctx = montar();
+  l = lead({ motivo_perda: 'desconfianca' });
+  c = await abrir(ctx, l);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'parar' });
+  assert.equal(ctx.store.leads.get(l.id).motivo_perda, 'desconfianca');
+});
+
+await teste('valor antes do preço: o prompt traz economia × honorário × quanto sobra, e o guard aceita só esses números', () => {
+  const l = lead({ economia_estimada: 42000 });
+  const sistema = montarSistema(l, config);
+  assert.match(sistema, /COMPARAÇÃO PARA APRESENTAR O PREÇO[^\n]*economia estimada R\$\s42\.000, honorário R\$\s5\.040, sobra para a pessoa R\$\s36\.960/);
+  assert.equal(validarSaida('Você economiza R$ 42.000, o honorário é R$ 5.040 e ficam R$ 36.960 no seu bolso.', l).ok, true);
+  assert.equal(validarSaida('Ficam R$ 37.000 no seu bolso.', l).ok, false);
+  assert.doesNotMatch(montarSistema(lead({ responsavel: 'PJ' }), config), /COMPARAÇÃO PARA APRESENTAR/, 'empresa não tem economia confiável');
+  assert.doesNotMatch(montarSistema(lead({ economia_estimada: null }), config), /COMPARAÇÃO PARA APRESENTAR/);
+});
+
+await teste('prova social: regra no prompt e arquivo de casos reais começa vazio (nada inventado)', () => {
+  const sistema = montarSistema(lead(), config);
+  assert.match(sistema, /PROVA SOCIAL/);
+  assert.match(sistema, /SOMENTE se ele estiver escrito/);
+  const k = carregarConhecimento();
+  assert.ok(k.arquivos.includes('06-casos-de-sucesso.md'));
+  assert.match(k.texto, /nenhum caso cadastrado ainda/);
+});
+
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);
