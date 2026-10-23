@@ -504,7 +504,18 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       if (acao?.tipo === 'passar') {
         const hist = await store.historico(conversaId);
         const detalhe = `${acao.motivo}${acao.resumo ? ` — ${acao.resumo}` : ''}`;
-        if (emEspera) {
+        // O lead aceitou uma ligação rápida hoje: aviso próprio e sempre imediato (não entra na trava de 30 min).
+        const ligacao = /^\s*liga[cç][aã]o hoje/i.test(acao.motivo || '');
+        if (ligacao) {
+          avisosEspera.set(conversaId, Date.now());
+          if (!emEspera) await store.setEstado(conversaId, 'ativa', `${MARCA_ESPERA}${acao.motivo}`);
+          try {
+            await store.atualizarLead(lead.id, { nota: `LIGAR HOJE: ${acao.resumo || acao.motivo}`.trim() });
+          } catch (e) {
+            log.warn(`[bot] não consegui gravar a nota da ligação: ${e.message}`);
+          }
+          await notificar.avisar({ tipo: 'LIGAR HOJE', lead, telefone: conversa.telefone, motivo: detalhe, historico: hist });
+        } else if (emEspera) {
           // Já tinha passado antes: o bot continua disponível; só avisa o Gabriel (no máximo 1x a cada 30 min).
           const ultimo = avisosEspera.get(conversaId) || 0;
           if (Date.now() - ultimo >= TRINTA_MIN) {

@@ -122,6 +122,12 @@ Termine toda mensagem com um passo concreto rumo ao fechamento, não com pergunt
 const ESTRATEGIA_CONSULTORIA = `# ESTRATÉGIA: LEVAR PARA A CONSULTORIA
 Seu objetivo é entender o caso, passar valor e conduzir a pessoa para a consultoria gratuita com o Gabriel, onde ele apresenta a proposta. Antes de falar de honorário, sempre passe valor (o que o serviço entrega e o que ela perde sem ele). Se a pessoa perguntar o custo, responda conforme a regra 1. Depois de entender o caso e criar interesse, proponha a consultoria com pergunta que convida ao "não" ("Seria ruim se o Gabriel te explicasse isso numa conversa rápida?").`;
 
+const LIGACAO_RAPIDA = `# PLANO C: LIGAÇÃO RÁPIDA PELO CELULAR, NO MESMO DIA
+Vale quando a POLÍTICA DE REUNIÃO permite oferecer reunião/consultoria. Se a pessoa NÃO quiser a reunião ou a consultoria (sem tempo, dificuldade com vídeo ou tecnologia, não confia, vergonha, prefere não, "agora não dá" etc.), NÃO insista na reunião e NÃO desista da venda: ofereça uma ligação rápida pelo celular, que o Gabriel faz HOJE mesmo. Use pergunta que convida ao "não" e fale pouco, por exemplo: "Sem problema. Seria ruim se o Gabriel só te ligasse hoje, uma ligação rápida pelo celular?". Não prometa duração, valor ou resultado; só que é rápida e que é hoje.
+- Se ela topar: pergunte em UMA mensagem curta o melhor horário hoje e se pode ser neste mesmo número do WhatsApp (ou peça o outro número). Depois que ela responder, use passar_para_gabriel com motivo começando exatamente por "LIGAÇÃO HOJE:" e, no resumo, o horário combinado e o número a ligar. Diga ao lead, em uma frase, que o Gabriel liga hoje por volta desse horário.
+- Se ela também recusar a ligação: respeite, diga que segue com ela por aqui no WhatsApp no ritmo dela e continue a conversa de forma leve, sem insistir. Não ofereça a ligação mais de uma vez por conversa.
+- A ligação não substitui o fechamento: o objetivo continua sendo contratar. Se ela disser que fecha só por mensagem, siga o fechamento normal.`;
+
 function descreverLead(lead, config, nomeContato = '') {
   const isPJ = lead.responsavel === 'PJ';
   const linhas = [];
@@ -199,7 +205,7 @@ export function montarSistema(lead, config, conhecimento = '', trechos = '', esp
   const trabalho = porConsultoria
     ? 'entender o caso da pessoa, mostrar que você entendeu, passar valor, tirar dúvidas e levá-la para uma consultoria gratuita com o Gabriel (quando permitido) ou passar a conversa para o Gabriel. Você NÃO envia contrato, NÃO negocia preço e NÃO dá desconto.'
     : 'VENDER pela conversa: entender o caso, passar o máximo de valor do serviço, usar as técnicas de negociação abaixo e conduzir a pessoa até decidir contratar o Gabriel. A consultoria gratuita é o plano B (caso complexo, dúvida que você não sabe responder, ou quando perceber que ela não vai fechar pela conversa). Você NÃO envia contrato, NÃO negocia preço e NÃO dá desconto: quando ela decidir, o Gabriel formaliza.';
-  const base = montarBase(config.assistenteNome || 'Lia', trabalho) + `\n${TECNICAS}\n\n${porConsultoria ? ESTRATEGIA_CONSULTORIA : ESTRATEGIA_CONVERSA}\n`;
+  const base = montarBase(config.assistenteNome || 'Lia', trabalho) + `\n${TECNICAS}\n\n${porConsultoria ? ESTRATEGIA_CONSULTORIA : ESTRATEGIA_CONVERSA}\n\n${LIGACAO_RAPIDA}\n`;
   const bloco = conhecimento
     ? `\n# CONHECIMENTO DO GABRIEL (fonte oficial)\nUse este material para responder dúvidas sobre parcelamento, o que está incluído no serviço, o processo e quem é o Gabriel. Não o contradiga. Se a pergunta não estiver coberta aqui nem nos dados do lead, NÃO invente: use passar_para_gabriel.\n\n${conhecimento}\n`
     : '';

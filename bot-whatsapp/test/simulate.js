@@ -540,6 +540,33 @@ await teste('agendamento: ver_horarios → agendar_consultoria → confirmação
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /marcado/);
 });
 
+await teste('ligação rápida hoje: prompt traz o plano C nas duas estratégias e o aviso "LIGAR HOJE" sai na hora, mesmo já em modo espera', async () => {
+  for (const estrategia of ['conversa', 'consultoria']) {
+    const sis = montarSistema(lead(), { ...config, estrategia });
+    assert.match(sis, /PLANO C: LIGAÇÃO RÁPIDA PELO CELULAR, NO MESMO DIA/);
+    assert.match(sis, /HOJE mesmo/);
+    assert.match(sis, /motivo começando exatamente por "LIGAÇÃO HOJE:"/);
+    assert.match(sis, /Não ofereça a ligação mais de uma vez/);
+  }
+  const ctx = montar({
+    roteiro: [
+      [...texto('Vou pedir para o Gabriel continuar essa conversa com você pessoalmente, ele te responde por aqui.'), uso('passar_para_gabriel', { motivo: 'pediu desconto', resumo: 'Quer fechar com 8%.' })],
+      [...texto('Combinado, o Gabriel te liga hoje por volta das 15h.'), uso('passar_para_gabriel', { motivo: 'LIGAÇÃO HOJE: aceitou ligação rápida', resumo: 'Melhor horário 15h, neste número.' })],
+    ],
+  });
+  const c = await abrir(ctx, lead());
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'faz por 8%?' });
+  await ctx.bot.responder(c.id);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'pode ligar hoje às 15h nesse número' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  const aviso = ctx.avisos.find((a) => a.tipo === 'LIGAR HOJE');
+  assert.ok(aviso, 'aviso próprio de ligação, sem esperar os 30 min');
+  assert.match(aviso.motivo, /15h/);
+  assert.equal(ctx.avisos.filter((a) => a.tipo === 'LIGAR HOJE').length, 1);
+  assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /liga hoje/);
+});
+
 await teste('passar_para_gabriel: manda a mensagem, avisa, e o bot segue disponível em modo espera', async () => {
   const ctx = montar({
     roteiro: [
