@@ -1284,6 +1284,17 @@ await teste('sucinto: prompt tem a regra "SEJA SUCINTA" nas duas estratégias e 
   }
 });
 
+await teste('foco em fechar: estratégia "conversa" manda mostrar a conta cedo, convidar ao fechamento e puxar toda dúvida de volta para a decisão, sem pressão', () => {
+  const sis = montarSistema(lead(), { ...config, estrategia: 'conversa' });
+  assert.match(sis, /FOCO AGORA: FECHAR O CONTRATO/);
+  assert.match(sis, /já na 2ª ou 3ª resposta/);
+  assert.match(sis, /puxe de volta para a decisão/);
+  assert.match(sis, /nunca autoriza pressão, urgência inventada/);
+  assert.match(sis, /PASSAR VALOR antes de falar de honorário/);
+  const bloco = sis.slice(sis.indexOf('FOCO AGORA'), sis.indexOf('1. ENTENDER'));
+  assert.doesNotMatch(bloco, /só paga|risco zero|sem risco|advogado|jurídic|direito/i);
+});
+
 await teste('sucinto: muitoLonga ignora mensagem pronta (lista) e pega parágrafo grande', () => {
   assert.equal(muitoLonga('Oi! Tudo bem?'), false);
   assert.equal(muitoLonga('palavra '.repeat(120)), true);
