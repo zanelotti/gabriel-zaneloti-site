@@ -108,6 +108,20 @@ export function validarSaida(texto, lead, valoresExtras = [], { ignorarClt = fal
   return { ok: true };
 }
 
+export const LIMITE_SUCINTO = 600;
+
+/**
+ * Resposta comprida demais para WhatsApp (o lead perde a paciência). Não vale para mensagem pronta do
+ * conhecimento (lista com negrito de WhatsApp ou 3+ linhas seguidas), que é enviada como está.
+ */
+export function muitoLonga(texto, limite = LIMITE_SUCINTO) {
+  const t = String(texto ?? '').trim();
+  const linhas = t.split('\n').filter((l) => l.trim()).length;
+  const umBlocoSo = !/\n\s*\n/.test(t);
+  if (/\*[^*\n]+\*/.test(t) || (umBlocoSo && linhas >= 4)) return false;
+  return t.replace(/\s+/g, ' ').length > limite;
+}
+
 /** Divide a resposta do modelo em até 3 mensagens curtas (parágrafos separados por linha em branco). */
 export function dividirMensagens(texto, max = 3) {
   const partes = String(texto ?? '')

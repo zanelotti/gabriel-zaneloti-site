@@ -4,7 +4,7 @@
  * passou nas travas de conteúdo (guards.js).
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { dividirMensagens, validarSaida } from './guards.js';
+import { dividirMensagens, muitoLonga, validarSaida } from './guards.js';
 import { formatarTrechos } from './documentos.js';
 import { formatarAprendidos } from './aprendizado.js';
 import { montarSistema } from './prompt.js';
@@ -176,6 +176,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     let acao = null;
     const consumo = { entrada: 0, saida: 0 };
     let bloqueios = 0;
+    let jaPediuResumo = false;
     let ultimoMotivo = '';
 
     for (let rodada = 0; rodada < 8; rodada++) {
@@ -253,6 +254,17 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
       const v = cortada
         ? { ok: false, motivo: 'a resposta foi cortada por ser longa demais (escreva mais curta, em no máximo 3 mensagens pequenas)' }
         : validarSaida(texto, lead, valoresExtras);
+      if (v.ok && muitoLonga(texto) && !jaPediuResumo) {
+        // Resposta correta mas comprida: pede UMA reescrita mais curta (não conta como bloqueio; se continuar longa, envia assim mesmo).
+        jaPediuResumo = true;
+        log.warn(`[cerebro] resposta longa (${texto.length} caracteres); pedindo versão mais curta.`);
+        messages.push({ role: 'assistant', content: texto });
+        messages.push({
+          role: 'user',
+          content: '[AVISO INTERNO, não mencione ao lead: a resposta anterior ficou comprida demais para WhatsApp e o lead perde a paciência. Reescreva em no máximo 2 frases curtas (3 ou 4 só se for dar o preço ou explicar um mecanismo), uma técnica e uma pergunta, deixando o resto para as próximas mensagens. Mantenha todas as regras.]',
+        });
+        continue;
+      }
       if (v.ok) return { mensagens: dividirMensagens(texto), acao, uso: consumo };
 
       bloqueios += 1;

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { criarBot } from '../src/bot.js';
 import { criarCerebro, montarHistorico } from '../src/brain.js';
-import { dividirMensagens, extrairValoresReais, pediuParar, validarSaida } from '../src/guards.js';
+import { dividirMensagens, extrairValoresReais, muitoLonga, pediuParar, validarSaida } from '../src/guards.js';
 import { montarAbertura } from '../src/opening.js';
 import { montarSistema } from '../src/prompt.js';
 import { carregarConhecimento, sha256 } from '../src/conhecimento.js';
@@ -1270,6 +1270,47 @@ await teste('mensagens de valor um pouco mais longas passam (até 1.200 caracter
 });
 
 console.log('\nMensagens cortadas e mensagens prontas');
+
+await teste('sucinto: prompt tem a regra "SEJA SUCINTA" nas duas estratégias e mantém as técnicas de venda', () => {
+  for (const estrategia of ['conversa', 'consultoria']) {
+    const sis = montarSistema(lead(), { ...config, estrategia });
+    assert.match(sis, /SEJA SUCINTA/);
+    assert.match(sis, /no máximo 2 frases curtas/);
+    assert.match(sis, /Uma técnica por mensagem/);
+    assert.match(sis, /Valor em doses/);
+    assert.match(sis, /ARSENAL DE TÉCNICAS/);
+    assert.match(sis, /AUDITORIA antes do preço|sempre passe valor/);
+    assert.doesNotMatch(sis, /1 a 3 frases; até 4/);
+  }
+});
+
+await teste('sucinto: muitoLonga ignora mensagem pronta (lista) e pega parágrafo grande', () => {
+  assert.equal(muitoLonga('Oi! Tudo bem?'), false);
+  assert.equal(muitoLonga('palavra '.repeat(120)), true);
+  const lista = 'Segue o que preciso:\n*Nome completo*\n*CPF*\n*Endereço*\n*E-mail*\n' + 'x'.repeat(700);
+  assert.equal(muitoLonga(lista), false, 'mensagem pronta com negrito não é cortada');
+  const bloco = Array.from({ length: 6 }, (_, i) => `Item ${i} ` + 'y'.repeat(120)).join('\n');
+  assert.equal(muitoLonga(bloco), false, 'lista em um bloco só não é cortada');
+});
+
+await teste('sucinto: resposta correta mas comprida pede UMA versão curta; se continuar longa, envia (sem passar para o Gabriel)', async () => {
+  const longa = { content: [{ type: 'text', text: 'Entendo perfeitamente a sua situação e quero te explicar tudo com calma. '.repeat(10) }], stop_reason: 'end_turn' };
+  const curta = { content: [{ type: 'text', text: 'Parece que a certidão está travando a venda. Como está o prazo da escritura?' }], stop_reason: 'end_turn' };
+  const chamadas = [];
+  const fila = [longa, curta];
+  const client = { chamadas, messages: { async create(p) { chamadas.push(JSON.parse(JSON.stringify(p))); return fila.shift(); } } };
+  const cerebro = criarCerebro({ modelo: 'teste', config, client });
+  const r = await cerebro.gerarResposta({ lead: lead(), historico: [{ direcao: 'lead', texto: 'preciso vender a casa' }], ferramentas: {}, log: silencioso });
+  assert.equal(r.acao, null);
+  assert.deepEqual(r.mensagens, ['Parece que a certidão está travando a venda. Como está o prazo da escritura?']);
+  assert.equal(chamadas.length, 2);
+  assert.match(chamadas[1].messages.at(-1).content, /comprida demais/);
+  const sempreLonga = { messages: { async create() { return longa; } } };
+  const c2 = criarCerebro({ modelo: 'teste', config, client: sempreLonga });
+  const r2 = await c2.gerarResposta({ lead: lead(), historico: [{ direcao: 'lead', texto: 'oi' }], ferramentas: {}, log: silencioso });
+  assert.equal(r2.acao, null, 'não passa para o Gabriel só por ser longa');
+  assert.ok(r2.mensagens.length >= 1);
+});
 
 await teste('resposta cortada por limite de tamanho nunca é enviada: o bot pede reescrita e, se continuar cortando, passa para o Gabriel', async () => {
   const cortado = { content: [{ type: 'text', text: 'Sobre a sua pergunta anter' }], stop_reason: 'max_tokens' };
