@@ -140,6 +140,6 @@ Regra prática: coisas curtas e suas (preço, forma de pagamento, como você tra
 
 ## Limitações atuais
 
-- Foi testado por simulação (110 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
+- Foi testado por simulação (111 testes automáticos com WhatsApp, Supabase e Claude simulados). A conexão real com o WhatsApp só pode ser validada no primeiro teste com o QR code, por isso o passo 3 é importante.
 - Áudios e imagens do lead não são lidos: o bot pede que escreva e te avisa.
 - Não é feito para contatos em grupo.

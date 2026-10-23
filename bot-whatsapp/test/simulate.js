@@ -1223,6 +1223,21 @@ await teste('estratégia "conversa" (padrão): vende pela conversa, passa valor 
   assert.match(semCampo, /VENDER PELA CONVERSA/, 'sem o campo, o padrão é vender pela conversa');
 });
 
+await teste('segundo livro: técnicas de escuta/necessidades entram nas duas estratégias, sem frases proibidas', () => {
+  for (const estrategia of ['conversa', 'consultoria']) {
+    const sis = montarSistema(lead(), { ...config, estrategia });
+    assert.match(sis, /ESCUTA, NECESSIDADES E COMUNICAÇÃO CLARA/);
+    assert.match(sis, /Pedido x necessidade/);
+    assert.match(sis, /Conte a intenção antes de perguntar/);
+    assert.match(sis, /Receita como problema a resolver/);
+    assert.match(sis, /Admita o que não sabe/);
+  }
+  const sis = montarSistema(lead(), config);
+  const bloco = sis.slice(sis.indexOf('ARSENAL COMPLEMENTAR'), sis.indexOf('# ESTRATÉGIA'));
+  assert.ok(bloco.length > 1500, 'bloco presente');
+  assert.doesNotMatch(bloco, /só paga|risco zero|sem risco|advogado|jurídic|direito/i);
+});
+
 await teste('estratégia "consultoria": leva para a consultoria, mas também passa valor antes do honorário', () => {
   const sis = montarSistema(lead(), { ...config, estrategia: 'consultoria' });
   assert.match(sis, /LEVAR PARA A CONSULTORIA/);
