@@ -1567,6 +1567,34 @@ await teste('extração: conversa parada com resposta do Gabriel gera itens; mar
   assert.equal(client.chamadas.length, 1);
 });
 
+await teste('extração: se o modelo não aceita forçar a ferramenta (erro 400 tool_choice), usa modo automático e aprende igual', async () => {
+  const ctx = montar({});
+  const c = await abrir(ctx, lead({ nome: 'Carlos Pereira' }));
+  ctx.bot.pararTimers();
+  await conversaComGabriel(ctx, c);
+  const chamadas = [];
+  const client = {
+    chamadas,
+    messages: {
+      async create(params) {
+        chamadas.push(JSON.parse(JSON.stringify(params)));
+        if (params.tool_choice?.type === 'tool') {
+          const e = new Error('400 {"message":"tool_choice: type \\"tool\\" and \\"any\\" are not supported for this model."}');
+          e.status = 400;
+          throw e;
+        }
+        return { content: [uso('registrar_aprendizados', { itens: [itemBom] })] };
+      },
+    },
+  };
+  const ap = criarAprendizado({ store: ctx.store, modelo: 'teste', client, config: { aprendizadoAtivo: true }, log: silencioso, ociosoMs: 0 });
+  assert.equal(await ap.processarPendentes(), 1);
+  assert.equal(ctx.store.aprendizado.length, 1);
+  assert.equal(chamadas.length, 2, 'primeira tentativa forçada, segunda automática');
+  assert.equal(chamadas[1].tool_choice.type, 'auto');
+  assert.match(chamadas[1].system, /SEMPRE chamando a ferramenta registrar_aprendizados/);
+});
+
 await teste('extração: item parecido com um existente é descartado; lista vazia só marca como lida', async () => {
   const ctx = montar({});
   const c = await abrir(ctx, lead());

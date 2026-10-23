@@ -153,15 +153,31 @@ export function criarAprendizado({ store, modelo, apiKey, client, config, log = 
   const chamar = criarChamador(anthropic, log);
   let rodando = false;
 
+  // Alguns modelos não aceitam forçar a ferramenta (tool_choice "tool"); nesse caso
+  // o bot passa a usar "auto" e pede a ferramenta no próprio texto.
+  let forcar = true;
+
   async function extrair(conversa, historico, lead) {
-    const resp = await chamar({
+    const montar = () => ({
       model: modelo,
       max_tokens: 1500,
-      system: INSTRUCOES,
+      system: forcar ? INSTRUCOES : `${INSTRUCOES}\n\nResponda SEMPRE chamando a ferramenta ${FERRAMENTA.name} (com a lista vazia se não houver nada a aprender). Não escreva texto fora da ferramenta.`,
       tools: [FERRAMENTA],
-      tool_choice: { type: 'tool', name: FERRAMENTA.name },
+      tool_choice: forcar ? { type: 'tool', name: FERRAMENTA.name } : { type: 'auto' },
       messages: [{ role: 'user', content: `<conversa>\n${transcricao(historico)}\n</conversa>` }],
     });
+    let resp;
+    try {
+      resp = await chamar(montar());
+    } catch (e) {
+      if (forcar && e?.status === 400 && /tool_choice/i.test(String(e?.message))) {
+        forcar = false;
+        log.warn('[aprendizado] o modelo não aceita forçar a ferramenta; usando modo automático.');
+        resp = await chamar(montar());
+      } else {
+        throw e;
+      }
+    }
     const uso = resp.content?.find((b) => b.type === 'tool_use' && b.name === FERRAMENTA.name);
     return { itens: Array.isArray(uso?.input?.itens) ? uso.input.itens : [], uso: resp.usage };
   }
