@@ -59,6 +59,7 @@ export function Footer() {
 
         <div className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-navy-500">
           © {year} Gabriel Zaneloti. Todo o conteúdo deste site é reservado.
+          <span className="mt-1 block text-[11px] opacity-70">Mapa: @svg-maps/brazil (CC BY 4.0)</span>
         </div>
       </Container>
     </footer>

@@ -6,7 +6,6 @@ import { BRASIL_VIEWBOX, ESTADOS_MAPA } from '@/data/brasilMapa';
 /** Mapa do Brasil mostrando que o atendimento (regularização e redução do INSS de obra) é feito em todos os estados. */
 export function BrasilMapa() {
   const [ativo, setAtivo] = useState<string | null>(null);
-  const estadoAtivo = ESTADOS_MAPA.find((e) => e.id === ativo);
 
   return (
     <section id="todo-brasil" className="scroll-mt-20 bg-white py-16 sm:py-24">
@@ -16,10 +15,10 @@ export function BrasilMapa() {
             align="left"
             eyebrow="Atendimento nacional"
             title="Regularização de obra em todo o Brasil"
-            description="Não importa onde sua obra esteja: o processo é todo feito à distância, por WhatsApp, ligação ou videochamada, e vale para os 26 estados e o Distrito Federal."
+            description="Onde quer que sua obra esteja, o caminho é o mesmo: todo o processo de regularização é feito pelo sistema da Receita Federal (e-CAC), com atendimento nos 26 estados e no Distrito Federal."
           />
           <ul className="mt-8 grid gap-3 text-sm font-semibold text-navy-800 sm:grid-cols-2">
-            {['Atendimento 100% online', 'Todos os 26 estados e o DF', 'Acompanhamento por 5 anos', 'Fale direto com o Gabriel'].map((item) => (
+            {['Processo 100% pelo e-CAC', 'Todos os 26 estados e o DF', 'Acompanhamento por 5 anos', 'Fale direto com o Gabriel'].map((item) => (
               <li key={item} className="flex items-center gap-2">
                 <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5 flex-shrink-0 text-accent-600" aria-hidden="true">
                   <path
@@ -65,10 +64,6 @@ export function BrasilMapa() {
               <circle key={`pin-${e.id}`} cx={e.cx} cy={e.cy} r={4.5} className="pointer-events-none fill-amber-500 stroke-white" strokeWidth={1.5} />
             ))}
           </svg>
-          <figcaption className="mt-3 min-h-[1.5rem] text-center text-sm font-semibold text-navy-700">
-            {estadoAtivo ? `${estadoAtivo.nome}: atendemos aqui` : 'Passe o mouse ou toque em um estado'}
-          </figcaption>
-          <p className="mt-1 text-center text-[11px] text-navy-300">Mapa: @svg-maps/brazil (CC BY 4.0)</p>
         </figure>
       </Container>
     </section>
