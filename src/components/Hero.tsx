@@ -1,11 +1,17 @@
+import { useState } from 'react';
 import { Container } from '@/components/ui/Container';
 import { RiskFreeBadge } from '@/components/ui/RiskFreeBadge';
+import { Calculator } from '@/components/calculator/Calculator';
 import { generateGenericWhatsAppLink } from '@/services/whatsapp';
 import { trackEvent } from '@/services/analytics';
 
+/** Topo do site: título + a calculadora logo de cara (a primeira coisa que o visitante vê). */
 export function Hero() {
+  // Depois do cálculo o resultado é largo: o cartão passa a ocupar a linha inteira.
+  const [temResultado, setTemResultado] = useState(false);
+
   return (
-    <section id="inicio" className="relative overflow-hidden bg-navy-950 pb-24 pt-16 sm:pb-32 sm:pt-20">
+    <section id="inicio" className="relative overflow-hidden bg-navy-950 pb-24 pt-8 sm:pb-28 sm:pt-12">
       <div
         className="pointer-events-none absolute inset-0 opacity-40"
         style={{
@@ -15,36 +21,29 @@ export function Hero() {
         aria-hidden="true"
       />
 
-      <Container className="relative grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-        <div className="animate-fade-in-up">
+      <Container
+        className={`relative grid gap-8 lg:gap-12 ${temResultado ? '' : 'lg:grid-cols-[1fr_1.05fr] lg:items-start'}`}
+      >
+        <div className={`animate-fade-in-up ${temResultado ? 'mx-auto max-w-3xl text-center' : ''}`}>
           <span className="inline-flex items-center rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-accent-300">
             Especialista em INSS de Obras
           </span>
 
-          <h1 className="mt-6 text-4xl font-extrabold leading-[1.1] text-white sm:text-5xl lg:text-[3.25rem]">
-            Reduza o INSS da sua obra e regularize sua construção com segurança
+          <h1 className="mt-4 text-[1.65rem] font-extrabold leading-[1.15] text-white sm:mt-6 sm:text-4xl lg:text-[2.4rem]">
+            Economize até 70%* no INSS da sua Obra utilizando a nossa estratégia de acordo com a IN RFB 2.021/2021
+            da Receita Federal!
           </h1>
 
-          <p className="mt-6 max-w-xl text-lg text-navy-100">
-            Analiso as características da sua obra e identifico oportunidades de redução do INSS, além de
-            cuidar do processo de regularização.
+          <p className="mt-3 text-xs text-navy-300 sm:mt-4">
+            *A economia varia conforme as características, documentação e situação de cada obra.
           </p>
 
-          <div className="mt-8 inline-flex flex-col items-start gap-1.5 rounded-2xl border border-accent-400/30 bg-white/5 px-5 py-4">
-            <span className="text-2xl font-extrabold text-accent-300 sm:text-3xl">Economia de até 70%*</span>
-            <span className="text-xs text-navy-200">
-              *A economia varia conforme as características, documentação e situação de cada obra.
-            </span>
-          </div>
+          <p className="mt-5 hidden max-w-xl text-lg text-navy-100 sm:block">
+            Analiso as características da sua obra e identifico oportunidades de redução do INSS, além de cuidar do
+            processo de regularização.
+          </p>
 
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <a
-              href="#calculadora"
-              className="btn-primary"
-              onClick={() => trackEvent('click_simular', { origem: 'hero' })}
-            >
-              Calcular meu INSS
-            </a>
+          <div className={`mt-6 hidden flex-col gap-3 sm:mt-8 sm:flex sm:flex-row ${temResultado ? 'sm:justify-center' : ''}`}>
             <a
               href={generateGenericWhatsAppLink()}
               target="_blank"
@@ -56,29 +55,10 @@ export function Hero() {
             </a>
           </div>
 
-          <RiskFreeBadge variant="dark" className="mt-6" />
+          <RiskFreeBadge variant="dark" className="mt-6 hidden lg:inline-flex" />
         </div>
 
-        <div className="relative animate-fade-in lg:justify-self-end">
-          <div className="mx-auto max-w-sm rounded-xl2 border border-white/10 bg-white/[0.06] p-6 shadow-card backdrop-blur">
-            <p className="text-sm font-semibold uppercase tracking-wide text-accent-300">Resultado</p>
-            <p className="mt-4 text-sm text-navy-200">INSS estimado antes da análise</p>
-            <p className="text-2xl font-bold text-white">R$ 42.180,00</p>
-
-            <div className="my-4 h-px bg-white/10" />
-
-            <p className="text-sm text-navy-200">Valor estimado após redução</p>
-            <p className="text-3xl font-extrabold text-accent-300">R$ 16.872,00</p>
-
-            <div className="mt-4 flex items-center gap-2 rounded-lg bg-accent-500/10 px-3 py-2">
-              <span className="text-sm font-semibold text-accent-300">Redução estimada de 60%</span>
-            </div>
-
-            <p className="mt-4 text-[11px] leading-relaxed text-navy-300">
-              Exemplo ilustrativo. Sua simulação é calculada com base nos dados reais da sua obra.
-            </p>
-          </div>
-        </div>
+        <Calculator embedded onResultChange={setTemResultado} />
       </Container>
     </section>
   );

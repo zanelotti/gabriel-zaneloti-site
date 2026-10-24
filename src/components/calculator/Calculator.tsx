@@ -11,7 +11,14 @@ import { AreasStep } from './AreasStep';
 import { ResultCard } from './ResultCard';
 import { CalculatingLoader } from './CalculatingLoader';
 
-export function Calculator() {
+interface CalculatorProps {
+  /** true = só o cartão da calculadora (dentro do topo da página), sem a seção e o título próprios. */
+  embedded?: boolean;
+  /** Avisa quando existe (ou deixa de existir) um resultado, para o topo da página poder dar mais largura ao cartão. */
+  onResultChange?: (temResultado: boolean) => void;
+}
+
+export function Calculator({ embedded = false, onResultChange }: CalculatorProps = {}) {
   const { data, step, errors, result, calcError, isSubmitting, updateField, goNext, goBack, submit, reset } =
     useCalculatorForm();
 
@@ -24,6 +31,10 @@ export function Calculator() {
     if (!result) setRevealResult(false);
   }, [result]);
 
+  useEffect(() => {
+    onResultChange?.(Boolean(result));
+  }, [result, onResultChange]);
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     void submit();
@@ -34,16 +45,24 @@ export function Calculator() {
     goNext();
   };
 
-  return (
-    <section id="calculadora" className="scroll-mt-20 bg-navy-50 py-20 sm:py-28">
-      <Container>
-        <SectionHeading
-          eyebrow="Simulação gratuita"
-          title="Descubra quanto você pode economizar no INSS da sua obra"
-          description="Preencha os dados da sua obra para receber uma estimativa inicial e descobrir o potencial de economia."
-        />
+  const cartao = (
+        <div
+          id={embedded ? 'calculadora' : undefined}
+          className={
+            embedded
+              ? 'mx-auto w-full max-w-2xl scroll-mt-24 rounded-xl2 border border-navy-100 bg-white p-5 shadow-card sm:p-8'
+              : 'mx-auto mt-10 max-w-2xl rounded-xl2 border border-navy-100 bg-white p-6 shadow-card sm:p-10'
+          }
+        >
+          {embedded && !result && (
+            <div className="mb-6 text-center sm:text-left">
+              <span className="section-eyebrow">Simulação gratuita</span>
+              <h2 className="mt-1 text-xl font-bold text-navy-900 sm:text-2xl">
+                Descubra quanto você pode economizar no INSS da sua obra
+              </h2>
+            </div>
+          )}
 
-        <div className="mx-auto mt-10 max-w-2xl rounded-xl2 border border-navy-100 bg-white p-6 shadow-card sm:p-10">
           {!result && (
             <div className="mb-8">
               <ProgressBar currentStep={step} />
@@ -118,6 +137,19 @@ export function Calculator() {
             </div>
           )}
         </div>
+  );
+
+  if (embedded) return cartao;
+
+  return (
+    <section id="calculadora" className="scroll-mt-20 bg-navy-50 py-20 sm:py-28">
+      <Container>
+        <SectionHeading
+          eyebrow="Simulação gratuita"
+          title="Descubra quanto você pode economizar no INSS da sua obra"
+          description="Preencha os dados da sua obra para receber uma estimativa inicial e descobrir o potencial de economia."
+        />
+        {cartao}
       </Container>
     </section>
   );

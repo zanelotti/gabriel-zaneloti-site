@@ -1,7 +1,8 @@
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Hero } from '@/components/Hero';
-import { Calculator } from '@/components/calculator/Calculator';
+import { Destaques } from '@/components/Destaques';
+import { BrasilMapa } from '@/components/BrasilMapa';
 import { HowItWorks } from '@/components/HowItWorks';
 import { Services } from '@/components/Services';
 import { Authority } from '@/components/Authority';
@@ -20,7 +21,8 @@ function App() {
       <Header />
       <main className="flex-1">
         <Hero />
-        <Calculator />
+        <Destaques />
+        <BrasilMapa />
         <HowItWorks />
         <Services />
         <Authority />
