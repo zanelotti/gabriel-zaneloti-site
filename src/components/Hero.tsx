@@ -27,12 +27,15 @@ export function Hero() {
             Especialista em INSS de Obras
           </span>
 
-          <h1 className="mt-5 text-[1.65rem] font-extrabold leading-[1.2] tracking-tight text-white sm:mt-7 sm:text-4xl [text-wrap:balance] lg:text-[2.35rem] lg:leading-[1.22]">
-            Economize até 70%* no INSS da sua Obra utilizando a nossa estratégia de acordo com a IN RFB 2.021/2021
-            da Receita Federal!
+          <h1 className="mt-5 text-[2rem] font-extrabold leading-[1.1] tracking-tight text-white sm:mt-7 sm:text-5xl [text-wrap:balance] lg:text-[3.1rem] lg:leading-[1.08]">
+            Economize até 70%* no INSS da sua obra
           </h1>
 
-          <p className="mt-5 text-xs leading-relaxed text-navy-300 sm:mt-6 sm:text-sm">
+          <p className="mt-4 text-base leading-snug text-navy-200 sm:text-lg [text-wrap:balance]">
+            Estratégia baseada na IN RFB 2.021/2021, da Receita Federal.
+          </p>
+
+          <p className="mt-3 text-xs leading-relaxed text-navy-300 sm:text-sm">
             *A economia varia conforme as características, documentação e situação de cada obra.
           </p>
 
