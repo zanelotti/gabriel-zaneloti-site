@@ -18,7 +18,7 @@ export function BrasilMapa() {
             description="Onde quer que sua obra esteja, o caminho é o mesmo: todo o processo de regularização é feito pelo sistema da Receita Federal (e-CAC), com atendimento nos 26 estados e no Distrito Federal."
           />
           <ul className="mt-8 grid gap-3 text-sm font-semibold text-navy-800 sm:grid-cols-2">
-            {['Processo 100% pelo e-CAC', 'Todos os 26 estados e o DF', 'Acompanhamento por 5 anos', 'Fale direto com o Gabriel'].map((item) => (
+            {['Diagnóstico gratuito da obra', 'Todos os 26 estados e o DF', 'Acompanhamento por 5 anos', 'Fale direto com o Gabriel'].map((item) => (
               <li key={item} className="flex items-center gap-2">
                 <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5 flex-shrink-0 text-accent-600" aria-hidden="true">
                   <path
