@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Container } from '@/components/ui/Container';
 import { Calculator } from '@/components/calculator/Calculator';
+import { trackEvent } from '@/services/analytics';
 
 /** Topo do site: título + a calculadora logo de cara (a primeira coisa que o visitante vê). */
 export function Hero() {
@@ -19,9 +20,9 @@ export function Hero() {
       />
 
       <Container
-        className={`relative grid gap-8 lg:gap-12 ${temResultado ? '' : 'lg:grid-cols-2 lg:items-center'}`}
+        className={`relative grid gap-8 lg:gap-12 ${temResultado ? '' : 'lg:grid-cols-2 lg:items-start'}`}
       >
-        <div className={`animate-fade-in-up ${temResultado ? 'mx-auto max-w-3xl text-center' : 'lg:pr-6'}`}>
+        <div className={`animate-fade-in-up ${temResultado ? 'mx-auto max-w-3xl text-center' : 'lg:pr-6 lg:pt-4'}`}>
           <span className="inline-flex items-center rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-accent-300">
             Especialista em INSS de Obras
           </span>
@@ -34,6 +35,21 @@ export function Hero() {
           <p className="mt-5 text-xs leading-relaxed text-navy-300 sm:mt-6 sm:text-sm">
             *A economia varia conforme as características, documentação e situação de cada obra.
           </p>
+
+          <div className={`mt-8 sm:mt-10 ${temResultado ? 'flex flex-col items-center' : ''}`}>
+            <a
+              href="#agendar"
+              className="btn-primary w-full gap-3 px-8 py-4 text-base shadow-card ring-4 ring-amber-500/25 sm:w-auto"
+              onClick={() => trackEvent('click_agendar', { origem: 'hero' })}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="16" rx="2" />
+                <path d="M16 3v4M8 3v4M3 10h18" />
+              </svg>
+              Agendar call gratuita
+            </a>
+            <p className="mt-3 text-sm text-navy-200">Prefere falar? Marque uma call com o Gabriel.</p>
+          </div>
         </div>
 
         <Calculator embedded onResultChange={setTemResultado} />
