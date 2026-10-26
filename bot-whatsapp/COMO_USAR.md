@@ -123,7 +123,7 @@ Regra prática: coisas curtas e suas (preço, forma de pagamento, como você tra
 - Diz "só paga se economizar", "risco zero", garante resultado, fala de valor mínimo de honorário fora dos casos abaixo ou usa as palavras "legal", "jurídico", "direito", "advogado". Se o Claude escrever algo assim, a mensagem é bloqueada e reescrita; se não conseguir, o bot passa a conversa para você.
 - Dá desconto ou negocia o percentual (12% sobre a economia comprovada).
 - Oferece reunião quando a economia estimada é menor que o valor definido em `ECONOMIA_MIN_PARA_REUNIAO` (padrão R$ 5.000): nesses casos passa para você conversar por texto.
-- Fala de honorário por conta própria em lead de valor alto (honorário a partir de `HONORARIO_ALTO`, padrão R$ 2.000): nesses casos só responde sobre honorário se a pessoa perguntar, e já na 2ª ou 3ª resposta convida para uma conversa rápida com você. Em lead comum, só fala do honorário depois de 3 mensagens da pessoa ou se ela perguntar. Se o Claude tentar antes, a mensagem é bloqueada e reescrita.
+- Fala de honorário por conta própria em lead de valor alto (honorário a partir de `HONORARIO_ALTO`, padrão R$ 1.000): nesses casos só responde sobre honorário se a pessoa perguntar, e já na 2ª ou 3ª resposta convida para uma conversa rápida com você. Em lead comum, só fala do honorário depois de 3 mensagens da pessoa ou se ela perguntar. Se o Claude tentar antes, a mensagem é bloqueada e reescrita.
 - Passa a conversa para você nas duas primeiras respostas do lead por pergunta geral ("como funciona?"): nesses casos ele mesmo explica. Só passa cedo se a pessoa pedir desconto ou uma pessoa, estiver irritada, mandar documentos ou áudios, quiser contratar ou aceitar a ligação rápida.
 - Continua depois que o lead pede para parar.
 

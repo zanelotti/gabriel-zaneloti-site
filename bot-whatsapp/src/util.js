@@ -126,7 +126,7 @@ export function calcularHonorario(lead) {
 }
 
 /** Honorário (em R$) a partir do qual o lead é tratado com cautela extra: decisão grande, a pessoa precisa de confiança antes do preço. */
-export const HONORARIO_ALTO_PADRAO = 2000;
+export const HONORARIO_ALTO_PADRAO = 1000;
 
 /** Pessoa física com honorário alto (ex.: R$ 5.725 de honorário sobre R$ 47.705 de economia). Empresa não entra: a economia dela não é conhecida. */
 export function leadValorAlto(lead, config = {}) {
