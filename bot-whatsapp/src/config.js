@@ -37,6 +37,9 @@ export const config = {
   tetoMensagens24h: num(process.env.TETO_MENSAGENS_24H, 120),
   // Abaixo desta economia estimada o bot NÃO oferece reunião: passa o lead para o Gabriel conversar por texto.
   economiaMinParaReuniao: num(process.env.ECONOMIA_MIN_PARA_REUNIAO, 5000),
+  // Lead "grande": quando o honorário calculado chega a este valor (R$), o bot é mais cauteloso: não fala de honorário por conta própria
+  // e oferece a conversa com o Gabriel logo no começo, para passar confiança antes do preço.
+  honorarioAlto: num(process.env.HONORARIO_ALTO, 2000),
 
   // Se preenchido (números separados por vírgula, só dígitos), o bot só fala com esses números.
   // Use para o primeiro teste. Deixe vazio em produção.

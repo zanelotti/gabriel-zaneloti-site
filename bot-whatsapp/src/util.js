@@ -125,6 +125,16 @@ export function calcularHonorario(lead) {
   return { tipo: 'PF', economiaConhecida: true, valor: Math.round(bruto), minimoAplicado: false, liquido: Math.round(Number(eco) - Math.round(bruto)) };
 }
 
+/** Honorário (em R$) a partir do qual o lead é tratado com cautela extra: decisão grande, a pessoa precisa de confiança antes do preço. */
+export const HONORARIO_ALTO_PADRAO = 2000;
+
+/** Pessoa física com honorário alto (ex.: R$ 5.725 de honorário sobre R$ 47.705 de economia). Empresa não entra: a economia dela não é conhecida. */
+export function leadValorAlto(lead, config = {}) {
+  const limite = Number.isFinite(Number(config?.honorarioAlto)) && Number(config.honorarioAlto) > 0 ? Number(config.honorarioAlto) : HONORARIO_ALTO_PADRAO;
+  const h = calcularHonorario(lead);
+  return h.tipo === 'PF' && h.economiaConhecida === true && Number(h.valor) >= limite;
+}
+
 /**
  * Chamada ao Claude com o "pensamento" desligado: num bot de WhatsApp ele só gasta tokens (e tempo) e,
  * com limite curto de resposta, chegou a cortar mensagens no meio da frase. Se a API recusar o parâmetro,

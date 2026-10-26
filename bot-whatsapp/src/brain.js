@@ -4,11 +4,12 @@
  * passou nas travas de conteúdo (guards.js).
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { dividirMensagens, muitoLonga, validarSaida } from './guards.js';
+import { dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, validarSaida } from './guards.js';
+import { citouHonorarios } from './funil.js';
 import { formatarTrechos } from './documentos.js';
 import { formatarAprendidos } from './aprendizado.js';
 import { montarSistema } from './prompt.js';
-import { criarChamador } from './util.js';
+import { criarChamador, leadValorAlto } from './util.js';
 
 export const FERRAMENTAS = [
   {
@@ -34,7 +35,7 @@ export const FERRAMENTAS = [
   {
     name: 'passar_para_gabriel',
     description:
-      'Encerra a participação do assistente e avisa o Gabriel para continuar pessoalmente. Escreva também uma mensagem curta ao lead dizendo que o Gabriel continua a conversa.',
+      'Encerra a participação do assistente e avisa o Gabriel para continuar pessoalmente. Escreva também uma mensagem curta ao lead dizendo que o Gabriel continua a conversa. NÃO use nas primeiras respostas só porque a pessoa pediu uma explicação geral ("como funciona?"): explique você mesma. Use só por motivo claro (pediu pessoa ou desconto, irritação, documentos, pronta para contratar, dúvida técnica sem base).',
     input_schema: {
       type: 'object',
       properties: {
@@ -167,6 +168,15 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     }
     // O parcelamento é um diferencial que a assistente precisa citar em algum momento (a abertura não fala dele).
     const parcelamentoCitado = historico.some((m) => m.direcao !== 'lead' && /parcel/i.test(m.texto || ''));
+    // Cautela com preço: o honorário só entra na conversa quando a pessoa pergunta (ou, em lead comum, depois de algumas trocas).
+    // Em lead de valor alto (honorário grande) só quando ela pergunta. Nunca o bot oferece "mostrar a conta com o honorário" por conta própria.
+    const msgsLead = historico.filter((m) => m.direcao === 'lead');
+    const perguntouPreco = leadPerguntouPreco(msgsLead.slice(-2).map((m) => m.texto).join(' '));
+    const jaFalouHonorario = historico.some((m) => m.direcao !== 'lead' && citouHonorarios(m.texto));
+    const valorAlto = leadValorAlto(lead, config);
+    const precoPrematuro = (t) => falaDeHonorario(t) && !perguntouPreco && !jaFalouHonorario && (valorAlto || msgsLead.length < 3);
+    const MOTIVO_PRECO_CEDO =
+      'fala de honorário/preço, mas a pessoa não perguntou o custo e ainda é cedo (ou o caso é de valor alto e pede cautela). Reescreva SEM citar honorário, percentual do Gabriel nem oferecer "mostrar a conta": passe valor do serviço ligado ao caso dela, mostre confiança e, se já tiver trocado algumas mensagens, ofereça a conversa rápida com o Gabriel (sem compromisso)';
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
     const temBusca = (documentos && documentos.total > 0) || (aprendizado && aprendizado.total > 0);
     const ferramentasApi = temBusca ? [...FERRAMENTAS, FERRAMENTA_DOCUMENTOS] : FERRAMENTAS;
@@ -224,6 +234,15 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
             continue;
           }
           try {
+            if (uso.name === 'passar_para_gabriel' && !espera && msgsLead.length <= 2 && !passagemJustificada(uso.input?.motivo)) {
+              // Cedo demais: "me explica como funciona" não é motivo para largar o lead. Devolve a vez para a assistente responder.
+              resultados.push({
+                type: 'tool_result',
+                tool_use_id: uso.id,
+                content: JSON.stringify({ ok: false, erro: 'Ainda é cedo para passar para o Gabriel e esse motivo não justifica. Responda você mesma: explique em 2 ou 3 frases curtas como o serviço funciona (use o CONHECIMENTO) e faça UMA pergunta para entender a obra dela.' }),
+              });
+              continue;
+            }
             const fn = ferramentas[uso.name];
             if (!fn) throw new Error(`ferramenta desconhecida: ${uso.name}`);
             const saida = await fn(uso.input || {});
@@ -242,7 +261,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
 
         if (acao) {
           // Ação terminal: usa o texto que o modelo escreveu junto (se passar nas travas) ou um padrão seguro.
-          const v = texto ? validarSaida(texto, lead, valoresExtras) : { ok: false };
+          const v = texto && !precoPrematuro(texto) ? validarSaida(texto, lead, valoresExtras) : { ok: false };
           const msgs = v.ok ? dividirMensagens(texto) : [TEXTO_PADRAO[acao.tipo]];
           return { mensagens: msgs, acao, uso: consumo };
         }
@@ -251,9 +270,10 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
 
       // Resposta final em texto. Se foi cortada por limite de tamanho, NUNCA envia (sairia pela metade).
       const cortada = resp.stop_reason === 'max_tokens';
-      const v = cortada
+      let v = cortada
         ? { ok: false, motivo: 'a resposta foi cortada por ser longa demais (escreva mais curta, em no máximo 3 mensagens pequenas)' }
         : validarSaida(texto, lead, valoresExtras);
+      if (v.ok && precoPrematuro(texto)) v = { ok: false, motivo: MOTIVO_PRECO_CEDO };
       if (v.ok && muitoLonga(texto) && !jaPediuResumo) {
         // Resposta correta mas comprida: pede UMA reescrita mais curta (não conta como bloqueio; se continuar longa, envia assim mesmo).
         jaPediuResumo = true;

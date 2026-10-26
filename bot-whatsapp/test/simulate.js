@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { criarBot } from '../src/bot.js';
 import { criarCerebro, montarHistorico } from '../src/brain.js';
-import { dividirMensagens, extrairValoresReais, muitoLonga, pediuParar, validarSaida } from '../src/guards.js';
+import { dividirMensagens, extrairValoresReais, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, pediuParar, validarSaida } from '../src/guards.js';
 import { montarAbertura } from '../src/opening.js';
 import { montarSistema } from '../src/prompt.js';
 import { carregarConhecimento, sha256 } from '../src/conhecimento.js';
@@ -18,7 +18,7 @@ import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel
 import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAprendizado } from '../src/aprendizado.js';
 import { citouHonorarios, MOTIVOS_PERDA, podeMover } from '../src/funil.js';
 import { descreverQuando, lembreteDevido, montarFollowup, montarMensagemConsultoria, proximoFollowup } from '../src/acompanhamento.js';
-import { calcularHonorario, criarChamador, limparNomeInformado, nomeParecePessoa, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
+import { calcularHonorario, criarChamador, leadValorAlto, limparNomeInformado, nomeParecePessoa, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
 
 let passou = 0;
 const teste = async (nome, fn) => {
@@ -700,7 +700,7 @@ await teste('pasta de conhecimento é carregada e os valores nela podem ser cita
 });
 
 await teste('conhecimento vai para o prompt e a resposta sobre parcelamento sai', async () => {
-  const resposta = 'Dá para parcelar sim. O saldo do INSS da obra pode ser parcelado em até 60 vezes, com parcela mínima de R$ 200 para pessoa física, e eu mesmo faço o parcelamento no final da obra.\n\nVocê está pensando em parcelar o INSS ou o honorário?';
+  const resposta = 'Dá para parcelar sim. O saldo do INSS da obra pode ser parcelado em até 60 vezes, com parcela mínima de R$ 200 para pessoa física, e eu mesmo faço o parcelamento no final da obra.\n\nVocê está pensando em parcelar o saldo do INSS da obra?';
   const ctx = montar({ roteiro: [texto(resposta)] });
   const c = await abrir(ctx, lead());
   await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'dá pra parcelar?' });
@@ -2085,5 +2085,96 @@ await teste('prova social: regra no prompt e depoimentos reais (sem nome e sem v
   assert.match(k.texto, /nunca prometa que o mesmo resultado/);
 });
 
+
+console.log('\nCautela com lead grande e preço');
+
+/** Cérebro com roteiro simples para os testes de cautela. */
+function cerebroRoteiro(roteiro) {
+  const chamadas = [];
+  const client = { chamadas, messages: { async create(p) { chamadas.push(JSON.parse(JSON.stringify(p))); const r = roteiro.shift(); if (!r) throw new Error('roteiro acabou'); return { content: r, stop_reason: 'end_turn' }; } } };
+  return { chamadas, cerebro: criarCerebro({ modelo: 'teste', config, client }) };
+}
+const leadPequeno = () => lead({ economia_estimada: 8000, inss_estimado: 20000, valor_apos_reducao: 12000 });
+const hist = (...textos) => textos.map((t, i) => ({ direcao: i % 2 === 0 ? 'lead' : 'bot', texto: t }));
+
+await teste('lead de valor alto: o prompt manda ter cautela, não falar de honorário sozinha e oferecer a conversa cedo; lead pequeno não recebe o bloco', () => {
+  assert.equal(leadValorAlto(lead()), true);
+  assert.equal(leadValorAlto(leadPequeno()), false);
+  assert.equal(leadValorAlto(lead({ responsavel: 'PJ' })), false);
+  const alto = montarSistema(lead(), config);
+  assert.match(alto, /LEAD DE VALOR ALTO/);
+  assert.match(alto, /NÃO fale em honorário/);
+  assert.match(alto, /2ª ou 3ª resposta ofereça uma conversa rápida/);
+  assert.doesNotMatch(montarSistema(leadPequeno(), config), /LEAD DE VALOR ALTO/);
+  assert.match(alto, /PERGUNTA GERAL NÃO É MOTIVO PARA PASSAR/);
+  assert.doesNotMatch(alto, /sem esperar ela perguntar/);
+});
+
+await teste('lead de valor alto: o limite de honorário pode ser ajustado pela configuração', () => {
+  assert.equal(leadValorAlto(lead({ economia_estimada: 20000 }), { honorarioAlto: 3000 }), false); // honorário 2.400
+  assert.equal(leadValorAlto(lead({ economia_estimada: 30000 }), { honorarioAlto: 3000 }), true);
+});
+
+await teste('detectores: pergunta de preço, fala de honorário e motivos que justificam passar logo', () => {
+  for (const t of ['quanto custa?', 'Qual o valor do serviço?', 'e o honorário?', 'quanto vocês cobram', 'tem desconto?', 'é caro?', 'qual a porcentagem']) assert.equal(leadPerguntouPreco(t), true, t);
+  for (const t of ['Poderia me explicar por aqui como funcionaria?', 'sim, por favor!', 'teve dois autônomos', 'dá pra parcelar o INSS?']) assert.equal(leadPerguntouPreco(t), false, t);
+  assert.equal(falaDeHonorario('Os honorários são de R$ 5.725'), true);
+  assert.equal(falaDeHonorario('Quer que eu te mostre como fica a conta, com o honorário do Gabriel?'), true);
+  assert.equal(falaDeHonorario('A economia estimada é de R$ 47.705.'), false);
+  assert.equal(passagemJustificada('LIGAÇÃO HOJE: 15h'), true);
+  assert.equal(passagemJustificada('pediu desconto'), true);
+  assert.equal(passagemJustificada('pronta para contratar'), true);
+  assert.equal(passagemJustificada('dúvida sobre como funciona o processo'), false);
+});
+
+await teste('não passa para o Gabriel na 1ª resposta por pergunta geral: devolve a vez e a assistente responde', async () => {
+  const { cerebro, chamadas } = cerebroRoteiro([
+    [{ type: 'tool_use', id: 't1', name: 'passar_para_gabriel', input: { motivo: 'pergunta geral sobre como funciona', resumo: 'quer entender o processo' } }],
+    texto('Claro, Bruna. O Gabriel confere a documentação da obra, cuida do CNO e das guias e acompanha tudo até a certidão. Como foi a obra, com pedreiro e prestadores autônomos?'),
+  ]);
+  const r = await cerebro.gerarResposta({ lead: lead(), historico: hist('Poderia me explicar por aqui como funcionaria?'), ferramentas: { passar_para_gabriel: async () => ({ ok: true }) }, log: silencioso });
+  assert.equal(r.acao, null, 'não passou');
+  assert.match(r.mensagens.join(' '), /CNO/);
+  assert.match(JSON.stringify(chamadas[1].messages.at(-1).content), /Ainda é cedo para passar/);
+});
+
+await teste('passar para o Gabriel continua funcionando cedo quando o motivo é claro (pediu desconto, quer contratar, ligação hoje) e depois de 3 mensagens', async () => {
+  for (const motivo of ['pediu desconto', 'pronta para contratar', 'LIGAÇÃO HOJE: 15h neste número']) {
+    const { cerebro } = cerebroRoteiro([[{ type: 'text', text: 'Vou pedir para o Gabriel continuar com você.' }, { type: 'tool_use', id: 't1', name: 'passar_para_gabriel', input: { motivo, resumo: 'x' } }]]);
+    const r = await cerebro.gerarResposta({ lead: lead(), historico: hist('oi'), ferramentas: { passar_para_gabriel: async () => ({ ok: true }) }, log: silencioso });
+    assert.equal(r.acao?.tipo, 'passar', motivo);
+  }
+  const { cerebro } = cerebroRoteiro([[{ type: 'text', text: 'Vou pedir para o Gabriel continuar com você.' }, { type: 'tool_use', id: 't1', name: 'passar_para_gabriel', input: { motivo: 'dúvida técnica sem base', resumo: 'x' } }]]);
+  const r = await cerebro.gerarResposta({ lead: lead(), historico: hist('a', 'b', 'c', 'd', 'e'), ferramentas: { passar_para_gabriel: async () => ({ ok: true }) }, log: silencioso });
+  assert.equal(r.acao?.tipo, 'passar', 'depois de várias trocas, passar por dúvida técnica é permitido');
+});
+
+await teste('lead de valor alto: honorário que ninguém perguntou é bloqueado e reescrito; se a pessoa pergunta o custo, sai (com a conta e o convite)', async () => {
+  const ruim = 'Quer que eu te mostre como fica a conta, com o honorário do Gabriel?';
+  const boa = 'Pela estimativa, o INSS cai bastante. Seria ruim se o Gabriel te explicasse isso numa conversa rápida, sem compromisso?';
+  const a = cerebroRoteiro([texto(ruim), texto(boa)]);
+  const r = await a.cerebro.gerarResposta({ lead: lead(), historico: hist('Olá', 'Claro', 'Teve dois autônomos', 'Entendi', 'Ok, e agora?'), ferramentas: {}, log: silencioso });
+  assert.deepEqual(r.mensagens, [boa]);
+  assert.match(JSON.stringify(a.chamadas[1].messages.at(-1).content), /não perguntou o custo/);
+  // Agora ela pergunta o preço: pode falar.
+  const resposta = 'Os honorários são de R$ 5.040 (12% da economia estimada de R$ 42.000), e sobram R$ 36.960 para você. Seria ruim se o Gabriel te explicasse como funciona numa conversa rápida?';
+  const b = cerebroRoteiro([texto(resposta)]);
+  const r2 = await b.cerebro.gerarResposta({ lead: lead(), historico: hist('Olá', 'Claro', 'Quanto vocês cobram?'), ferramentas: {}, log: silencioso });
+  assert.deepEqual(r2.mensagens, [resposta]);
+});
+
+await teste('lead comum: honorário sem ser perguntado só depois de 3 mensagens da pessoa; se ela perguntar, sai na hora', async () => {
+  const com = 'Os honorários são de R$ 960 (12% da economia estimada de R$ 8.000). Como você gostaria de seguir?';
+  const ok = 'Pela estimativa da calculadora a economia é boa. Como foi a obra, teve prestadores autônomos?';
+  const a = cerebroRoteiro([texto(com), texto(ok)]);
+  const r = await a.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('Oi'), ferramentas: {}, log: silencioso });
+  assert.deepEqual(r.mensagens, [ok]);
+  const b = cerebroRoteiro([texto(com)]);
+  const r2 = await b.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', 'b', 'c', 'd', 'e'), ferramentas: {}, log: silencioso });
+  assert.deepEqual(r2.mensagens, [com]);
+  const c = cerebroRoteiro([texto(com)]);
+  const r3 = await c.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('Qual o valor do serviço?'), ferramentas: {}, log: silencioso });
+  assert.deepEqual(r3.mensagens, [com]);
+});
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

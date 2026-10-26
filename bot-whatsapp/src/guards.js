@@ -133,3 +133,26 @@ export function dividirMensagens(texto, max = 3) {
   cabeca.push(partes.slice(max - 1).join('\n\n'));
   return cabeca;
 }
+
+/** O lead perguntou (ou puxou o assunto de) custo/honorário? */
+export function leadPerguntouPreco(texto) {
+  const t = String(texto ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  return /(honorari|quanto (voce|vc|ele|o gabriel|vcs|voces)?\s*(cobra|cobram|custa|fica|e que|sai)|quanto (e|eh|custa|fica|sai|seria)|\bcusto\b|\bcustos\b|\bcustar\b|\bpreco|valor do (servico|trabalho|honorario)|qual (e )?o valor|cobranca|\bcobra|\bcobram|\bpagar (pra|para) (voce|vc|ele|o gabriel)|percentual|\bporcentagem|comissao|\btaxa\b|mensalidade|\bcaro\b|\bbarato\b|desconto)/.test(t);
+}
+
+/** O texto do bot fala do honorário do Gabriel (valor, percentual ou "a conta com o honorário")? */
+export function falaDeHonorario(texto) {
+  return /honor[aá]rio|\b12\s?%|\bdo gabriel cobrar|\bcobran[cç]a\b/i.test(String(texto ?? ''));
+}
+
+/**
+ * Passar a conversa para o Gabriel logo nas primeiras respostas só se justifica por motivo explícito
+ * (pediu pessoa, desconto, irritação, documentos, pronta para contratar, ligação aceita). Dúvida geral
+ * ("como funciona?") se responde na conversa.
+ */
+export function passagemJustificada(motivo) {
+  return /liga[cç][aã]o hoje|desconto|negocia|condi[cç][aã]o|pessoa|humano|atendente|falar com (o )?gabriel|irrit|reclam|document|[aá]udio|proposta formal|decidid|contrat|fechar|dados do contrato|pediu para falar/i.test(String(motivo ?? ''));
+}
