@@ -22,6 +22,8 @@ export default defineConfig({
         privacidade: path.resolve(__dirname, 'privacidade.html'),
         termos: path.resolve(__dirname, 'termos.html'),
         sobre: path.resolve(__dirname, 'sobre.html'),
+        // Programa de parceiros (indicação) — página sem indexação, acessada por anúncio/link.
+        parceiros: path.resolve(__dirname, 'parceiros.html'),
       },
     },
   },

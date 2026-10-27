@@ -598,6 +598,10 @@ function buildEmailHtml(lead) {
           </tr>
         </table>`;
 
+  const avisoParceiro = lead.parceiroRef
+    ? `<div style="margin:0 0 16px;padding:12px 14px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;color:#78350f;font-size:13px;"><strong>🤝 Indicação de parceiro:</strong> ${escapeHtml(lead.parceiroRef)} — combinar 20% de comissão quando o cliente pagar.</div>`
+    : '';
+
   const mensagem = buildMensagemAbertura(lead);
   const whatsappLink = buildWhatsAppLink(lead, mensagem);
 
@@ -646,6 +650,7 @@ function buildEmailHtml(lead) {
     <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#111827;">
       <h2 style="margin:0 0 4px;font-size:20px;">Nova simulação no site 🎯</h2>
       <p style="margin:0 0 20px;color:#6b7280;font-size:14px;">${escapeHtml(lead.nome || 'Alguém')} acabou de preencher a calculadora de INSS de obras.</p>
+      ${avisoParceiro}
       ${avisoPJ}
       ${avisoGfipAnterior}
       ${linhaResultado}
@@ -685,6 +690,7 @@ function toSupabaseRow(lead) {
     percentual_reducao: lead.percentualReducao ?? null,
     valor_apos_reducao: lead.valorAposReducao ?? null,
     created_at: lead.createdAt || new Date().toISOString(),
+    ...(lead.parceiroRef ? { notas: `Indicação de parceiro: ${String(lead.parceiroRef).slice(0, 40)}` } : {}),
   };
 }
 
@@ -756,7 +762,7 @@ async function sendEmail(lead) {
         from: 'Simulador INSS de Obras <onboarding@resend.dev>',
         to: [toEmail],
         reply_to: toEmail,
-        subject: `Nova simulação: ${lead.nome || 'Visitante do site'}`,
+        subject: `Nova simulação${lead.parceiroRef ? ' (INDICAÇÃO)' : ''}: ${lead.nome || 'Visitante do site'}`,
         html: buildEmailHtml(lead),
         ...(attachments ? { attachments } : {}),
       }),

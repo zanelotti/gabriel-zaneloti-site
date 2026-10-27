@@ -1,4 +1,5 @@
 import type { Lead, NewLeadInput } from '@/types/lead';
+import { getParceiroRef } from '@/services/attribution';
 
 /**
  * ============================================================================
@@ -121,7 +122,9 @@ function notifyByEmail(lead: Lead): void {
 export const leadService = {
   /** Cria e persiste um novo lead a partir dos dados da simulação + resultado. */
   async createLead(input: NewLeadInput): Promise<Lead> {
-    const lead = await activeAdapter.create(input);
+    // Programa de parceiros: se o visitante veio de um link `?ref=`, o lead leva o código do parceiro.
+    const parceiroRef = getParceiroRef();
+    const lead = await activeAdapter.create(parceiroRef ? { ...input, parceiroRef } : input);
     notifyByEmail(lead);
     return lead;
   },

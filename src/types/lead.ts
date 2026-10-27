@@ -115,6 +115,8 @@ export interface Lead {
    */
   detalheInterno: INSSDetalheInterno | null;
   createdAt: string;
+  /** Código do parceiro que indicou este lead (vem do link `?ref=` do programa de parceiros). */
+  parceiroRef?: string;
 
   // --------------------------------------------------------------------
   // Campos do CRM (só existem nos leads vindos do Supabase — a captura

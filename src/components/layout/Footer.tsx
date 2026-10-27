@@ -54,6 +54,11 @@ export function Footer() {
                 Termos de Uso
               </a>
             </p>
+            <p className="mt-1 text-sm">
+              <a href="/parceiros.html" className="hover:text-accent-400">
+                Seja parceiro
+              </a>
+            </p>
           </div>
         </div>
 

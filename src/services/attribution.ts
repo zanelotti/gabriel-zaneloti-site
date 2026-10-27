@@ -63,9 +63,39 @@ function writeStored(value: Attribution): void {
   }
 }
 
+const PARCEIRO_KEY = 'gz_parceiro_ref';
+const PARCEIRO_RE = /^[a-z0-9-]{3,40}$/i;
+
+/** Programa de parceiros: guarda o código `?ref=` do link (90 dias) para registrar quem indicou o lead. */
+function captureParceiroRef(): void {
+  try {
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref && PARCEIRO_RE.test(ref)) {
+      window.localStorage.setItem(PARCEIRO_KEY, JSON.stringify({ ref: ref.toLowerCase(), capturedAt: Date.now() }));
+    }
+  } catch {
+    // Armazenamento indisponível — segue sem guardar.
+  }
+}
+
+/** Código do parceiro que trouxe este visitante (vazio se não veio por link de parceiro). */
+export function getParceiroRef(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const raw = window.localStorage.getItem(PARCEIRO_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as { ref?: string; capturedAt?: number };
+    if (!parsed.ref || !parsed.capturedAt || Date.now() - parsed.capturedAt > MAX_AGE_MS) return undefined;
+    return PARCEIRO_RE.test(parsed.ref) ? parsed.ref : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Chame uma vez ao carregar a página (ver src/main.tsx). Nunca lança erro. */
 export function captureAttribution(): void {
   if (typeof window === 'undefined') return;
+  captureParceiroRef();
 
   try {
     const search = new URLSearchParams(window.location.search);
