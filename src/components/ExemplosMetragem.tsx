@@ -6,31 +6,31 @@ interface Exemplo {
   sem: string;
   com: string;
   economia: string;
-  pct: string;
 }
 
 /**
- * Exemplos gerados pelo motor da própria calculadora do site (calculateINSS):
- * casa residencial de alvenaria, obra nova, SP, pessoa física, obra de 03/2023 a 03/2024 (out/2026).
+ * Potencial MÁXIMO de redução (até 70%) aplicado sobre o INSS estimado pela calculadora do site
+ * (casa residencial de alvenaria, obra nova, SP, pessoa física, obra de 03/2023 a 03/2024, out/2026).
+ * Não é resultado típico: o aviso abaixo da tabela deixa isso claro.
  */
 const EXEMPLOS: Exemplo[] = [
-  { area: '100 m²', sem: 'R$ 3.544', com: 'R$ 2.404', economia: 'R$ 1.140', pct: '32%' },
-  { area: '150 m²', sem: 'R$ 10.632', com: 'R$ 4.611', economia: 'R$ 6.021', pct: '57%' },
-  { area: '200 m²', sem: 'R$ 14.176', com: 'R$ 5.715', economia: 'R$ 8.461', pct: '60%' },
-  { area: '300 m²', sem: 'R$ 29.239', com: 'R$ 10.407', economia: 'R$ 18.832', pct: '64%' },
-  { area: '400 m²', sem: 'R$ 49.618', com: 'R$ 22.935', economia: 'R$ 26.683', pct: '54%' },
-  { area: '500 m²', sem: 'R$ 79.743', com: 'R$ 36.071', economia: 'R$ 43.672', pct: '55%' },
+  { area: '100 m²', sem: 'R$ 3.544', com: 'R$ 1.063', economia: 'R$ 2.481' },
+  { area: '150 m²', sem: 'R$ 10.632', com: 'R$ 3.190', economia: 'R$ 7.442' },
+  { area: '200 m²', sem: 'R$ 14.176', com: 'R$ 4.253', economia: 'R$ 9.923' },
+  { area: '300 m²', sem: 'R$ 29.239', com: 'R$ 8.772', economia: 'R$ 20.467' },
+  { area: '400 m²', sem: 'R$ 49.618', com: 'R$ 14.885', economia: 'R$ 34.733' },
+  { area: '500 m²', sem: 'R$ 79.743', com: 'R$ 23.923', economia: 'R$ 55.820' },
 ];
 
-/** Tabela de exemplos por metragem: resposta imediata para quem ainda não quer preencher a simulação. */
+/** Tabela de exemplos por metragem: mostra o potencial máximo de redução para quem ainda não quer preencher a simulação. */
 export function ExemplosMetragem() {
   return (
     <section id="exemplos" className="scroll-mt-20 bg-navy-50 py-16 sm:py-20">
       <Container>
         <SectionHeading
           eyebrow="Exemplos"
-          title="Quanto uma obra pode reduzir de INSS"
-          description="Veja estimativas para casas de diferentes tamanhos. A sua obra pode ter outro resultado: simule para ver o seu caso."
+          title="Quanto sua obra pode economizar de INSS"
+          description="Veja o potencial máximo de redução (até 70%*) para casas de diferentes tamanhos. Simule para ver o que a sua obra pode alcançar."
         />
 
         <div className="mx-auto mt-10 max-w-3xl overflow-hidden rounded-xl border border-navy-100 bg-white shadow-soft">
@@ -39,8 +39,8 @@ export function ExemplosMetragem() {
               <tr>
                 <th scope="col" className="px-2 py-3 font-semibold sm:px-4">Área</th>
                 <th scope="col" className="px-2 py-3 font-semibold sm:px-4">Sem estratégia</th>
-                <th scope="col" className="px-2 py-3 font-semibold sm:px-4">Com estratégia</th>
-                <th scope="col" className="px-2 py-3 font-semibold sm:px-4">Economia</th>
+                <th scope="col" className="px-2 py-3 font-semibold sm:px-4">Redução máxima*</th>
+                <th scope="col" className="px-2 py-3 font-semibold sm:px-4">Economia potencial</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-navy-100 text-navy-800">
@@ -51,7 +51,6 @@ export function ExemplosMetragem() {
                   <td className="px-2 py-3 font-semibold sm:px-4">{e.com}</td>
                   <td className="px-2 py-3 font-bold text-accent-700 sm:px-4">
                     <span className="whitespace-nowrap">{e.economia}</span>
-                    <span className="block font-semibold text-accent-600">{e.pct}</span>
                   </td>
                 </tr>
               ))}
@@ -60,7 +59,7 @@ export function ExemplosMetragem() {
         </div>
 
         <p className="mx-auto mt-4 max-w-3xl text-center text-xs leading-relaxed text-navy-500">
-          Estimativas da nossa calculadora para casa residencial de alvenaria, obra nova em São Paulo, pessoa física, com obra de 03/2023 a 03/2024. O valor real depende das características, da documentação e da situação de cada obra e se confirma na análise.
+          *Potencial máximo de redução (até 70%) aplicado sobre o INSS estimado pela nossa calculadora para casa residencial de alvenaria, obra nova em São Paulo, pessoa física, com obra de 03/2023 a 03/2024. Nem toda obra alcança esse percentual: o resultado real depende das características, da documentação e da situação de cada obra e se confirma na análise.
         </p>
 
         <div className="mt-8 text-center">

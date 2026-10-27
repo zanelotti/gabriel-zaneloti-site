@@ -7,10 +7,8 @@ interface Numero {
 
 /** Números reais dos contratos do Gabriel (set/2024 a set/2026), do painel de controle dele. */
 const NUMEROS: Numero[] = [
-  { valor: '59', rotulo: 'obras atendidas desde 2024' },
   { valor: 'R$ 1,09 mi', rotulo: 'de INSS economizados para os clientes' },
   { valor: '58%', rotulo: 'de redução média sobre o INSS da obra' },
-  { valor: '42%', rotulo: 'dos clientes chegam por indicação' },
 ];
 
 /** Faixa de prova social com os resultados reais, logo abaixo dos três destaques. */
@@ -18,7 +16,7 @@ export function Numeros() {
   return (
     <section aria-label="Resultados" className="bg-white pb-6 pt-12 sm:pt-16">
       <Container>
-        <ul className="grid grid-cols-2 gap-x-4 gap-y-8 text-center lg:grid-cols-4">
+        <ul className="mx-auto grid max-w-3xl grid-cols-2 gap-x-4 gap-y-8 text-center">
           {NUMEROS.map((n) => (
             <li key={n.rotulo}>
               <p className="text-3xl font-extrabold tracking-tight text-navy-900 sm:text-4xl">{n.valor}</p>
