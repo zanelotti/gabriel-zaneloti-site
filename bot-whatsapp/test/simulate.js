@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { criarBot } from '../src/bot.js';
 import { criarCerebro, montarHistorico } from '../src/brain.js';
-import { dividirMensagens, extrairValoresReais, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, pediuParar, validarSaida } from '../src/guards.js';
+import { dividirMensagens, extrairValoresReais, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, pediuParar, repeticaoExcessiva, validarSaida } from '../src/guards.js';
 import { montarAbertura } from '../src/opening.js';
 import { montarSistema } from '../src/prompt.js';
 import { carregarConhecimento, sha256 } from '../src/conhecimento.js';
@@ -521,7 +521,7 @@ await teste('agendamento: ver_horarios → agendar_consultoria → confirmação
   ctx.client.messages.create = (() => {
     const roteiro2 = [
       [uso('agendar_consultoria', { inicio: '2026-10-24T15:00:00.000Z', email: 'maria@exemplo.com' })],
-      texto('Combinado, Maria! Deixei marcado e você vai receber a confirmação por e-mail.'),
+      texto('Deixei marcado e você vai receber a confirmação por e-mail.'),
     ];
     return async () => ({ content: roteiro2.shift() });
   })();
@@ -571,7 +571,7 @@ await teste('passar_para_gabriel: manda a mensagem, avisa, e o bot segue dispon�
   const ctx = montar({
     roteiro: [
       [...texto('Vou pedir para o Gabriel continuar essa conversa com você pessoalmente, ele te responde por aqui.'), uso('passar_para_gabriel', { motivo: 'pediu desconto', resumo: 'Quer fechar com 8%.' })],
-      texto('Os documentos principais costumam ser o alvará e o projeto aprovado. O Gabriel confirma a lista no seu caso.'),
+      texto('Os documentos principais costumam ser o alvará e o projeto aprovado. A lista final se confirma no seu caso.'),
     ],
   });
   const c = await abrir(ctx, lead());
@@ -1761,7 +1761,7 @@ await teste('citouHonorarios: palavra "honorários" junto de valor ou porcentage
 });
 
 await teste('bot citou os honorários: card vai para "Proposta enviada"', async () => {
-  const ctx = montar({ roteiro: [texto('Os honorários são de 12% sobre a economia conseguida, em torno de R$ 5.040 no seu caso.\n\nFaz sentido para você?')] });
+  const ctx = montar({ roteiro: [texto('Os honorários são de 12% sobre a economia conseguida, em torno de R$ 5.040 no seu caso.\n\nPosso te mostrar como ficam os próximos passos?')] });
   const l = lead();
   const c = await abrir(ctx, l);
   await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'Quanto é o seu honorário?' });
@@ -1804,7 +1804,7 @@ await teste('se o banco ainda não aceita o status "agendado", o agendamento nã
     siteUrl: 'https://exemplo.test',
     fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true }) }),
   });
-  const ctx = montar({ siteFalso: site, roteiro: [[uso('agendar_consultoria', { inicio: '2026-10-24T15:00:00.000Z', email: 'maria@exemplo.com' })], texto('Combinado, Maria! Deixei marcado e você vai receber a confirmação por e-mail.')] });
+  const ctx = montar({ siteFalso: site, roteiro: [[uso('agendar_consultoria', { inicio: '2026-10-24T15:00:00.000Z', email: 'maria@exemplo.com' })], texto('Deixei marcado e você vai receber a confirmação por e-mail.')] });
   const l = lead();
   const c = await abrir(ctx, l);
   const original = ctx.store.atualizarLead.bind(ctx.store);
@@ -2265,6 +2265,56 @@ await teste('funil: movimentoDaConsultoria nunca mexe em fechado/perdido', async
     assert.equal(movimentoDaConsultoria(st, 'perdido'), null);
   }
   assert.equal(movimentoDaConsultoria('cancelado', 'contatado'), null);
+});
+
+
+await teste('repetição: nome da pessoa, nome do Gabriel, abertura igual e perguntas de enchimento ou repetidas', () => {
+  const bot = (...t) => t.map((texto) => ({ direcao: 'bot', texto }));
+  const h = bot(
+    'Oi, Jonathan, tudo bem? Aqui é Lia, assistente do Gabriel Zaneloti. Posso te explicar rapidinho?',
+    'Combinado, Jonathan. O Gabriel confirma o que vale no seu caso. Durante a obra, teve pedreiro ou algum prestador autônomo?',
+    'Isso ajuda, Jonathan: o Gabriel cadastra cada autônomo. Na época, algum deles teve INSS recolhido?'
+  );
+  const J = ['Jonathan'];
+  // nome usado nas últimas mensagens: pede outra versão; sem o nome, passa
+  assert.match(repeticaoExcessiva('Tranquilo, Jonathan. Dá para resolver recolhendo agora.', h, J), /nome "Jonathan"/);
+  assert.equal(repeticaoExcessiva('Dá para resolver recolhendo agora, de forma retroativa.', h, J), null);
+  // depois de 3 mensagens sem o nome, pode usar de novo (1 vez)
+  const h2 = [...h, ...bot('Dá para resolver recolhendo agora.', 'Com a certidão em mãos, a venda não trava.', 'Quer combinar uma conversa de 10 minutos?')];
+  assert.equal(repeticaoExcessiva('Fechado, Jonathan. Qual horário fica melhor?', h2, J), null);
+  assert.match(repeticaoExcessiva('Jonathan, entendo, Jonathan.', h2, J), /mais de uma vez/);
+  // "Gabriel" em quase todas as mensagens
+  assert.match(repeticaoExcessiva('Ele cuida de tudo. O Gabriel faz o parcelamento.', h, J), /Gabriel/);
+  assert.equal(repeticaoExcessiva('Ele cuida de tudo e faz o parcelamento.', h, J), null);
+  // abertura igual a uma recente
+  assert.match(repeticaoExcessiva('Isso ajuda a regularizar tudo de uma vez.', h, []), /mesmas palavras/);
+  // perguntas de enchimento e repetidas
+  assert.match(repeticaoExcessiva('Dá para fazer em poucos dias. Isso combina com o que você precisa para a sua obra?', h2, []), /enchimento/);
+  assert.match(repeticaoExcessiva('Dá para fazer. O que fez você querer regularizar a obra agora?', h2, []), /enchimento/);
+  assert.match(repeticaoExcessiva('Então, na época, algum deles teve INSS recolhido?', h, []), /repete uma pergunta/);
+  assert.equal(repeticaoExcessiva('Então bora marcar: prefere hoje ou amanhã?', h, []), null);
+});
+
+await teste('repetição: o cérebro pede UMA reescrita sem o nome repetido; se insistir, envia mesmo assim', async () => {
+  const ruim = 'Combinado, Maria. Dá para recolher agora, de forma retroativa. Isso combina com o que você precisa?';
+  const boa = 'Dá para recolher agora, de forma retroativa. Prefere conversar 10 minutos por telefone hoje ou amanhã?';
+  const h = [...hist('Ok', 'Oi, Maria, tudo bem? Aqui é Lia, assistente do Gabriel Zaneloti.', 'todos autônomos')];
+  const a = cerebroRoteiro([texto(ruim), texto(boa)]);
+  const r = await a.cerebro.gerarResposta({ lead: lead(), historico: h, ferramentas: {}, log: silencioso });
+  assert.deepEqual(r.mensagens, [boa]);
+  assert.match(JSON.stringify(a.chamadas[1].messages.at(-1).content), /repetitiva/);
+  // continua repetindo: não entra em loop, envia a segunda versão
+  const b = cerebroRoteiro([texto(ruim), texto(ruim)]);
+  const r2 = await b.cerebro.gerarResposta({ lead: lead(), historico: h, ferramentas: {}, log: silencioso });
+  assert.deepEqual(r2.mensagens, [ruim]);
+});
+
+await teste('repetição: o prompt manda usar pouco o nome, não repetir "o Gabriel", não fazer pergunta de enchimento e avançar para a conversa depois de 2 perguntas', () => {
+  const p = montarSistema(lead(), config);
+  assert.match(p, /NOMES, REPETIÇÃO E PERGUNTAS/);
+  assert.match(p, /no máximo 1 vez a cada 4 mensagens/);
+  assert.match(p, /Isso combina com o que você precisa/);
+  assert.match(p, /depois de no máximo 2 perguntas de diagnóstico/);
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

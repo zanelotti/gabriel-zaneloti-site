@@ -4,12 +4,12 @@
  * passou nas travas de conteúdo (guards.js).
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, validarSaida } from './guards.js';
+import { dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, repeticaoExcessiva, validarSaida } from './guards.js';
 import { citouHonorarios } from './funil.js';
 import { formatarTrechos } from './documentos.js';
 import { formatarAprendidos } from './aprendizado.js';
 import { montarSistema } from './prompt.js';
-import { criarChamador, leadValorAlto } from './util.js';
+import { criarChamador, leadValorAlto, primeiroNome, primeiroNomePessoa } from './util.js';
 
 export const FERRAMENTAS = [
   {
@@ -187,6 +187,8 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     const consumo = { entrada: 0, saida: 0 };
     let bloqueios = 0;
     let jaPediuResumo = false;
+    let jaPediuVariar = false;
+    const nomesDaPessoa = [primeiroNome(nomeContato), primeiroNomePessoa(lead.nome)].filter(Boolean);
     let ultimoMotivo = '';
 
     for (let rodada = 0; rodada < 8; rodada++) {
@@ -284,6 +286,20 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
           content: '[AVISO INTERNO, não mencione ao lead: a resposta anterior ficou comprida demais para WhatsApp e o lead perde a paciência. Reescreva em no máximo 2 frases curtas (3 ou 4 só se for dar o preço ou explicar um mecanismo), uma técnica e uma pergunta, deixando o resto para as próximas mensagens. Mantenha todas as regras.]',
         });
         continue;
+      }
+      if (v.ok && !jaPediuVariar) {
+        // Repete o nome da pessoa, o nome do Gabriel, a abertura ou uma pergunta: pede UMA reescrita (se continuar igual, envia assim mesmo).
+        const rep = repeticaoExcessiva(texto, historico, nomesDaPessoa);
+        if (rep) {
+          jaPediuVariar = true;
+          log.warn(`[cerebro] resposta repetitiva (${rep}); pedindo outra versão.`);
+          messages.push({ role: 'assistant', content: texto });
+          messages.push({
+            role: 'user',
+            content: `[AVISO INTERNO, não mencione ao lead: a resposta anterior ficou repetitiva porque ${rep}. Reescreva mais direta e objetiva: sem chamar a pessoa pelo nome nem repetir o nome do Gabriel à toa, sem repetir ressalvas ou perguntas já feitas, no máximo UMA pergunta e só se ela mudar o próximo passo. Mantenha todas as regras.]`,
+          });
+          continue;
+        }
       }
       if (v.ok) return { mensagens: dividirMensagens(texto), acao, uso: consumo };
 

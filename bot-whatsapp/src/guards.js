@@ -156,3 +156,82 @@ export function falaDeHonorario(texto) {
 export function passagemJustificada(motivo) {
   return /liga[cç][aã]o hoje|desconto|negocia|condi[cç][aã]o|pessoa|humano|atendente|falar com (o )?gabriel|irrit|reclam|document|[aá]udio|proposta formal|decidid|contrat|fechar|dados do contrato|pediu para falar/i.test(String(motivo ?? ''));
 }
+
+// ---------------------------------------------------------------------------
+// Repetição: nome da pessoa, nome do Gabriel, abertura igual e perguntas de enchimento
+// ---------------------------------------------------------------------------
+
+const semAcento = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const palavras = (t) => semAcento(t).replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2);
+const contem = (texto, nome) => new RegExp(`(^|[^a-z0-9])${semAcento(nome).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`).test(semAcento(texto));
+const ocorrencias = (texto, nome) => (semAcento(texto).match(new RegExp(`(^|[^a-z0-9])${semAcento(nome)}([^a-z0-9]|$)`, 'g')) || []).length;
+
+// Perguntas "de enchimento": não levam a conversa a lugar nenhum e cansam o lead.
+const PERGUNTAS_DE_ENCHIMENTO = [
+  /isso combina com/i,
+  /faz sentido (pra|para) voc[êe]/i,
+  /o que (fez|te fez|levou) voc[êe] (a )?(querer|decidir|buscar|procurar)/i,
+  /o que te (levou|fez) a/i,
+  /(ficou|est[áa]) (tudo )?claro\??\s*$/i,
+  /tudo bem at[ée] aqui/i,
+  /(voc[êe] )?concorda\??\s*$/i,
+];
+
+function ultimaPergunta(texto) {
+  const frases = String(texto ?? '').split(/(?<=[.!?])\s+|\n+/).map((f) => f.trim()).filter(Boolean);
+  for (let i = frases.length - 1; i >= 0; i--) if (frases[i].endsWith('?')) return frases[i];
+  return '';
+}
+
+function parecidas(a, b) {
+  const A = new Set(palavras(a));
+  const B = new Set(palavras(b));
+  if (A.size < 3 || B.size < 3) return false;
+  let comum = 0;
+  for (const w of A) if (B.has(w)) comum += 1;
+  return comum / (A.size + B.size - comum) >= 0.55;
+}
+
+/**
+ * A resposta repete demais? Devolve o motivo (texto para o aviso interno ao modelo) ou null se está ok.
+ *  - nome da pessoa: só se não apareceu nas últimas 3 mensagens do bot (e no máximo 1 vez na resposta);
+ *  - "Gabriel": no máximo 2 vezes nas últimas 3 mensagens somadas à resposta, e 1 vez por resposta;
+ *  - abertura igual à de uma das últimas mensagens ("Isso ajuda, ...", "Tranquilo, ...");
+ *  - pergunta de enchimento ou quase igual a uma pergunta já feita.
+ * `historico` = mensagens da conversa (direcao 'lead' = pessoa; as demais são do bot ou do Gabriel).
+ */
+export function repeticaoExcessiva(texto, historico = [], nomes = []) {
+  const t = String(texto ?? '').trim();
+  if (!t) return null;
+  const doBot = historico.filter((m) => m.direcao !== 'lead').map((m) => String(m.texto || ''));
+  const ultimas = doBot.slice(-3);
+  const motivos = [];
+
+  for (const nome of [...new Set(nomes.filter(Boolean))]) {
+    if (!contem(t, nome)) continue;
+    if (ocorrencias(t, nome) > 1) motivos.push(`usa o nome "${nome}" mais de uma vez na mesma resposta`);
+    else if (ultimas.some((m) => contem(m, nome))) motivos.push(`usa o nome "${nome}" de novo, e ele já apareceu nas últimas mensagens (use o nome só de vez em quando, a cada 4 mensagens ou mais; fale direto, sem chamar pelo nome)`);
+  }
+
+  if (contem(t, 'gabriel')) {
+    const recentes = ultimas.filter((m) => contem(m, 'gabriel')).length;
+    if (ocorrencias(t, 'gabriel') > 1) motivos.push('cita "o Gabriel" mais de uma vez na mesma resposta (use "ele" ou reescreva sem o nome)');
+    else if (recentes >= 2) motivos.push('cita "o Gabriel" de novo, e o nome dele já aparece em quase todas as últimas mensagens (diga "ele", "nós", ou só a ação, sem repetir o nome)');
+  }
+
+  const inicio = palavras(t).slice(0, 2).join(' ');
+  if (inicio.split(' ').length === 2 && ultimas.some((m) => palavras(m).slice(0, 2).join(' ') === inicio)) {
+    motivos.push(`começa com as mesmas palavras de uma mensagem recente ("${t.split(/\s+/).slice(0, 2).join(' ')}...": vá direto ao ponto, sem aquele reconhecimento de abertura)`);
+  }
+
+  const pergunta = ultimaPergunta(t);
+  if (pergunta) {
+    if (PERGUNTAS_DE_ENCHIMENTO.some((r) => r.test(pergunta))) {
+      motivos.push(`faz uma pergunta de enchimento ("${pergunta.slice(0, 80)}"): pergunte só o que muda o próximo passo ou, se já entendeu a obra, proponha a conversa rápida com o Gabriel`);
+    } else if (doBot.slice(-6).some((m) => parecidas(ultimaPergunta(m), pergunta))) {
+      motivos.push(`repete uma pergunta que já foi feita ("${pergunta.slice(0, 80)}")`);
+    }
+  }
+
+  return motivos.length ? motivos.join('; ') : null;
+}
