@@ -11,7 +11,7 @@ interface LeadFormProps {
 /** Etapa 1 da calculadora — dados básicos de contato do lead. */
 export function LeadForm({ data, errors, onChange }: LeadFormProps) {
   return (
-    <CalculatorStep title="Vamos começar" description="Precisamos apenas do seu nome e WhatsApp para continuar.">
+    <CalculatorStep title="Vamos começar" description="Precisamos apenas do seu nome e WhatsApp para continuar. O retorno é rápido, pelo próprio WhatsApp.">
       <div>
         <label htmlFor="nome" className="field-label">
           Nome
