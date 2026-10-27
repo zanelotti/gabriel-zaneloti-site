@@ -304,11 +304,13 @@ export function criarStore({ url, key }) {
     },
 
     /** Atualiza o funil do CRM (só avança; nunca mexe em leads fechados ou perdidos — ver funil.js). */
-    async atualizarLead(leadId, { status, nota, motivoPerda }) {
+    async atualizarLead(leadId, { status, nota, motivoPerda, regredirDe }) {
       const atual = checar(await db.from('leads').select('*').eq('id', leadId).maybeSingle(), 'ler lead');
       if (!atual) return;
       const patch = {};
-      if (status && podeMover(atual.status, status)) {
+      // `regredirDe`: exceção controlada — permite voltar o card só se ele ainda está exatamente nessa coluna (ex.: "agendado" -> "contatado" quando o lead falta à consultoria).
+      const regride = Boolean(status && regredirDe && atual.status === regredirDe && status !== atual.status);
+      if (status && (regride || podeMover(atual.status, status))) {
         patch.status = status;
         // Só preenche o motivo da perda se o card realmente foi para "perdido", o Gabriel ainda não escolheu um
         // e a coluna já existe no banco (se ainda não rodou o SQL, o card vai para "perdido" do mesmo jeito).

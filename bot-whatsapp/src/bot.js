@@ -11,7 +11,7 @@
  *   4. Se o Gabriel responder à mão numa conversa, o bot se cala nela.
  */
 import { dentroDaJanelaAutomatica, lembreteDevido, montarFollowup, montarMensagemConsultoria, proximoFollowup } from './acompanhamento.js';
-import { citouHonorarios } from './funil.js';
+import { citouHonorarios, ehDocumentoDoLead, movimentoDaConsultoria, podeMover } from './funil.js';
 import { dividirMensagens, pediuParar, validarSaida } from './guards.js';
 import { montarAbertura } from './opening.js';
 import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, limparNomeInformado, normalizarTelefoneBR } from './util.js';
@@ -27,6 +27,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   const falhasLead = new Map();
   const falhasResposta = new Map();
   const avisosEspera = new Map(); // conversaId -> quando avisamos que o lead está esperando
+  const avisosDocumento = new Map(); // conversaId -> quando o lead mandou documento pela última vez (aviso + card)
+  const cardsFeitos = new Set(); // 'card:agendamento:status'
   const followupsFeitos = new Set(); // 'conversa:nível:última mensagem' já enviados nesta execução (trava extra contra repetição)
   const lembretesFeitos = new Set(); // 'lembrete:agendamento:tipo'
   let inicioDoBot = null;
@@ -215,6 +217,42 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   }
 
   /**
+   * Quadro do CRM x consultoria gratuita: quando a consultoria é marcada, o card vai para "Agendamento"; "Realizado" na aba Agenda
+   * leva para "Decidindo"; "Não compareceu" devolve para "Contatado" (e avisa o Gabriel). Cada mudança de situação vale uma só vez,
+   * então se o Gabriel arrastar o card à mão depois, o bot não desfaz. Funciona só para quem já tem conversa com o bot.
+   */
+  async function sincronizarCardsConsultorias() {
+    const lista = (await store.agendamentosRecentes()).sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
+    let movidos = 0;
+    for (const a of lista) {
+      if (!['agendado', 'realizado', 'nao_compareceu'].includes(a.status)) continue;
+      const chave = `card:${a.id}:${a.status}`;
+      if (cardsFeitos.has(chave)) continue;
+      const telefone = normalizarTelefoneBR(a.whatsapp);
+      if (!telefone) continue;
+      const conversa = await store.conversaPorTelefone(telefone);
+      if (!conversa) continue;
+      if (await store.lerEstado(chave)) {
+        cardsFeitos.add(chave);
+        continue;
+      }
+      const lead = await store.leadPorId(conversa.lead_id);
+      if (!lead) continue;
+      const mov = movimentoDaConsultoria(a.status, lead.status);
+      if (mov) {
+        await store.atualizarLead(lead.id, { status: mov.status, nota: mov.nota, regredirDe: mov.regredirDe });
+        movidos += 1;
+        if (mov.avisar) {
+          await notificar.avisar({ tipo: 'Lead faltou à consultoria', lead, telefone: conversa.telefone, motivo: 'O lead não compareceu à consultoria gratuita. O card voltou para "Contatado". O bot oferece remarcar.' });
+        }
+      }
+      await store.gravarEstado(chave, new Date().toISOString());
+      cardsFeitos.add(chave);
+    }
+    return movidos;
+  }
+
+  /**
    * Mensagens ligadas à consultoria gratuita (tabela agendamentos): lembrete 24h e 1h antes; pós-consultoria quando o Gabriel marca
    * "Realizado" na aba Agenda; oferta de remarcar quando marca "Não compareceu". Só para quem já tem conversa ativa com o bot.
    */
@@ -292,6 +330,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
     const conteudo = texto && texto.trim() ? texto.trim() : `[o lead enviou ${tipo}]`;
     await store.addMensagem({ conversa_id: conversa.id, direcao: 'lead', texto: conteudo, wa_id: waId });
+    if (ehDocumentoDoLead(tipo)) await tratarDocumentoDoLead(conversa, tipo);
     if (conversa.estado === 'humano') {
       await avisarLeadEsperando(conversa, conteudo);
       return;
@@ -331,11 +370,34 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
     if (tipo !== 'texto' && !(texto && texto.trim())) {
       await enviar(conversa, 'Recebi o seu arquivo, mas por aqui eu consigo ler só texto. Consegue me escrever em poucas palavras?');
-      await notificar.avisar({ tipo: 'Lead enviou mídia', lead, telefone: conversa.telefone, motivo: `O lead enviou ${tipo}, que o bot não lê. Vale olhar no seu WhatsApp.`, historico });
+      if (!ehDocumentoDoLead(tipo)) await notificar.avisar({ tipo: 'Lead enviou mídia', lead, telefone: conversa.telefone, motivo: `O lead enviou ${tipo}, que o bot não lê. Vale olhar no seu WhatsApp.`, historico });
       return;
     }
 
     agendarResposta(conversa.id, config.debounceMs);
+  }
+
+  /**
+   * O lead mandou documento ou foto: é sinal de interesse real. O card avança para "Decidindo" (só avança, nunca volta),
+   * entra uma nota e o Gabriel recebe um e-mail (no máximo um a cada 30 minutos por conversa, mesmo se mandar vários arquivos).
+   */
+  async function tratarDocumentoDoLead(conversa, tipo) {
+    const ultimo = avisosDocumento.get(conversa.id) || 0;
+    if (Date.now() - ultimo < TRINTA_MIN) return;
+    avisosDocumento.set(conversa.id, Date.now());
+    try {
+      const lead = await store.leadPorId(conversa.lead_id);
+      await store.atualizarLead(conversa.lead_id, { status: 'decidindo', nota: `Lead enviou ${tipo} pelo WhatsApp.` });
+      await notificar.avisar({
+        tipo: 'Lead enviou documento',
+        lead,
+        telefone: conversa.telefone,
+        motivo: `O lead enviou ${tipo} pelo WhatsApp (o bot não lê arquivos). O card foi para "Decidindo". Vale olhar no seu WhatsApp.`,
+        historico: await store.historico(conversa.id),
+      });
+    } catch (e) {
+      log.warn(`[bot] não consegui tratar o documento do lead: ${e.message}`);
+    }
   }
 
   // Conversa passada para o Gabriel que ele ainda não respondeu: o lead escreveu de novo e está esperando.
@@ -364,6 +426,17 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     if (conversa.estado === 'ativa') {
       await store.setEstado(conversa.id, 'humano', 'Gabriel respondeu pelo WhatsApp');
       log.info(`[bot] Gabriel assumiu a conversa ${conversa.id}; o bot se calou.`);
+    }
+    // O quadro também acompanha o que o Gabriel fala: se ele apresentou os honorários, o card vai para "Proposta enviada".
+    if (citouHonorarios(texto)) {
+      try {
+        const lead = await store.leadPorId(conversa.lead_id);
+        if (lead && podeMover(lead.status, 'proposta_enviada')) {
+          await store.atualizarLead(conversa.lead_id, { status: 'proposta_enviada', nota: 'Gabriel apresentou os honorários pelo WhatsApp.' });
+        }
+      } catch (e) {
+        log.warn(`[bot] não consegui mover o card após a mensagem do Gabriel: ${e.message}`);
+      }
     }
   }
 
@@ -581,5 +654,5 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     timers.clear();
   }
 
-  return { processarNovosLeads, marcarSemResposta, processarFollowups, processarConsultorias, aoReceber, aoHumano, responder, assumir, devolver, enviarComoGabriel, retomarPendentes, pararTimers, _dividir: dividirMensagens };
+  return { processarNovosLeads, marcarSemResposta, sincronizarCardsConsultorias, processarFollowups, processarConsultorias, aoReceber, aoHumano, responder, assumir, devolver, enviarComoGabriel, retomarPendentes, pararTimers, _dividir: dividirMensagens };
 }

@@ -87,6 +87,7 @@ async function principal() {
   }, 10 * 60 * 1000);
   // Lembretes da consultoria (24h e 1h antes), pós-consultoria e remarcação de quem faltou.
   setInterval(() => {
+    bot.sincronizarCardsConsultorias().catch((e) => log.warn(`[funil] ${e.message}`));
     bot.processarConsultorias().catch((e) => log.warn(`[consultoria] ${e.message}`));
   }, 2 * 60 * 1000);
   log.info(`Painel do CRM ligado. Assistente: ${config.assistenteNome}.${config.ativo ? '' : ' (desligado pelo painel)'}`);

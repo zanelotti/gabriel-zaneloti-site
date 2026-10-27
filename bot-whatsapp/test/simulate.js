@@ -111,10 +111,10 @@ function criarStoreMemoria() {
     async contarMensagensBot() {
       return mensagens.filter((m) => m.direcao === 'bot').length;
     },
-    async atualizarLead(id, { status, nota, motivoPerda }) {
+    async atualizarLead(id, { status, nota, motivoPerda, regredirDe }) {
       const l = leads.get(id);
       if (!l) return;
-      if (status && podeMover(l.status, status)) {
+      if (status && ((regredirDe && l.status === regredirDe && status !== l.status) || podeMover(l.status, status))) {
         l.status = status;
         if (status === 'perdido' && motivoPerda && MOTIVOS_PERDA.includes(motivoPerda) && !l.motivo_perda) l.motivo_perda = motivoPerda;
       }
@@ -2175,6 +2175,96 @@ await teste('lead comum: honorário sem ser perguntado só depois de 3 mensagens
   const c = cerebroRoteiro([texto(com)]);
   const r3 = await c.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('Qual o valor do serviço?'), ferramentas: {}, log: silencioso });
   assert.deepEqual(r3.mensagens, [com]);
+});
+
+
+await teste('cards: o que o Gabriel escreve à mão também move o quadro (honorários -> Proposta enviada), sem voltar nem repetir nota', async () => {
+  const ctx = montar();
+  const l = lead();
+  const c = await abrir(ctx, l);
+  assert.equal(ctx.store.leads.get(l.id).status, 'contatado');
+  await ctx.bot.aoHumano({ telefone: telefoneDe(c), texto: 'Oi! Podemos conversar sobre o seu caso?' });
+  assert.equal(ctx.store.leads.get(l.id).status, 'contatado', 'conversa comum não move o card');
+  await ctx.bot.aoHumano({ telefone: telefoneDe(c), texto: 'Meu honorário é de 12% sobre a economia, só paga se economizar.' });
+  assert.equal(ctx.store.leads.get(l.id).status, 'proposta_enviada');
+  const notas = ctx.store.leads.get(l.id).notas;
+  await ctx.bot.aoHumano({ telefone: telefoneDe(c), texto: 'Lembrando: o honorário é de 12%.' });
+  assert.equal(ctx.store.leads.get(l.id).notas, notas, 'não repete a nota');
+  // card que o Gabriel já arrastou para frente não volta
+  ctx.store.leads.get(l.id).status = 'decidindo';
+  await ctx.bot.aoHumano({ telefone: telefoneDe(c), texto: 'Meu honorário é de 12%.' });
+  assert.equal(ctx.store.leads.get(l.id).status, 'decidindo');
+});
+
+await teste('cards: documento ou foto do lead leva para Decidindo e avisa o Gabriel (1x/30 min); áudio não move', async () => {
+  const ctx = montar();
+  const l = lead();
+  const c = await abrir(ctx, l);
+  const antesAvisos = ctx.avisos.length;
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: '', tipo: 'áudio' });
+  ctx.bot.pararTimers();
+  assert.equal(ctx.store.leads.get(l.id).status, 'contatado', 'áudio não é documento');
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: '', tipo: 'documento' });
+  ctx.bot.pararTimers();
+  assert.equal(ctx.store.leads.get(l.id).status, 'decidindo');
+  assert.match(ctx.store.leads.get(l.id).notas, /enviou documento/);
+  const docs = ctx.avisos.filter((a) => a.tipo === 'Lead enviou documento');
+  assert.equal(docs.length, 1);
+  assert.equal(ctx.avisos.filter((a) => a.tipo === 'Lead enviou mídia').length, 1, 'só o áudio gerou o aviso de mídia (sem e-mail duplicado para documento)');
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: '', tipo: 'imagem' });
+  ctx.bot.pararTimers();
+  assert.equal(ctx.avisos.filter((a) => a.tipo === 'Lead enviou documento').length, 1, 'vários arquivos seguidos: um e-mail só');
+  assert.ok(ctx.avisos.length > antesAvisos);
+});
+
+await teste('cards: consultoria marcada -> Agendamento; Realizada -> Decidindo; faltou -> Contatado + aviso (só se o card ainda está em Agendamento)', async () => {
+  const ctx = montar();
+  const l = lead();
+  const c = await abrir(ctx, l);
+  const ag = (extra) => ({ id: 'agA', nome: 'Maria', whatsapp: '11912345678', inicio: new Date(AGORA.getTime() + 20 * 3600000).toISOString(), fim: new Date(AGORA.getTime() + 20.5 * 3600000).toISOString(), status: 'agendado', created_at: horasAtras(2), ...extra });
+  const status = () => ctx.store.leads.get(l.id).status;
+  ctx.store.agendamentos = [ag()];
+  assert.equal(await ctx.bot.sincronizarCardsConsultorias(), 1);
+  assert.equal(status(), 'agendado');
+  assert.equal(await ctx.bot.sincronizarCardsConsultorias(), 0, 'não repete');
+  // Realizada: o card volta uma coluna, para Decidindo
+  ctx.store.agendamentos = [ag({ status: 'realizado' })];
+  assert.equal(await ctx.bot.sincronizarCardsConsultorias(), 1);
+  assert.equal(status(), 'decidindo');
+  // O Gabriel arrasta o card para Proposta/Fechado: o bot não mexe mais (mesma situação já registrada)
+  ctx.store.leads.get(l.id).status = 'fechado';
+  assert.equal(await ctx.bot.sincronizarCardsConsultorias(), 0);
+  assert.equal(status(), 'fechado');
+  // Faltou: volta para Contatado + aviso, mas só se o card ainda estava em Agendamento
+  const l2 = lead({ id: 'lead-2', whatsapp: '(11) 98888-7777' });
+  const c2 = await abrir(ctx, l2);
+  ctx.store.agendamentos = [ag({ id: 'agB', whatsapp: '11988887777', status: 'agendado' })];
+  await ctx.bot.sincronizarCardsConsultorias();
+  assert.equal(ctx.store.leads.get(l2.id).status, 'agendado');
+  ctx.store.agendamentos = [ag({ id: 'agB', whatsapp: '11988887777', status: 'nao_compareceu' })];
+  assert.equal(await ctx.bot.sincronizarCardsConsultorias(), 1);
+  assert.equal(ctx.store.leads.get(l2.id).status, 'contatado');
+  assert.ok(ctx.avisos.find((a) => a.tipo === 'Lead faltou à consultoria'));
+  // Faltou, mas o Gabriel já tinha movido o card para outra coluna: respeita
+  const l3 = lead({ id: 'lead-3', whatsapp: '(11) 97777-6666' });
+  await abrir(ctx, l3);
+  ctx.store.leads.get(l3.id).status = 'proposta_enviada';
+  ctx.store.agendamentos = [ag({ id: 'agC', whatsapp: '11977776666', status: 'nao_compareceu' })];
+  assert.equal(await ctx.bot.sincronizarCardsConsultorias(), 0);
+  assert.equal(ctx.store.leads.get(l3.id).status, 'proposta_enviada');
+  // Quem o bot não conhece é ignorado
+  ctx.store.agendamentos = [ag({ id: 'agD', whatsapp: '11955554444' })];
+  assert.equal(await ctx.bot.sincronizarCardsConsultorias(), 0);
+  void c; void c2;
+});
+
+await teste('funil: movimentoDaConsultoria nunca mexe em fechado/perdido', async () => {
+  const { movimentoDaConsultoria } = await import('../src/funil.js');
+  for (const st of ['agendado', 'realizado', 'nao_compareceu']) {
+    assert.equal(movimentoDaConsultoria(st, 'fechado'), null);
+    assert.equal(movimentoDaConsultoria(st, 'perdido'), null);
+  }
+  assert.equal(movimentoDaConsultoria('cancelado', 'contatado'), null);
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

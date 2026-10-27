@@ -49,3 +49,25 @@ export function citouHonorarios(texto) {
 
 /** Motivos de perda gravados no card (o CRM mostra o nome em português; ver MOTIVO_PERDA_LABEL no site). */
 export const MOTIVOS_PERDA = ['preco', 'vai_fazer_sozinho', 'desconfianca', 'ja_resolveu', 'sem_resposta', 'sem_interesse', 'pediu_para_parar', 'outro'];
+
+/**
+ * O que acontece com o card quando a consultoria gratuita (tabela agendamentos) muda de situação.
+ * Devolve null (não mexer) ou { status, nota, regredirDe?, avisar? }.
+ *  - agendada  -> "Agendamento"
+ *  - realizada -> "Decidindo" (se o card ainda estava em "Agendamento", pode voltar uma coluna)
+ *  - faltou    -> "Contatado", só se o card ainda estava em "Agendamento" (nunca desfaz o que o Gabriel arrastou à mão) + aviso por e-mail
+ */
+export function movimentoDaConsultoria(statusConsultoria, statusCard) {
+  if (STATUS_PROTEGIDOS.includes(statusCard)) return null;
+  if (statusConsultoria === 'agendado') return { status: 'agendado', nota: 'Consultoria gratuita agendada.' };
+  if (statusConsultoria === 'realizado') return { status: 'decidindo', regredirDe: 'agendado', nota: 'Consultoria realizada.' };
+  if (statusConsultoria === 'nao_compareceu') {
+    return statusCard === 'agendado' ? { status: 'contatado', regredirDe: 'agendado', nota: 'Lead não compareceu à consultoria.', avisar: true } : null;
+  }
+  return null;
+}
+
+/** O lead mandou arquivo que o bot não lê (documento ou foto)? Vale como interesse real: o card avança para "Decidindo". */
+export function ehDocumentoDoLead(tipo) {
+  return tipo === 'documento' || tipo === 'imagem';
+}
