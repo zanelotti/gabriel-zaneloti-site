@@ -92,7 +92,8 @@ function criarStoreMemoria() {
       return row;
     },
     async conversaPorTelefone(t) {
-      return conversas.find((c) => c.telefone === t) || null;
+      // como no Supabase: se houver mais de uma conversa com o telefone, vale a mais nova
+      return [...conversas].reverse().find((c) => c.telefone === t) || null;
     },
     async conversaPorId(id) {
       return conversas.find((c) => c.id === id) || null;
@@ -2315,6 +2316,63 @@ await teste('repetição: o prompt manda usar pouco o nome, não repetir "o Gabr
   assert.match(p, /no máximo 1 vez a cada 4 mensagens/);
   assert.match(p, /Isso combina com o que você precisa/);
   assert.match(p, /depois de no máximo 2 perguntas de diagnóstico/);
+});
+
+console.log('\nLead repetido (mesmo telefone em dois leads)');
+
+await teste('lead repetido: o mesmo telefone não ganha uma segunda conversa nem uma segunda abertura', async () => {
+  const ctx = montar();
+  const a = lead({ whatsapp: '(11) 91234-5678' });
+  const ca = await abrir(ctx, a);
+  const antes = ctx.wa.enviados.length;
+  assert.ok(antes >= 1, 'controle: a primeira abertura saiu');
+  const b = lead({ whatsapp: '(11) 91234-5678' });
+  const cb = await abrir(ctx, b);
+  assert.equal(ctx.wa.enviados.length, antes, 'nada novo enviado');
+  assert.equal(cb.estado, 'encerrada');
+  assert.match(cb.telefone, /^duplicado:/, 'a linha de controle nunca é achada como a conversa do número');
+  assert.equal((await ctx.store.conversaPorTelefone(ca.telefone)).id, ca.id, 'as respostas continuam indo para a conversa verdadeira');
+  assert.match(ctx.store.leads.get(b.id).notas || '', /Telefone repetido/);
+});
+
+await teste('lead repetido: se o Gabriel já assumiu a conversa (ou a pessoa pediu para parar), o segundo lead não recebe nada', async () => {
+  for (const estado of ['humano', 'optout']) {
+    const ctx = montar();
+    const ca = await abrir(ctx, lead({ whatsapp: '(11) 91234-5678' }));
+    ca.estado = estado;
+    const antes = ctx.wa.enviados.length;
+    const cb = await abrir(ctx, lead({ whatsapp: '(11) 91234-5678' }));
+    assert.equal(ctx.wa.enviados.length, antes, `${estado}: nada enviado`);
+    assert.equal(cb.estado, 'encerrada');
+  }
+});
+
+await teste('lead repetido: conversa antiga e encerrada não impede um lead novo de ser atendido', async () => {
+  const ctx = montar();
+  const ca = await abrir(ctx, lead({ whatsapp: '(11) 91234-5678' }));
+  ca.estado = 'encerrada';
+  const antes = ctx.wa.enviados.length;
+  const cb = await abrir(ctx, lead({ whatsapp: '(11) 91234-5678' }));
+  assert.equal(cb.estado, 'ativa');
+  assert.ok(ctx.wa.enviados.length > antes);
+});
+
+await teste('acompanhamento: conversa velha duplicada (só com mensagens do bot) não manda nada quando o telefone já tem conversa mais nova', async () => {
+  // reproduz o caso real: dois leads do mesmo telefone já existiam antes do conserto; o Gabriel assumiu a conversa nova
+  const ctx = montar();
+  const velho = lead({ whatsapp: '(11) 91234-5678' });
+  const cv = await abrir(ctx, velho);
+  const novo = lead({ whatsapp: '(11) 91234-5678' });
+  ctx.store.leads.set(novo.id, novo);
+  const cn = await ctx.store.criarConversa({ lead_id: novo.id, telefone: cv.telefone, jid: cv.jid, estado: 'humano' });
+  envelhecer(ctx, 30);
+  const antes = ctx.wa.enviados.length;
+  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0);
+  assert.equal(ctx.wa.enviados.length, antes, 'nenhuma mensagem saiu');
+  assert.equal(cv.estado, 'encerrada', 'a conversa duplicada foi fechada');
+  assert.match(cv.observacao, /duplicada/);
+  assert.equal(cn.estado, 'humano', 'a conversa do Gabriel não foi mexida');
+  assert.equal((cv.followup_nivel ?? 0), 0, 'nem registrou acompanhamento');
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

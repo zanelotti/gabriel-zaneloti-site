@@ -120,6 +120,21 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     }
 
     const digitosJid = jid.split('@')[0].split(':')[0];
+
+    // Mesmo telefone que já tem conversa (a pessoa preencheu a calculadora de novo)? Não abre outra: seria falar duas vezes com o mesmo
+    // lead, e a conversa antiga continuaria mandando acompanhamento mesmo com o Gabriel já conversando.
+    const existente = await store.conversaPorTelefone(digitosJid);
+    if (existente && ['ativa', 'humano', 'optout'].includes(existente.estado)) {
+      const idadeDias = (Date.now() - Date.parse(existente.criado_em)) / 86400000;
+      if (existente.estado === 'optout' || !(idadeDias > 60)) {
+        // O "telefone" da linha de controle leva um prefixo para ela NUNCA ser achada como a conversa deste número.
+        await store.criarConversa({ lead_id: lead.id, telefone: `duplicado:${digitosJid}`, jid, estado: 'encerrada', observacao: `duplicado: este telefone já tem conversa (${existente.estado})` });
+        await store.atualizarLead(lead.id, { nota: 'Telefone repetido: este número já tem conversa com o bot, então ele não abriu outra.' });
+        log.info(`[bot] lead ${lead.id} repetido (telefone já tem conversa ${existente.estado}): não abri outra.`);
+        return;
+      }
+    }
+
     const conversa = await store.criarConversa({ lead_id: lead.id, telefone: digitosJid, jid });
     if (!conversa) return; // já criada por outra execução
 
@@ -188,6 +203,17 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       if (!nivel || followupsFeitos.has(chaveFollowup)) continue;
       const lead = await store.leadPorId(c.lead_id);
       if (!lead || ['agendado', 'fechado', 'perdido'].includes(lead.status)) continue;
+      // Mesmo telefone em outra conversa (lead repetido)? Quem manda é a conversa mais nova: se o Gabriel assumiu ou o lead já respondeu
+      // lá, esta aqui (velha, só com mensagens do bot) não pode mandar acompanhamento nenhum. Fecha esta e segue.
+      const principal = await store.conversaPorTelefone(c.telefone);
+      if (principal && principal.id !== c.id) {
+        try {
+          await store.setEstado(c.id, 'encerrada', 'duplicada: o mesmo telefone tem uma conversa mais nova');
+        } catch (e) {
+          log.warn(`[bot] não consegui fechar a conversa duplicada: ${e.message}`);
+        }
+        continue;
+      }
       if (!(await abaixoDoTeto())) {
         await avisarTeto();
         break;
