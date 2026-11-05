@@ -45,6 +45,8 @@ export type AnalyticsEventName =
   | 'faq_opened'
   | 'pdf_baixado'
   | 'guia_caminho_baixado'
+  | 'ebook_baixado'
+  | 'click_ebook'
   | 'click_agendar'
   | 'agenda_horario_escolhido'
   | 'consultoria_agendada';
@@ -192,6 +194,8 @@ export function trackEvent(name: AnalyticsEventName, payload: AnalyticsEventPayl
     window.fbq('trackCustom', name, payload);
     // Evento padrão da Meta para agendamentos (permite otimizar anúncios por ele).
     if (name === 'consultoria_agendada') window.fbq('track', 'Schedule');
+    // Evento padrão da Meta para cadastros (e-book): permite criar anúncios otimizados por Lead.
+    if (name === 'ebook_baixado') window.fbq('track', 'Lead');
   }
 
   // Alimenta o dataLayer do Tag Manager (criado pelo snippet fixo no HTML de

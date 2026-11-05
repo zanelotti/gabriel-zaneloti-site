@@ -10,10 +10,15 @@
  * Preparado para atender mais de um material ao mesmo tempo (basta acrescentar
  * uma entrada em `GUIAS`); o campo `material` é gravado junto no Supabase
  * para diferenciar de qual PDF veio cada contato.
+ *
+ * Material atual: e-book "Como reduzir o INSS da sua obra"
+ * (`public/ebook-reduzir-inss-obra.pdf`). O material antigo
+ * ('guia-caminho-regularizacao') continua na lista só para que os contatos
+ * já gravados no CRM sigam com o nome certo.
  * ============================================================================
  */
 
-export type GuiaMaterial = 'guia-caminho-regularizacao';
+export type GuiaMaterial = 'ebook-reduzir-inss-obra' | 'guia-caminho-regularizacao';
 
 export interface GuiaLeadInput {
   nome: string;
@@ -27,12 +32,23 @@ interface GuiaConfig {
   pdfDownloadName: string;
 }
 
+export const GUIA_PADRAO: GuiaMaterial = 'ebook-reduzir-inss-obra';
+
 const GUIAS: Record<GuiaMaterial, GuiaConfig> = {
+  'ebook-reduzir-inss-obra': {
+    pdfHref: '/ebook-reduzir-inss-obra.pdf',
+    pdfDownloadName: 'ebook-como-reduzir-o-inss-da-sua-obra.pdf',
+  },
   'guia-caminho-regularizacao': {
-    pdfHref: '/guia-caminho-regularizacao.pdf',
-    pdfDownloadName: 'o-caminho-da-regularizacao.pdf',
+    pdfHref: '/ebook-reduzir-inss-obra.pdf',
+    pdfDownloadName: 'ebook-como-reduzir-o-inss-da-sua-obra.pdf',
   },
 };
+
+/** Endereço e nome do arquivo do PDF — usados também pelo botão "Baixar e-book". */
+export function getGuiaDownload(material: GuiaMaterial = GUIA_PADRAO): GuiaConfig {
+  return GUIAS[material];
+}
 
 function notifyByEmail(input: GuiaLeadInput): void {
   if (typeof fetch === 'undefined') return;
@@ -60,7 +76,7 @@ function downloadGuiaPdf(material: GuiaMaterial): void {
 export const guiaLeadService = {
   /** Registra o interesse (best-effort) e dispara o download do guia. */
   capture(input: GuiaLeadInput): void {
-    const material = input.material ?? 'guia-caminho-regularizacao';
+    const material = input.material ?? GUIA_PADRAO;
     notifyByEmail({ ...input, material });
     downloadGuiaPdf(material);
   },

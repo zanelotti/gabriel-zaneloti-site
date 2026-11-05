@@ -52,6 +52,16 @@ export function Hero() {
               Agendar call gratuita
             </a>
             <p className="mt-3 text-sm text-navy-200">Prefere falar? Marque uma call com o Gabriel.</p>
+            <a
+              href="#ebook"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-accent-300 underline-offset-4 hover:underline"
+              onClick={() => trackEvent('click_ebook', { origem: 'hero' })}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+                <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" />
+              </svg>
+              Ou baixe o e-book grátis: como reduzir o INSS da obra
+            </a>
           </div>
         </div>
 

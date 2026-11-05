@@ -19,12 +19,15 @@
 
 const DEFAULT_NOTIFICATION_EMAIL = 'comercial.mfzeng@gmail.com';
 
+const MATERIAL_PADRAO = 'ebook-reduzir-inss-obra';
+
 const MATERIAIS = {
+  'ebook-reduzir-inss-obra': 'Como reduzir o INSS da sua obra',
   'guia-caminho-regularizacao': 'O caminho da regularização da sua obra',
 };
 
 function materialLabel(material) {
-  return MATERIAIS[material] || MATERIAIS['guia-caminho-regularizacao'];
+  return MATERIAIS[material] || MATERIAIS[MATERIAL_PADRAO];
 }
 
 function escapeHtml(value) {
@@ -56,7 +59,7 @@ function buildWhatsAppLink(guiaLead) {
   const nome = guiaLead.nome || '';
   const material = materialLabel(guiaLead.material);
 
-  const texto = `Oi ${nome}, tudo bem? Aqui é o Gabriel. Vi que você baixou o guia "${material}" — isso costuma ser sinal de que tem uma obra pra regularizar. Posso te ajudar a entender o seu caso? Se quiser, dá pra fazer uma simulação rápida no site e já ver uma estimativa de economia, ou posso te explicar direto por aqui como funciona.`;
+  const texto = `Oi ${nome}, tudo bem? Aqui é o Gabriel. Vi que você baixou o e-book "${material}" — isso costuma ser sinal de que tem uma obra pra regularizar. Posso te ajudar a entender o seu caso? Se quiser, me conta rapidinho sobre a obra por aqui, ou faz a simulação no site que eu te retorno com a análise.`;
 
   return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
 }
@@ -70,7 +73,7 @@ function buildRoteiroHtml() {
     <div style="margin:16px 0 0;padding:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
       <p style="margin:0 0 8px;font-weight:700;color:#1e3a8a;font-size:13px;text-transform:uppercase;letter-spacing:.03em;">📋 Roteiro rápido — próximos passos</p>
       <ul style="margin:0;padding-left:18px;color:#1e40af;font-size:13px;line-height:1.6;">
-        <li style="margin-bottom:8px;"><strong>Perguntou como funciona / quer saber mais:</strong> convide pra fazer a simulação no site (já dá uma estimativa de economia em R$) ou colete os dados da obra direto por ali; deixe claro que a análise inicial não tem custo.</li>
+        <li style="margin-bottom:8px;"><strong>Perguntou como funciona / quer saber mais:</strong> convide pra fazer a simulação no site (o resultado não aparece na tela — você retorna com a análise) ou colete os dados da obra direto por ali; deixe claro que a análise inicial não tem custo.</li>
         <li style="margin-bottom:8px;"><strong>Perguntou quanto custa:</strong> reforce que a análise inicial não tem custo — o honorário é de 12% sobre a economia comprovada, e só é definido depois de confirmada.</li>
         <li style="margin-bottom:8px;"><strong>Não respondeu em 1-2 dias:</strong> mande um segundo contato, convidando de novo pra fazer a simulação no site.</li>
         <li><strong>Disse que vai resolver por conta própria ou vai pensar:</strong> reforce, sem pressionar, que a pendência é corrigida pela Selic mês a mês e que, sem a regularização, não é possível emitir a certidão negativa (CND) necessária para vender, financiar ou dar baixa no imóvel.</li>
@@ -101,7 +104,7 @@ async function saveToSupabase(guiaLead) {
         nome: guiaLead.nome ?? null,
         email: guiaLead.email ?? null,
         whatsapp: guiaLead.whatsapp ?? null,
-        material: guiaLead.material || 'guia-caminho-regularizacao',
+        material: guiaLead.material || MATERIAL_PADRAO,
         created_at: new Date().toISOString(),
       }),
     });
@@ -144,10 +147,10 @@ async function sendEmail(guiaLead) {
         from: 'Simulador INSS de Obras <onboarding@resend.dev>',
         to: [toEmail],
         reply_to: toEmail,
-        subject: `Novo download do guia gratuito: ${guiaLead.nome || 'Visitante do site'}`,
+        subject: `Novo download do e-book gratuito: ${guiaLead.nome || 'Visitante do site'}`,
         html: `
           <div style="font-family:sans-serif;font-size:14px;color:#0f1638;max-width:600px;margin:0 auto;">
-            <p><strong>${nome}</strong> baixou o guia gratuito "${material}".</p>
+            <p><strong>${nome}</strong> baixou o e-book gratuito "${material}".</p>
             <p>E-mail: ${leadEmail}</p>
             <p>WhatsApp: ${whatsapp}</p>
             <p style="color:#7c8ab0;font-size:12px;">Este é um contato ainda sem simulação completa — considere fazer um follow-up.</p>

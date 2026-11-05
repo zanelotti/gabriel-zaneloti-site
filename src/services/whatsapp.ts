@@ -104,3 +104,10 @@ export function generateGenericWhatsAppLink(message?: string): string {
   const defaultMessage = 'Olá, Gabriel! Gostaria de saber mais sobre a redução do INSS da minha obra.';
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message ?? defaultMessage)}`;
 }
+
+/** WhatsApp para quem acabou de baixar o e-book "Como reduzir o INSS da sua obra". */
+export function generateEbookWhatsAppLink(nome?: string): string {
+  const quem = nome && nome.trim() ? ` Meu nome é ${nome.trim()}.` : '';
+  const texto = `Olá, Gabriel! Baixei o e-book "Como reduzir o INSS da sua obra" e gostaria de saber se a minha obra tem redução.${quem}`;
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(texto)}`;
+}

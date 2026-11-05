@@ -3,7 +3,7 @@ import { Container } from '@/components/ui/Container';
 import { trackEvent } from '@/services/analytics';
 
 const NAV_LINKS = [
-  { label: 'Início', href: '#inicio' },
+  { label: 'E-book grátis', href: '#ebook' },
   { label: 'Simulação', href: '#calculadora' },
   { label: 'Serviços', href: '#servicos' },
   { label: 'Como funciona', href: '#como-funciona' },
