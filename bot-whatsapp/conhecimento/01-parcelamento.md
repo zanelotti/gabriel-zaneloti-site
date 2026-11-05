@@ -10,5 +10,6 @@
 
 ## Pagamento dos honorários do Gabriel
 - O honorário é de 12% sobre a economia comprovada, sem desconto. O valor em reais de cada pessoa vem nos dados do lead (existe um valor mínimo de R$ 800 para casos de economia pequena e uma base para empresas); nunca calcule por conta própria.
-- Forma de pagamento que o Gabriel costuma oferecer: à vista, ou dividido em duas partes: 50% no início do contrato e o restante ao final do trabalho.
-- Qualquer outra divisão (mais parcelas, cartão, outras datas) quem combina é o próprio Gabriel: nesses casos, passe a conversa para ele.
+- Há duas formas de pagar o honorário (vale para o valor TODO): (1) à vista, ou dividido em duas partes: 50% no início do contrato e 50% ao final do trabalho; ou (2) no cartão de crédito, parcelado em até 6x sem juros, também sobre o valor inteiro do honorário.
+- O parcelamento em até 6x no cartão NÃO é só para "o restante": é para o honorário inteiro. Nunca diga que só o restante pode ser parcelado no cartão.
+- Qualquer outra divisão (mais parcelas, outras datas, outras condições) quem combina é o próprio Gabriel: nesses casos, passe a conversa para ele.

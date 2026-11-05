@@ -10,6 +10,7 @@ import { extrairValoresReais } from './guards.js';
 
 /** SHA-256 de versões antigas de arquivos que foram corrigidas. Se o texto no CRM ainda for IDÊNTICO a uma delas (ninguém editou), é trocado pelo novo automaticamente. */
 const VERSOES_ANTERIORES = {
+  '01-parcelamento.md': ['4a36e642e1e32da4b725f95af6137be0a95356d79caa9e253ae56d23b0b3150e'],
   '04-formas-de-reduzir.md': ['b0bd0a3827bd0556bc1d0b80307834dd21b3914e18bebe8531bec1801136ec08'],
   '06-casos-de-sucesso.md': ['c54d9bc3a5435467b0c492ee603a7d3250299f0cbddcd420e84279ca1cf6e4f4'],
 };

@@ -715,6 +715,16 @@ await teste('conhecimento vai para o prompt e a resposta sobre parcelamento sai'
   assert.equal(ctx.avisos.length, 0, 'sem e-mail quando o bot resolve sozinho');
 });
 
+await teste('forma de pagamento do honorário: 6x no cartão vale para o valor todo, não só o restante', () => {
+  const k = carregarConhecimento();
+  assert.match(k.texto, /parcelado em até 6x sem juros, também sobre o valor inteiro/);
+  assert.doesNotMatch(k.texto, /restante ao final/);
+  const s = montarSistema(lead(), config, k.texto);
+  assert.match(s, /FORMAS DE PAGAMENTO DO HONORÁRIO/);
+  assert.match(s, /50% ao final do trabalho/);
+  assert.match(s, /até 6x sem juros, sobre o valor inteiro/);
+});
+
 await teste('pergunta fora do conhecimento: o prompt manda passar para o Gabriel em vez de inventar', () => {
   const s = montarSistema(lead(), config, carregarConhecimento().texto);
   assert.match(s, /NÃO invente: use passar_para_gabriel/);
