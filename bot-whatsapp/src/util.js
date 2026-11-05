@@ -118,11 +118,30 @@ export function calcularHonorario(lead) {
     return { tipo: 'PF', economiaConhecida: false, minimoAplicado: false };
   }
   const bruto = Number(eco) * HONORARIO_PERCENTUAL;
-  // `liquido` = quanto sobra para a pessoa depois de pagar o honorário (para mostrar o valor antes do preço).
+  // Atenção: o bot NUNCA diz quanto "sobra" para a pessoa depois do honorário (a conta líquida é implícita).
   if (bruto < HONORARIO_MINIMO_PF) {
-    return { tipo: 'PF', economiaConhecida: true, valor: HONORARIO_MINIMO_PF, doze: Math.round(bruto), minimoAplicado: true, liquido: Math.round(Number(eco) - HONORARIO_MINIMO_PF) };
+    return { tipo: 'PF', economiaConhecida: true, valor: HONORARIO_MINIMO_PF, doze: Math.round(bruto), minimoAplicado: true };
   }
-  return { tipo: 'PF', economiaConhecida: true, valor: Math.round(bruto), minimoAplicado: false, liquido: Math.round(Number(eco) - Math.round(bruto)) };
+  return { tipo: 'PF', economiaConhecida: true, valor: Math.round(bruto), minimoAplicado: false };
+}
+
+/**
+ * Pergunta objetiva (sim ou não) que fecha a conversa depois do honorário. Não é pergunta aberta: a resposta
+ * esperada é "sim" (e aí o bot envia a lista de dados do contrato) ou uma objeção.
+ */
+export const PERGUNTA_FECHAMENTO = 'Posso te passar a lista de dados para o Gabriel já preparar o seu contrato?';
+
+/**
+ * Dados que o Gabriel precisa para preparar o contrato. Para mudar a lista, edite só aqui.
+ */
+export const DADOS_CONTRATO_PF = ['Nome completo', 'CPF', 'Endereço completo', 'E-mail'];
+export const DADOS_CONTRATO_PJ = ['Razão social', 'CNPJ', 'Endereço completo da empresa', 'Nome e CPF do representante que assina', 'E-mail'];
+
+/** Mensagem pronta com a lista de dados do contrato (enviada quando a pessoa aceita seguir). */
+export function mensagemDadosContrato(lead) {
+  const lista = lead?.responsavel === 'PJ' ? DADOS_CONTRATO_PJ : DADOS_CONTRATO_PF;
+  // Sem linha em branco: sai como UMA mensagem só no WhatsApp.
+  return `Perfeito! Para o Gabriel preparar o seu contrato, me envie por aqui:\n${lista.map((d) => `• ${d}`).join('\n')}\nAssim que eu receber, já encaminho para ele.`;
 }
 
 /**

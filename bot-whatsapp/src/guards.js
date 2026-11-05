@@ -33,6 +33,12 @@ const PROIBIDAS = [
   [/\b15\s?%/i, 'percentual de 15% (o honorário é 12%)'],
   [/\b(garanto|garantimos|garantido|garantida|garantia de)\b/i, 'promessa/garantia de resultado'],
   [/\b(com certeza voc[eê] vai economizar|certeza de economia)\b/i, 'certeza de economia'],
+  // A conta líquida é implícita: nunca diga quanto "sobra" ou "fica com a pessoa" depois do honorário.
+  [/\b(?:fic|sobr)[a-zçãõáéíóúâêô]*[^.!?\n]{0,40}R\$[^.!?\n]{0,30}\b(?:com voc[eê]|para voc[eê]|no (?:seu )?bolso|l[ií]quid)/i, 'valor líquido que sobra para a pessoa (a conta líquida é implícita; não diga isso)'],
+  [/R\$\s*[\d.,]+[^.!?\n]{0,30}\b(?:fic|sobr)[a-zçãõáéíóúâêô]*[^.!?\n]{0,25}\b(?:com voc[eê]|para voc[eê]|no (?:seu )?bolso)/i, 'valor líquido que sobra para a pessoa (a conta líquida é implícita; não diga isso)'],
+  [/\bno (?:seu )?bolso\b|\bvalor l[ií]quido\b|\bl[ií]quido (?:para|de) voc[eê]\b/i, 'conta líquida (a conta líquida é implícita; não diga isso)'],
+  // Fechamento tem de ser pergunta objetiva (sim/não), nunca pergunta aberta.
+  [/\b(como|de que (?:forma|maneira)|qual (?:o |seu )?(?:melhor )?caminho)\b[^.!?\n]{0,25}\b(voc[eê]|vc|prefere|gostaria|quer|deseja)\b[^.!?\n]{0,20}\b(seguir|prosseguir|avan[cç]ar|continuar|prefere)\b/i, 'pergunta aberta de fechamento (como você gostaria de seguir?); use a pergunta objetiva de sim ou não'],
 ];
 
 export const REGEX_CLT_PF = /funcion[aá]rios?\s+(registrad|com\s+carteira|contratad)|registrad[oa]s?\s+(em\s+)?(clt|na\s+carteira)|\bclt\b|carteira\s+assinada/i;
@@ -57,7 +63,6 @@ export function valoresPermitidos(lead) {
   if (h.economiaConhecida) {
     extras.push(h.valor);
     if (h.minimoAplicado) extras.push(h.doze);
-    if (h.liquido > 0) extras.push(h.liquido); // quanto sobra para a pessoa depois dos honorários
   } else {
     extras.push(HONORARIO_MINIMO_PF); // sem economia estimada: pode explicar a regra do valor mínimo (R$ 800)
   }
