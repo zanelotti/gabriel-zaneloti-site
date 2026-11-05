@@ -66,9 +66,25 @@ async function baixarJsonDoBacen() {
   throw ultimoErro;
 }
 
+/** Mês atual em Brasília, no formato "AAAA-MM". */
+export function chaveDoMesAtual(agora = new Date()) {
+  return agora.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).slice(0, 7);
+}
+
+/**
+ * A série 4390 também traz o mês EM ANDAMENTO, com o acumulado só até hoje (ex.: 0,10% no 2º dia útil do mês).
+ * Esse valor parcial NÃO pode entrar na tabela: o script nunca sobrescreve um mês já gravado, então o erro ficaria
+ * para sempre (foi o que aconteceu com 10/2026: entrou 0,10 em vez de 1,07). Um mês só é aceito se (a) já terminou
+ * e (b) a própria série já trouxe uma linha de mês posterior, o que prova que ele está fechado.
+ */
+export function apenasMesesFechados(meses, mesAtual = chaveDoMesAtual()) {
+  const maisRecente = meses.reduce((maior, item) => (item.chave > maior ? item.chave : maior), '');
+  return meses.filter((item) => item.chave < mesAtual && item.chave < maisRecente);
+}
+
 async function buscarUltimosMeses() {
   const dados = await baixarJsonDoBacen();
-  return dados
+  const meses = dados
     .map((item) => {
       const valor = Number(item.valor);
       if (!Number.isFinite(valor) || valor < 0 || valor > 10) {
@@ -80,6 +96,7 @@ async function buscarUltimosMeses() {
       return { chave: chaveDoMes(item.data), valor };
     })
     .filter((item) => /^\d{4}-\d{2}$/.test(item.chave));
+  return apenasMesesFechados(meses);
 }
 
 export function aplicarNovosMeses(conteudoAtual, novosMeses) {
