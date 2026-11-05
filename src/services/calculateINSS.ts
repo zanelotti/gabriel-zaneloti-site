@@ -4,6 +4,9 @@ import type { ResponsavelObra } from '@/types/fatorAjuste';
 import { calculateRMTIndireta } from './calculateRMTIndireta';
 import { calculateFatorAjuste } from './calculateFatorAjuste';
 
+/** Honorário mínimo (R$) do Gabriel para pessoa física: vale quando 12% da economia dá menos que isso. Mesmo valor do bot. */
+const HONORARIO_MINIMO_PF = 800;
+
 /**
  * ============================================================================
  *  MOTOR DE CÁLCULO DO SIMULADOR PÚBLICO DO SITE
@@ -137,8 +140,8 @@ export function calculateINSS(data: CalculatorData): INSSResult {
     });
 
     // Honorários (uso exclusivamente interno, no e-mail que o Gabriel recebe):
-    // 12% sobre a economia estimada, nunca mostrados ao visitante do site.
-    const honorarios = round2(fatorAjusteResult.reducao * 0.12);
+    // 12% sobre a economia estimada, com mínimo de R$ 800; nunca mostrados ao visitante do site.
+    const honorarios = round2(Math.max(HONORARIO_MINIMO_PF, fatorAjusteResult.reducao * 0.12));
     const reducaoLiquida = round2(fatorAjusteResult.reducao - honorarios);
 
     return {

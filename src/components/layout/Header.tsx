@@ -34,7 +34,7 @@ export function Header() {
   return (
     <header
       className={`sticky top-0 z-50 w-full transition-all duration-200 ${
-        isScrolled ? 'bg-white/95 shadow-soft backdrop-blur' : 'bg-white/70 backdrop-blur-sm'
+        isScrolled ? 'bg-white/95 shadow-soft xl:backdrop-blur' : 'bg-white/90 xl:bg-white/70 xl:backdrop-blur-sm'
       }`}
     >
       <Container className="flex h-20 items-center justify-between">

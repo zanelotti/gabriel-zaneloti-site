@@ -63,7 +63,7 @@ export function Destaques() {
           {DESTAQUES.map((d) => (
             <li
               key={d.id}
-              className="flex items-start gap-4 rounded-xl border border-navy-100 bg-white/95 p-5 shadow-card backdrop-blur"
+              className="flex items-start gap-4 rounded-xl border border-navy-100 bg-white p-5 shadow-card"
             >
               <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-600">
                 <Icone tipo={d.icone} />

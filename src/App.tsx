@@ -1,10 +1,11 @@
+import { lazy } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Hero } from '@/components/Hero';
 import { Destaques } from '@/components/Destaques';
 import { Numeros } from '@/components/Numeros';
 import { ExemplosMetragem } from '@/components/ExemplosMetragem';
-import { BrasilMapa } from '@/components/BrasilMapa';
+import { CarregarQuandoPerto } from '@/components/ui/CarregarQuandoPerto';
 import { HowItWorks } from '@/components/HowItWorks';
 import { Services } from '@/components/Services';
 import { Authority } from '@/components/Authority';
@@ -17,6 +18,9 @@ import { FAQ } from '@/components/FAQ';
 import { CTA } from '@/components/CTA';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
 
+// O mapa do Brasil carrega muitos dados e fica longe do topo: só é baixado quando o visitante chega perto dele.
+const BrasilMapa = lazy(() => import('@/components/BrasilMapa').then((m) => ({ default: m.BrasilMapa })));
+
 function App() {
   return (
     <div className="flex min-h-screen flex-col">
@@ -26,7 +30,9 @@ function App() {
         <Destaques />
         <Numeros />
         <ExemplosMetragem />
-        <BrasilMapa />
+        <CarregarQuandoPerto id="todo-brasil" alturaMinima="34rem">
+          <BrasilMapa />
+        </CarregarQuandoPerto>
         <HowItWorks />
         <Services />
         <Authority />

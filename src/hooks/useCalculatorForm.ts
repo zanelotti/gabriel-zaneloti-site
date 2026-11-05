@@ -10,9 +10,8 @@ interface UseCalculatorFormReturn {
   data: CalculatorData;
   step: CalculatorStepIndex;
   errors: FormErrors<CalculatorData>;
-  result: INSSResult | null;
-  /** Mensagem amigável quando não foi possível gerar a estimativa automática para os dados informados. */
-  calcError: string | null;
+  /** true depois que os dados foram enviados (o visitante vê só a confirmação — o valor calculado NÃO é mostrado). */
+  enviado: boolean;
   isSubmitting: boolean;
   updateField: <K extends keyof CalculatorData>(field: K, value: CalculatorData[K]) => void;
   goNext: () => void;
@@ -29,8 +28,7 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
   const [data, setData] = useState<CalculatorData>(INITIAL_CALCULATOR_DATA);
   const [step, setStep] = useState<CalculatorStepIndex>(1);
   const [errors, setErrors] = useState<FormErrors<CalculatorData>>({});
-  const [result, setResult] = useState<INSSResult | null>(null);
-  const [calcError, setCalcError] = useState<string | null>(null);
+  const [enviado, setEnviado] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [started, setStarted] = useState(false);
 
@@ -76,7 +74,6 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
     if (Object.keys(stepErrors).length > 0) return;
 
     setIsSubmitting(true);
-    setCalcError(null);
     // Cede o controle ao navegador por um instante antes do cálculo (síncrono e,
     // em geral, quase instantâneo) para garantir que o texto "Calculando..." do
     // botão apareça na tela antes de qualquer processamento — evita a sensação
@@ -85,16 +82,13 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
     try {
       let calcResult: INSSResult | null = null;
       try {
+        // O cálculo continua sendo feito (o CRM e o bot usam esses números),
+        // mas o valor NÃO é mostrado ao visitante.
         calcResult = calculateINSS(data);
-        setResult(calcResult);
-      } catch (err) {
-        // Datas fora da faixa suportada (ex: obra iniciada antes de jan/2021) ou combinação
-        // de dados que o motor não sabe tratar — não trava a captura do lead por isso.
-        setCalcError(
-          err instanceof Error
-            ? err.message
-            : 'Não foi possível gerar uma estimativa automática para os dados informados.'
-        );
+      } catch {
+        // Datas fora da faixa suportada ou combinação de dados que o motor não sabe tratar —
+        // não trava a captura do lead por isso (o lead segue sem estimativa automática).
+        calcResult = null;
       }
 
       await leadService.createLead({
@@ -110,6 +104,7 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
         estado: data.estado,
         tipoObra: data.tipoObra,
       });
+      setEnviado(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -119,10 +114,9 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
     setData(INITIAL_CALCULATOR_DATA);
     setStep(1);
     setErrors({});
-    setResult(null);
-    setCalcError(null);
+    setEnviado(false);
     setStarted(false);
   }, []);
 
-  return { data, step, errors, result, calcError, isSubmitting, updateField, goNext, goBack, submit, reset };
+  return { data, step, errors, enviado, isSubmitting, updateField, goNext, goBack, submit, reset };
 }

@@ -337,9 +337,9 @@ await teste('dividirMensagens limita a 3 partes', () => {
 
 await teste('todas as variantes de abertura passam nas travas e se apresentam como assistente', () => {
   const casos = [
-    lead(),
-    lead({ economia_estimada: 12000, percentual_reducao: 20 }),
-    lead({ economia_estimada: 2386, percentual_reducao: 10 }),
+    lead(), // valor alto
+    lead({ economia_estimada: 12000, percentual_reducao: 20 }), // honorário R$ 1.440: valor alto
+    lead({ economia_estimada: 8000, percentual_reducao: 10 }), // honorário R$ 960: padrão
     lead({ responsavel: 'PJ' }),
     lead({ data_inicio: '2018-02-01' }),
     lead({ inss_estimado: null, economia_estimada: null }),
@@ -353,8 +353,10 @@ await teste('todas as variantes de abertura passam nas travas e se apresentam co
     assert.doesNotMatch(a.texto, /virtual/i);
     assert.equal(validarSaida(a.texto, l).ok, true, `${a.variante}: ${validarSaida(a.texto, l).motivo}`);
     assert.doesNotMatch(a.texto, /12%|honor[aá]rio/i, 'abertura não fala de honorário');
+    assert.doesNotMatch(a.texto, /R\$/, 'abertura não cita nenhum valor em reais (o site não mostra mais o resultado)');
+    assert.doesNotMatch(a.texto, /simulou|o site mostrou|estimativa do site/i, 'a pessoa não viu resultado: não fala como se tivesse visto');
   }
-  assert.equal(variantes.size, 7);
+  assert.equal(variantes.size, 5);
 });
 
 await teste('prompt contém dados do lead, regras e política de reunião', () => {
@@ -1181,45 +1183,48 @@ await teste('conhecimento: arquivo novo na pasta é copiado uma vez; o apagado n
 
 console.log('\nHonorários');
 
-await teste('cálculo do honorário: PF 12% com piso de R$ 600; PJ R$ 1.000 + 12%', () => {
+await teste('cálculo do honorário: PF 12% com piso de R$ 800; PJ R$ 1.000 + 12%', () => {
   assert.deepEqual(calcularHonorario(lead({ economia_estimada: 42000 })), { tipo: 'PF', economiaConhecida: true, valor: 5040, minimoAplicado: false, liquido: 36960 });
   const baixo = calcularHonorario(lead({ economia_estimada: 3000 }));
-  assert.equal(baixo.valor, 600);
+  assert.equal(baixo.valor, 800);
   assert.equal(baixo.doze, 360);
   assert.equal(baixo.minimoAplicado, true);
-  assert.equal(calcularHonorario(lead({ economia_estimada: 0 })).valor, 600, 'sem economia: piso');
-  assert.equal(calcularHonorario(lead({ economia_estimada: 5000 })).minimoAplicado, false, '12% de 5.000 já é 600: sem piso');
+  assert.equal(calcularHonorario(lead({ economia_estimada: 0 })).valor, 800, 'sem economia: piso');
+  assert.equal(calcularHonorario(lead({ economia_estimada: 5000 })).minimoAplicado, true, '12% de 5.000 é 600: fica no piso de 800');
+  assert.equal(calcularHonorario(lead({ economia_estimada: 5000 })).valor, 800);
+  assert.equal(calcularHonorario(lead({ economia_estimada: 8000 })).minimoAplicado, false, '12% de 8.000 já é 960: sem piso');
+  assert.equal(calcularHonorario(lead({ economia_estimada: 8000 })).valor, 960);
   assert.equal(calcularHonorario(lead({ economia_estimada: null })).economiaConhecida, false);
   assert.deepEqual(calcularHonorario(lead({ responsavel: 'PJ' })), { tipo: 'PJ', base: 1000 });
 });
 
-await teste('PF com 12% acima de R$ 600: pode citar o honorário; não pode falar em mínimo nem em R$ 600', () => {
+await teste('PF com 12% acima de R$ 800: pode citar o honorário; não pode falar em mínimo nem em R$ 800', () => {
   const l = lead({ economia_estimada: 42000 });
   assert.equal(validarSaida('Pelo valor estimado de R$ 42.000, o honorário seria de R$ 5.040 (12%), confirmado na análise.', l).ok, true);
-  assert.equal(validarSaida('O honorário tem um valor mínimo de R$ 600.', l).ok, false);
+  assert.equal(validarSaida('O honorário tem um valor mínimo de R$ 800.', l).ok, false);
   assert.equal(validarSaida('O honorário seria de R$ 5.500.', l).ok, false, 'valor inventado');
   const sistema = montarSistema(l, config);
   assert.match(sistema, /HONORÁRIO: R\$\s5\.040/);
   assert.match(sistema, /NÃO fale em valor mínimo/);
 });
 
-await teste('PF com economia pequena: honorário fica em R$ 600 e a Lia pode explicar o piso', () => {
+await teste('PF com economia pequena: honorário fica em R$ 800 e a Lia pode explicar o piso', () => {
   const l = lead({ economia_estimada: 3000, inss_estimado: 9000, valor_apos_reducao: 6000 });
-  assert.equal(validarSaida('12% da estimativa daria R$ 360, então o honorário fica em R$ 600, que é o valor mínimo.', l).ok, true);
+  assert.equal(validarSaida('12% da estimativa daria R$ 360, então o honorário fica em R$ 800, que é o valor mínimo.', l).ok, true);
   assert.equal(validarSaida('O honorário fica em R$ 700.', l).ok, false);
-  assert.match(montarSistema(l, config), /fica em R\$\s600/);
+  assert.match(montarSistema(l, config), /fica em R\$\s800/);
 });
 
-await teste('PF sem economia estimada: pode explicar a regra dos R$ 600 sem inventar outros valores', () => {
+await teste('PF sem economia estimada: pode explicar a regra dos R$ 800 sem inventar outros valores', () => {
   const l = lead({ economia_estimada: null, inss_estimado: 50000 });
-  assert.equal(validarSaida('São 12% sobre a economia comprovada; se der menos de R$ 600, o honorário fica em R$ 600.', l).ok, true);
+  assert.equal(validarSaida('São 12% sobre a economia comprovada; se der menos de R$ 800, o honorário fica em R$ 800.', l).ok, true);
   assert.equal(validarSaida('O honorário será de R$ 6.000.', l).ok, false);
 });
 
-await teste('empresa: R$ 1.000 mais 12% da economia conseguida; nunca valor de economia nem R$ 600', () => {
+await teste('empresa: R$ 1.000 mais 12% da economia conseguida; nunca valor de economia nem R$ 800', () => {
   const l = lead({ responsavel: 'PJ', economia_estimada: null, inss_estimado: null });
   assert.equal(validarSaida('Para empresa o honorário é R$ 1.000 mais 12% sobre a economia que a gente conseguir com notas de pré-moldado e créditos de mão de obra.', l).ok, true);
-  assert.equal(validarSaida('O honorário é R$ 600.', l).ok, false);
+  assert.equal(validarSaida('O honorário é R$ 800.', l).ok, false);
   assert.equal(validarSaida('Você economiza R$ 42.000.', l).ok, false);
   assert.match(montarSistema(l, config), /HONORÁRIO \(empresa\): R\$\s1\.000 mais 12%/);
 });
@@ -1416,31 +1421,28 @@ await teste('chamada ao Claude desliga o pensamento; se a API recusar o parâmet
   assert.deepEqual(ok[0].thinking, { type: 'disabled' });
 });
 
-console.log('\nAbertura com os números do site');
+console.log('\nAbertura sem números (o site não mostra mais o resultado)');
 
-await teste('abertura traz o valor da Receita, o valor com planejamento, a economia em R$ e o percentual (pessoa física)', () => {
+await teste('abertura apresenta o valor do serviço e a obra, sem nenhum número do cálculo (pessoa física)', () => {
   const l = lead({ area_principal: 180, inss_estimado: 16760, valor_apos_reducao: 9311, economia_estimada: 7449, percentual_reducao: 44.4 });
   const a = montarAbertura(l, 'Lia');
+  assert.equal(a.variante, 'Padrão');
   assert.equal(
     a.texto.replace(/\u00a0/g, ' '),
-    'Oi, Maria, tudo bem? Aqui é Lia, assistente do Gabriel Zaneloti, especialista em regularização de INSS de obra. Vi que você simulou a obra de 180 m² aqui no site, e a estimativa do valor cobrado pela Receita Federal foi de R$ 16.760. Com nosso planejamento o INSS da obra ficaria em R$ 9.311; isso representa R$ 7.449 (cerca de 44,4%) de economia. E o saldo do INSS da obra ainda pode ser parcelado em até 60 vezes. Posso te explicar rapidinho de onde vêm esses números?', 'texto exatamente como o Gabriel pediu');
+    'Oi, Maria, tudo bem? Aqui é Lia, assistente do Gabriel Zaneloti, especialista em regularização de INSS de obra. Recebi os dados da obra de 180 m² pelo site. O Gabriel cuida de todo o processo para reduzir o INSS que a Receita cobraria da obra, do começo ao fim. E o saldo do INSS da obra ainda pode ser parcelado em até 60 vezes. Esta é uma hora ruim para eu te fazer umas perguntas rápidas sobre ela?');
   assert.equal(validarSaida(a.texto, l).ok, true, 'passa nas travas');
-  assert.doesNotMatch(a.texto, /honor[aá]rio|12%/i);
+  assert.doesNotMatch(a.texto, /honor[aá]rio|12%|R\$/i);
 });
 
-await teste('abertura calcula o percentual quando o site não trouxe e mantém o texto antigo se faltar valor', () => {
-  const sem = montarAbertura(lead({ inss_estimado: 20000, valor_apos_reducao: 10000, economia_estimada: 10000, percentual_reducao: null }), 'Lia');
-  assert.match(sem.texto, /cerca de 50%\) de economia/);
-  const faltando = montarAbertura(lead({ inss_estimado: 20000, economia_estimada: 10000, valor_apos_reducao: null }), 'Lia');
-  assert.doesNotMatch(faltando.texto, /Com nosso planejamento/);
-  assert.match(faltando.texto, /economia ficou em torno de R\$\s10\.000/);
-});
-
-await teste('a abertura nova vale para economia grande, média e pequena', () => {
-  for (const eco of [3000, 9000, 40000]) {
-    const l = lead({ inss_estimado: eco * 2, valor_apos_reducao: eco, economia_estimada: eco, percentual_reducao: 50 });
-    const a = montarAbertura(l, 'Lia');
-    assert.match(a.texto, /Com nosso planejamento o INSS da obra ficaria em/);
+await teste('abertura nunca traz valores, para economia pequena, média ou grande; a faixa só muda a variante (valor alto = acima de R$ 1.300 de honorário)', () => {
+  const esperado = { 3000: 'Padrão', 9000: 'Padrão', 10834: 'Padrão', 11000: 'Valor alto', 40000: 'Valor alto' };
+  for (const [eco, variante] of Object.entries(esperado)) {
+    const e = Number(eco);
+    const l = lead({ inss_estimado: e * 2, valor_apos_reducao: e, economia_estimada: e, percentual_reducao: 50 });
+    const a = montarAbertura(l, 'Lia', config);
+    assert.equal(a.variante, variante, `economia ${eco}`);
+    assert.doesNotMatch(a.texto, /R\$|\d+%|simulou/);
+    assert.match(a.texto, /60 vezes/);
     assert.equal(validarSaida(a.texto, l).ok, true);
   }
 });
@@ -1755,7 +1757,7 @@ await teste('regras do funil: só avança, lateral em "sem resposta", fechado e 
 await teste('citouHonorarios: palavra "honorários" junto de valor ou porcentagem', () => {
   assert.equal(citouHonorarios('Os honorários são 12% sobre a economia.'), true);
   assert.equal(citouHonorarios('Meus Honorários ficam em R$ 5.040.'), true);
-  assert.equal(citouHonorarios('Honorário mínimo de R$ 600.'), true);
+  assert.equal(citouHonorarios('Honorário mínimo de R$ 800.'), true);
   assert.equal(citouHonorarios('Você economiza 55% no INSS da obra.'), false);
   assert.equal(citouHonorarios('Os honorários só entram depois da análise.'), false);
   assert.equal(citouHonorarios(''), false);
@@ -1835,7 +1837,8 @@ await teste('modelos de acompanhamento: tempos, textos e sem valor para empresa'
   assert.equal(proximoFollowup({ nivelAtual: 2, ultimaDirecao: 'bot', ultimaEm: horasAtras(97), agora: AGORA.getTime() }), 3);
   assert.equal(proximoFollowup({ nivelAtual: 3, ultimaDirecao: 'bot', ultimaEm: horasAtras(900), agora: AGORA.getTime() }), null, 'máximo de 3');
   assert.equal(proximoFollowup({ nivelAtual: 0, ultimaDirecao: 'lead', ultimaEm: horasAtras(900), agora: AGORA.getTime() }), null, 'lead esperando resposta: não é caso de acompanhamento');
-  assert.match(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: false }), /economia de R\$\s42\.000/);
+  assert.doesNotMatch(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: false }), /R\$|o site mostrou/, 'o lead não viu números: o lembrete não cita valores');
+  assert.match(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: false }), /como funciona a redução/);
   assert.match(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: true }), /Ficou alguma dúvida/);
   assert.match(montarFollowup({ lead: pf, nivel: 2, respondeuAntes: false }), /60 vezes/);
   assert.match(montarFollowup({ lead: pf, nivel: 3, respondeuAntes: false }), /desistiu de regularizar/);
@@ -1856,7 +1859,7 @@ await teste('acompanhamento: 1 dia, 3 dias e 7 dias de silêncio; depois para', 
   assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0, 'ainda é cedo');
   envelhecer(ctx, 25);
   assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
-  assert.match(ctx.wa.enviados[enviados() - 1].texto, /economia de R\$\s42\.000/);
+  assert.match(ctx.wa.enviados[enviados() - 1].texto, /como funciona a redução/);
   assert.equal(c.followup_nivel, 1);
   envelhecer(ctx, 1);
   assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0, 'não repete');
@@ -2104,11 +2107,42 @@ await teste('lead de valor alto: o prompt manda ter cautela, não falar de honor
   assert.equal(leadValorAlto(lead({ responsavel: 'PJ' })), false);
   const alto = montarSistema(lead(), config);
   assert.match(alto, /LEAD DE VALOR ALTO/);
+  assert.match(alto, /AGENDAR A CONSULTORIA GRATUITA/);
   assert.match(alto, /NÃO fale em honorário/);
-  assert.match(alto, /2ª ou 3ª resposta ofereça uma conversa rápida/);
+  assert.match(alto, /NÃO apresente o texto dos números/);
+  assert.match(alto, /já na 2ª ou 3ª resposta/);
   assert.doesNotMatch(montarSistema(leadPequeno(), config), /LEAD DE VALOR ALTO/);
   assert.match(alto, /PERGUNTA GERAL NÃO É MOTIVO PARA PASSAR/);
   assert.doesNotMatch(alto, /sem esperar ela perguntar/);
+});
+
+await teste('valor alto = honorário ACIMA de R$ 1.300 (exatamente R$ 1.300 ainda é lead comum)', () => {
+  // 12% de 10.833 = 1.299,96 -> R$ 1.300; 12% de 10.900 = 1.308
+  assert.equal(calcularHonorario(lead({ economia_estimada: 10833 })).valor, 1300);
+  assert.equal(leadValorAlto(lead({ economia_estimada: 10833 })), false, 'R$ 1.300 não é "acima"');
+  assert.equal(leadValorAlto(lead({ economia_estimada: 10900 })), true);
+  assert.equal(leadValorAlto(lead({ economia_estimada: 3000 })), false, 'piso de R$ 800');
+  assert.equal(leadValorAlto(lead({ responsavel: 'PJ' })), false);
+  assert.equal(leadValorAlto(lead({ economia_estimada: null })), false);
+});
+
+await teste('prompt: cada faixa recebe o seu roteiro (alto agenda consultoria; comum explica os números e só no fim fala do honorário)', () => {
+  const alto = montarSistema(lead(), config);
+  assert.match(alto, /acima de R\$\s1\.300/);
+  const comum = montarSistema(leadPequeno(), config);
+  assert.match(comum, /ROTEIRO DESTE LEAD: honorário até R\$\s1\.300/);
+  assert.match(comum, /TEXTO DOS NÚMEROS/);
+  assert.match(comum, /HONORÁRIO SÓ NO FINAL/);
+  assert.doesNotMatch(comum, /LEAD DE VALOR ALTO/);
+  const pj = montarSistema(lead({ responsavel: 'PJ' }), config);
+  assert.match(pj, /não há números do cálculo para apresentar/);
+  const sem = montarSistema(lead({ economia_estimada: null, inss_estimado: null }), config);
+  assert.match(sem, /não há números do cálculo para apresentar/);
+  for (const sis of [alto, comum, pj]) {
+    assert.match(sis, /A PESSOA AINDA NÃO VIU NENHUM VALOR/);
+    assert.match(sis, /DUAS FAIXAS DE HONORÁRIO/);
+    assert.doesNotMatch(sis, /valor que o site mostrou|Economia estimada pelo site/);
+  }
 });
 
 await teste('lead de valor alto: o limite de honorário pode ser ajustado pela configuração', () => {
@@ -2164,6 +2198,20 @@ await teste('lead de valor alto: honorário que ninguém perguntou é bloqueado 
   assert.deepEqual(r2.mensagens, [resposta]);
 });
 
+await teste('lead comum: o honorário (mesmo depois de várias trocas) só sai sem ser perguntado DEPOIS do texto dos números', async () => {
+  const comHonorario = 'Os honorários são de R$ 960 (12% da economia estimada de R$ 8.000). Como você gostaria de seguir?';
+  const textoNumeros = 'Pela estimativa da calculadora, a Receita cobraria R$ 20.000 e, com a redução, ficaria em R$ 12.000, uma economia de R$ 8.000. O saldo ainda pode ser parcelado em até 60 vezes. Isso faz sentido para a sua obra?';
+  // 5 mensagens, mas os números ainda não foram explicados: o honorário é barrado e a conversa pede o texto dos números.
+  const a = cerebroRoteiro([texto(comHonorario), texto(textoNumeros)]);
+  const r = await a.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', 'b', 'c', 'd', 'e'), ferramentas: {}, log: silencioso });
+  assert.deepEqual(r.mensagens, [textoNumeros], 'o texto dos números pode sair (sem falar de honorário)');
+  assert.match(JSON.stringify(a.chamadas[1].messages.at(-1).content), /explique-os agora/);
+  // Se a pessoa pergunta o custo, o honorário sai direto.
+  const b = cerebroRoteiro([texto(comHonorario)]);
+  const r2 = await b.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', 'b', 'Quanto custa o serviço?'), ferramentas: {}, log: silencioso });
+  assert.deepEqual(r2.mensagens, [comHonorario]);
+});
+
 await teste('lead comum: honorário sem ser perguntado só depois de 3 mensagens da pessoa; se ela perguntar, sai na hora', async () => {
   const com = 'Os honorários são de R$ 960 (12% da economia estimada de R$ 8.000). Como você gostaria de seguir?';
   const ok = 'Pela estimativa da calculadora a economia é boa. Como foi a obra, teve prestadores autônomos?';
@@ -2171,7 +2219,8 @@ await teste('lead comum: honorário sem ser perguntado só depois de 3 mensagens
   const r = await a.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('Oi'), ferramentas: {}, log: silencioso });
   assert.deepEqual(r.mensagens, [ok]);
   const b = cerebroRoteiro([texto(com)]);
-  const r2 = await b.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', 'b', 'c', 'd', 'e'), ferramentas: {}, log: silencioso });
+  const explicou = 'Pela estimativa da calculadora, a Receita cobraria R$ 20.000 e com a redução ficaria em R$ 12.000, uma economia de R$ 8.000. O saldo ainda pode ser parcelado em até 60 vezes.';
+  const r2 = await b.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', explicou, 'c', 'd', 'e'), ferramentas: {}, log: silencioso });
   assert.deepEqual(r2.mensagens, [com]);
   const c = cerebroRoteiro([texto(com)]);
   const r3 = await c.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('Qual o valor do serviço?'), ferramentas: {}, log: silencioso });

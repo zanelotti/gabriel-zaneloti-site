@@ -49,7 +49,7 @@ export function extrairValoresReais(texto) {
   return valores;
 }
 
-/** Valores que o bot pode citar: somente os que o próprio site mostrou ao lead. */
+/** Valores que o bot pode citar: somente os dos dados do lead (calculados pelo sistema). */
 export function valoresPermitidos(lead) {
   const h = calcularHonorario(lead);
   if (h.tipo === 'PJ') return [h.base]; // empresa: nunca valor de economia; só a base do honorário
@@ -59,7 +59,7 @@ export function valoresPermitidos(lead) {
     if (h.minimoAplicado) extras.push(h.doze);
     if (h.liquido > 0) extras.push(h.liquido); // quanto sobra para a pessoa depois dos honorários
   } else {
-    extras.push(HONORARIO_MINIMO_PF); // sem economia estimada: pode explicar a regra de R$ 600
+    extras.push(HONORARIO_MINIMO_PF); // sem economia estimada: pode explicar a regra do valor mínimo (R$ 800)
   }
   return [lead.inss_estimado, lead.economia_estimada, lead.valor_apos_reducao, ...extras]
     .map((v) => (v === null || v === undefined ? NaN : Number(v)))
@@ -101,7 +101,7 @@ export function validarSaida(texto, lead, valoresExtras = [], { ignorarClt = fal
     if (!confere) {
       return {
         ok: false,
-        motivo: `cita o valor R$ ${v.toLocaleString('pt-BR')}, que não é um número que o site mostrou ao lead (não invente nem calcule valores)`,
+        motivo: `cita o valor R$ ${v.toLocaleString('pt-BR')}, que não está nos dados do lead (não invente nem calcule valores)`,
       };
     }
   }
@@ -141,6 +141,20 @@ export function leadPerguntouPreco(texto) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
   return /(honorari|quanto (voce|vc|ele|o gabriel|vcs|voces)?\s*(cobra|cobram|custa|fica|e que|sai)|quanto (e|eh|custa|fica|sai|seria)|\bcusto\b|\bcustos\b|\bcustar\b|\bpreco|valor do (servico|trabalho|honorario)|qual (e )?o valor|cobranca|\bcobra|\bcobram|\bpagar (pra|para) (voce|vc|ele|o gabriel)|percentual|\bporcentagem|comissao|\btaxa\b|mensalidade|\bcaro\b|\bbarato\b|desconto)/.test(t);
+}
+
+/** Pessoa física com economia estimada: tem números (INSS, redução, valor final) para o bot explicar antes de falar do honorário. */
+export function precisaExplicarNumeros(lead) {
+  const h = calcularHonorario(lead);
+  return h.tipo === 'PF' && h.economiaConhecida === true && Number(lead?.economia_estimada) > 0;
+}
+
+/** O texto cita algum dos números do cálculo do lead (INSS estimado, economia ou valor após a redução)? */
+export function citouNumerosDoCalculo(texto, lead) {
+  const alvo = [lead?.inss_estimado, lead?.economia_estimada, lead?.valor_apos_reducao]
+    .map((v) => (v === null || v === undefined || v === '' ? NaN : Number(v)))
+    .filter((v) => Number.isFinite(v) && v > 0);
+  return extrairValoresReais(texto).some((v) => alvo.some((a) => Math.abs(a - v) <= 1));
 }
 
 /** O texto do bot fala do honorário do Gabriel (valor, percentual ou "a conta com o honorário")? */

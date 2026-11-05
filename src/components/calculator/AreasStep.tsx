@@ -19,7 +19,7 @@ export function AreasStep({ data, errors, onChange }: AreasStepProps) {
   return (
     <CalculatorStep
       title="Áreas e observações"
-      description="Últimos detalhes para calcularmos sua estimativa."
+      description="Últimos detalhes para o analista entender a sua obra."
     >
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
@@ -118,7 +118,7 @@ export function AreasStep({ data, errors, onChange }: AreasStepProps) {
             >
               Política de Privacidade
             </a>{' '}
-            e autorizo o uso dos meus dados para receber a simulação e ser contatado sobre ela.
+            e autorizo o uso dos meus dados para ser contatado sobre a minha simulação.
           </span>
         </label>
         {errors.aceitaTermos && (

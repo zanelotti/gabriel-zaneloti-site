@@ -6,10 +6,11 @@
  *   - NÃO COMPARECEU (quando o Gabriel marca "Não compareceu"): oferece remarcar.
  *
  * Os textos são modelos fixos (nada é inventado pelo Claude). Os únicos números
- * usados são os que o site já mostrou ao lead, e todo texto ainda passa por
- * `validarSaida` antes de sair.
+ * usados vêm dos dados do lead e todo texto ainda passa por `validarSaida` antes de sair.
+ * O site NÃO mostra o resultado do cálculo ao lead, então os lembretes de acompanhamento não citam valores
+ * (o lead ainda pode nem ter visto os números: eles aparecem na conversa, na hora certa).
  */
-import { formatarReaisInteiros, primeiroNomePessoa } from './util.js';
+import { primeiroNomePessoa } from './util.js';
 
 const HORA = 3600 * 1000;
 const FUSO = 'America/Sao_Paulo';
@@ -41,12 +42,6 @@ function nomeDe(lead, nomeContato) {
   return nomeContato || primeiroNomePessoa(lead?.nome) || '';
 }
 
-function economiaCitavel(lead) {
-  if (lead?.responsavel === 'PJ') return null;
-  const e = Number(lead?.economia_estimada);
-  return Number.isFinite(e) && e > 0 ? formatarReaisInteiros(e) : null;
-}
-
 /**
  * @param {object} p
  * @param {object} p.lead
@@ -56,18 +51,12 @@ function economiaCitavel(lead) {
  */
 export function montarFollowup({ lead, nivel, respondeuAntes, nomeContato = '' }) {
   const oi = saudacao(nomeDe(lead, nomeContato));
-  const eco = economiaCitavel(lead);
   if (nivel === 1) {
     if (respondeuAntes) return `${oi} Ficou alguma dúvida sobre o que conversamos? Se quiser, continuo de onde paramos.`;
-    return eco
-      ? `${oi} Só passando para ver se você conseguiu ler minha mensagem sobre o INSS da sua obra. A estimativa que o site mostrou indica uma economia de ${eco}. Posso te explicar de onde vem esse número?`
-      : `${oi} Só passando para ver se você conseguiu ler minha mensagem sobre o INSS da sua obra. Posso te explicar como funciona a redução, sem compromisso?`;
+    return `${oi} Só passando para ver se você conseguiu ler minha mensagem sobre o INSS da sua obra. Posso te explicar como funciona a redução, sem compromisso?`;
   }
   if (nivel === 2) {
-    const meio = eco
-      ? `No seu caso a estimativa é de ${eco} de economia, e o saldo do INSS da obra ainda pode ser parcelado em até 60 vezes.`
-      : 'O saldo do INSS da obra ainda pode ser parcelado em até 60 vezes.';
-    return `${oi} Muita gente fica na dúvida se compensa mexer nisso. ${meio} Faz sentido a gente conversar uns minutinhos?`;
+    return `${oi} Muita gente fica na dúvida se compensa mexer nisso. O saldo do INSS da obra ainda pode ser parcelado em até 60 vezes, e a análise pode reduzir o que a Receita cobraria. Faz sentido a gente conversar uns minutinhos?`;
   }
   return `${oi} Como não tive retorno, devo entender que você desistiu de regularizar o INSS da sua obra? Se for só falta de tempo, sem problema: é só me chamar aqui que eu retomo de onde paramos.`;
 }

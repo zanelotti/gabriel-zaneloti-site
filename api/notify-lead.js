@@ -131,16 +131,6 @@ function onlyDigits(value) {
   return String(value ?? '').replace(/\D/g, '');
 }
 
-/** Formata em reais inteiros (sem centavos) — usado nas mensagens de WhatsApp, onde centavos soam robóticos. */
-function formatCurrencyRound(value) {
-  return Number(value).toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-}
-
 /** Primeiro nome com a inicial maiúscula ("maria da silva" -> "Maria"). Vazio se não houver nome. */
 function primeiroNome(nome) {
   const first = String(nome ?? '').trim().split(/\s+/)[0] || '';
@@ -148,17 +138,20 @@ function primeiroNome(nome) {
   return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
 }
 
-// Faixas usadas só para escolher o tom da primeira mensagem (não afetam nenhum cálculo).
-const ECONOMIA_GRANDE_MIN = 30000; // acima disso (ou redução >= 70%), o risco é o lead achar "bom demais"
-const REDUCAO_GRANDE_MIN = 70;
-const ECONOMIA_PEQUENA_MAX = 5000; // abaixo disso, o risco é o lead achar que não vale a pena
+// Honorário (12% da economia, mínimo R$ 800) acima do qual o lead é "de valor alto": o objetivo é agendar a consultoria com o Gabriel.
+const HONORARIO_MINIMO_PF = 800;
+const HONORARIO_ALTO = 1300;
 
 /**
  * Monta a primeira mensagem de WhatsApp para o lead (roteiro de vendas, etapa 1)
  * e as mensagens de acompanhamento, seguindo o método do livro "Negocie como se
- * sua vida dependesse disso": abertura que mostra que o caso foi visto, rótulo da
- * dúvida provável do lead, pergunta que convida ao "não" ou pergunta calibrada
- * ("O que..."), SEM falar de honorário, contrato ou promessa de resultado.
+ * sua vida dependesse disso": abertura que mostra que o caso foi visto, pergunta
+ * que convida ao "não" ou pergunta calibrada ("O que..."), SEM falar de honorário,
+ * contrato ou promessa de resultado.
+ *
+ * IMPORTANTE: o site NÃO mostra mais o resultado do cálculo ao visitante, então a
+ * abertura também NÃO cita nenhum valor (INSS, economia ou honorário): ela apresenta o
+ * valor do serviço e puxa conversa sobre a obra. Os números ficam só nesta ficha.
  *
  * Regras de conteúdo (não alterar sem alinhar com o Gabriel): nada de "só paga se
  * economizar", sem mencionar mínimo de honorário, e sem as palavras "legal",
@@ -174,8 +167,7 @@ function buildMensagemAbertura(lead) {
     : 'Oi, tudo bem? Aqui é o Gabriel Zaneloti, da regularização de INSS de obra.';
 
   const areaNum = Number(lead.areaPrincipal);
-  const obraDescricao =
-    Number.isFinite(areaNum) && areaNum > 0 ? `a obra de ${formatArea(areaNum)}` : 'a sua obra';
+  const obraDe = Number.isFinite(areaNum) && areaNum > 0 ? `da obra de ${formatArea(areaNum)}` : 'da sua obra';
 
   const economia = Number(lead.economiaEstimada);
   const temEconomia =
@@ -187,46 +179,37 @@ function buildMensagemAbertura(lead) {
   const regime = determinarRegimeApuracao(lead.dataInicio);
   const gfipAnterior = !isPJ && regime === 'gfip_anterior_2021';
   const semCalculo = !isPJ && lead.inssEstimado === null;
+  const honorario = temEconomia ? Math.max(HONORARIO_MINIMO_PF, Math.round(economia * 0.12)) : null;
+  const valorAlto = honorario !== null && honorario > HONORARIO_ALTO;
 
   let variante;
   let dica;
   let corpo;
 
   if (isPJ) {
-    // Fator de Ajuste não se aplica a PJ: o valor de economia guardado no lead
-    // NUNCA vai na mensagem. A redução vem de outras frentes (contabilidade
-    // regular, CPRB/Simples, créditos abatíveis).
     variante = 'PJ';
     dica =
-      'Pessoa Jurídica: não cite valor de economia. Rotule a dúvida e descubra se há contabilidade da obra, CNAE/Simples e créditos.';
-    corpo = `Vi que você simulou a regularização do INSS da obra da sua empresa aqui no site. Para obra feita em nome de empresa o caminho de redução é outro (contabilidade da obra, desoneração da folha, créditos abatíveis) e depende de cada empresa. Parece que o número que apareceu no site deixou dúvida sobre o que dá para reduzir. Está podendo conversar sobre a regularização da sua obra rapidinho?`;
+      'Pessoa Jurídica: não cite valor de economia. Descubra se há contabilidade da obra, CNAE/Simples e créditos.';
+    corpo = `Vi que você enviou os dados da obra da sua empresa aqui no site. Para obra feita em nome de empresa o caminho de redução é outro (contabilidade da obra, desoneração da folha, créditos abatíveis) e depende de cada empresa. Está podendo me contar rapidinho como está a obra?`;
   } else if (gfipAnterior) {
     variante = 'Obra antes de 10/2021';
     dica =
-      'Obra antiga: o lead viu só o INSS devido, sem desconto. Descubra as datas reais e as provas de época (decadência) antes de falar em número.';
-    corpo = `Vi que você simulou ${obraDescricao} aqui no site. Obra iniciada antes de 2021 tem um cálculo diferente, e podem existir pontos que mudam o valor e que o site não consegue mostrar. Parece que ficou a dúvida de quanto você realmente vai pagar. Esta é uma hora ruim para eu te explicar?`;
+      'Obra antiga: o cálculo automático só mostra o INSS devido, sem desconto. Descubra as datas reais e as provas de época (decadência) antes de falar em número.';
+    corpo = `Vi que você enviou os dados ${obraDe} aqui no site. Obra iniciada antes de 2021 tem um cálculo diferente, e podem existir pontos que mudam bastante o valor e que só aparecem numa análise. Esta é uma hora ruim para eu te perguntar sobre a obra?`;
   } else if (semCalculo) {
     variante = 'Sem estimativa automática';
     dica = 'O site não fechou estimativa. Abra com curiosidade e peça os dados que faltaram.';
-    corpo = `Vi que você simulou ${obraDescricao} aqui no site, e o cálculo automático não conseguiu fechar uma estimativa para o seu caso. Isso costuma indicar que vale olhar com cuidado. Esta é uma hora ruim para eu entender melhor a sua obra?`;
-  } else if (temEconomia && (economia >= ECONOMIA_GRANDE_MIN || Number(lead.percentualReducao) >= REDUCAO_GRANDE_MIN)) {
-    variante = 'Economia grande';
-    dica =
-      'Economia alta: o risco é o lead achar "bom demais para ser verdade". Rotule a desconfiança, explique de onde vem o número e não prometa o valor.';
-    corpo = `Vi que você simulou ${obraDescricao} aqui no site, e a estimativa de economia ficou em torno de ${formatCurrencyRound(economia)} em relação ao que a Receita cobraria sem revisão. Parece bom demais para ser verdade, né? Esta é uma hora ruim para eu te explicar de onde vem esse número?`;
-  } else if (temEconomia && economia < ECONOMIA_PEQUENA_MAX) {
-    variante = 'Economia pequena';
-    dica =
-      'Economia baixa: o risco é o lead achar que não vale a pena. Pergunte o que ele esperava e procure créditos e decadência que o site não captou.';
-    corpo = `Vi que você simulou ${obraDescricao} aqui no site, e a estimativa de economia ficou em torno de ${formatCurrencyRound(economia)}. O que você esperava ver nesse resultado?`;
-  } else if (temEconomia) {
-    variante = 'Economia média';
-    dica = 'Rotule a dúvida provável sobre o número, convide ao "não" e deixe ele escolher o ritmo.';
-    corpo = `Vi que você simulou ${obraDescricao} aqui no site, e a estimativa de economia ficou em torno de ${formatCurrencyRound(economia)} em relação ao que a Receita cobraria sem revisão. Pode ser que esse número tenha gerado dúvida. Esta é uma hora ruim para eu te explicar de onde ele vem?`;
+    corpo = `Vi que você enviou os dados ${obraDe} aqui no site, e o cálculo automático não conseguiu fechar uma estimativa para o seu caso. Isso costuma indicar que vale olhar com cuidado. Esta é uma hora ruim para eu entender melhor a sua obra?`;
+  } else if (valorAlto) {
+    variante = 'Valor alto';
+    dica = `Honorário acima de R$ ${HONORARIO_ALTO.toLocaleString('pt-BR')}: o objetivo é AGENDAR a consultoria com você. Passe confiança, não fale de preço e ofereça a conversa rápida.`;
+    corpo = `Vi que você enviou os dados ${obraDe} aqui no site, e ela merece uma olhada com cuidado. Eu cuido de todo o processo para reduzir o INSS que a Receita cobraria, e o saldo ainda pode ser parcelado em até 60 vezes. Esta é uma hora ruim para eu te fazer umas perguntas rápidas sobre a obra?`;
   } else {
     variante = 'Padrão';
-    dica = 'Sem valor de economia disponível: abra com curiosidade sobre o caso.';
-    corpo = `Vi que você simulou ${obraDescricao} aqui no site. Esta é uma hora ruim para eu te explicar como funciona a redução no seu caso?`;
+    dica = temEconomia
+      ? `Honorário até R$ ${HONORARIO_ALTO.toLocaleString('pt-BR')}: converse sobre a obra, explique os números (INSS estimado, redução e valor final) e só no final fale do honorário.`
+      : 'Sem valor de economia disponível: abra com curiosidade sobre o caso.';
+    corpo = `Vi que você enviou os dados ${obraDe} aqui no site. Eu cuido de todo o processo para reduzir o INSS que a Receita cobraria, e o saldo ainda pode ser parcelado em até 60 vezes. Esta é uma hora ruim para eu te fazer umas perguntas rápidas sobre a obra?`;
   }
 
   const nomeFollow = primeiro ? `Oi, ${primeiro}` : 'Oi';

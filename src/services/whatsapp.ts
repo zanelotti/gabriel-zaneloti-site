@@ -77,6 +77,28 @@ export function generateFallbackWhatsAppMessage(data: CalculatorData): string {
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
 }
 
+/**
+ * Mensagem da tela de confirmação do site: leva os dados da obra, mas NUNCA os
+ * valores calculados (a conversa é quem apresenta o serviço).
+ */
+export function buildConfirmacaoWhatsAppMessageText(data: CalculatorData): string {
+  return [
+    'Olá, Gabriel! Acabei de enviar os dados da minha obra pelo site e gostaria de conversar sobre a redução do INSS.',
+    '',
+    `Nome: ${data.nome || 'Não informado'}`,
+    `Início da obra: ${formatDateBR(data.dataInicio)}`,
+    `Fim da obra: ${formatDateBR(data.dataFim)}`,
+    `Responsável: ${RESPONSAVEL_LABEL[data.responsavel] ?? 'Não informado'}`,
+    `Estado: ${estadoLabel(data.estado)}`,
+    `Destinação: ${DESTINACAO_LABEL[data.destinacao] ?? 'Não informado'}`,
+    `Área principal: ${formatArea(data.areaPrincipal)}`,
+  ].join('\n');
+}
+
+export function generateConfirmacaoWhatsAppLink(data: CalculatorData): string {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(buildConfirmacaoWhatsAppMessageText(data))}`;
+}
+
 /** Gera uma URL simples de WhatsApp, sem dados de simulação — usada no botão flutuante e nos CTAs gerais. */
 export function generateGenericWhatsAppLink(message?: string): string {
   const defaultMessage = 'Olá, Gabriel! Gostaria de saber mais sobre a redução do INSS da minha obra.';

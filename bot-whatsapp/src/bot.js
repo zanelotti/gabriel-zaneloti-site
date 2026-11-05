@@ -14,7 +14,7 @@ import { dentroDaJanelaAutomatica, lembreteDevido, montarFollowup, montarMensage
 import { citouHonorarios, ehDocumentoDoLead, movimentoDaConsultoria, podeMover } from './funil.js';
 import { dividirMensagens, pediuParar, validarSaida } from './guards.js';
 import { montarAbertura } from './opening.js';
-import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, limparNomeInformado, normalizarTelefoneBR } from './util.js';
+import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, leadValorAlto, limparNomeInformado, normalizarTelefoneBR } from './util.js';
 
 const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
 const TRINTA_MIN = 30 * 60 * 1000;
@@ -63,14 +63,14 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   }
 
   /**
-   * Lead com economia alta (acima do mesmo limite da reunião): avisa o Gabriel por e-mail, uma vez por tipo de aviso,
+   * Lead de valor alto (honorário acima de R$ 1.300, o mesmo limite que faz o bot tentar agendar a consultoria): avisa o Gabriel por e-mail, uma vez por tipo de aviso,
    * para ele entrar pessoalmente (áudio de 1 minuto ou ligação) enquanto o lead está quente.
    */
   async function avisarLeadGrande(conversa, lead, tipoAviso, historico = []) {
     try {
       if (!lead || lead.responsavel === 'PJ') return;
       const eco = Number(lead.economia_estimada);
-      if (!Number.isFinite(eco) || eco < config.economiaMinParaReuniao) return;
+      if (!Number.isFinite(eco) || !leadValorAlto(lead, config)) return; // mesma régua do "valor alto": honorário acima de R$ 1.300
       const chave = `grande:${conversa.id}:${tipoAviso}`;
       if (await store.lerEstado(chave)) return;
       await store.gravarEstado(chave, new Date().toISOString());
@@ -138,7 +138,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     const conversa = await store.criarConversa({ lead_id: lead.id, telefone: digitosJid, jid });
     if (!conversa) return; // já criada por outra execução
 
-    const abertura = montarAbertura(lead, config.assistenteNome);
+    const abertura = montarAbertura(lead, config.assistenteNome, config);
     const v = validarSaida(abertura.texto, lead);
     if (!v.ok) {
       await store.setEstado(conversa.id, 'encerrada', `abertura bloqueada: ${v.motivo}`);

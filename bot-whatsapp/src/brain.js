@@ -4,7 +4,7 @@
  * passou nas travas de conteúdo (guards.js).
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, repeticaoExcessiva, validarSaida } from './guards.js';
+import { citouNumerosDoCalculo, dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, precisaExplicarNumeros, repeticaoExcessiva, validarSaida } from './guards.js';
 import { citouHonorarios } from './funil.js';
 import { formatarTrechos } from './documentos.js';
 import { formatarAprendidos } from './aprendizado.js';
@@ -168,15 +168,17 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     }
     // O parcelamento é um diferencial que a assistente precisa citar em algum momento (a abertura não fala dele).
     const parcelamentoCitado = historico.some((m) => m.direcao !== 'lead' && /parcel/i.test(m.texto || ''));
-    // Cautela com preço: o honorário só entra na conversa quando a pessoa pergunta (ou, em lead comum, depois de algumas trocas).
-    // Em lead de valor alto (honorário grande) só quando ela pergunta. Nunca o bot oferece "mostrar a conta com o honorário" por conta própria.
+    // Cautela com preço: o honorário só entra na conversa quando a pessoa pergunta (ou, em lead comum, no FINAL: depois de algumas trocas
+    // e depois de o bot ter explicado os números do cálculo). Em lead de valor alto (honorário acima de R$ 1.300) só quando ela pergunta.
+    // Nunca o bot oferece "mostrar a conta com o honorário" por conta própria.
     const msgsLead = historico.filter((m) => m.direcao === 'lead');
     const perguntouPreco = leadPerguntouPreco(msgsLead.slice(-2).map((m) => m.texto).join(' '));
     const jaFalouHonorario = historico.some((m) => m.direcao !== 'lead' && citouHonorarios(m.texto));
     const valorAlto = leadValorAlto(lead, config);
-    const precoPrematuro = (t) => falaDeHonorario(t) && !perguntouPreco && !jaFalouHonorario && (valorAlto || msgsLead.length < 3);
+    const numerosExplicados = !precisaExplicarNumeros(lead) || historico.some((m) => m.direcao !== 'lead' && citouNumerosDoCalculo(m.texto, lead));
+    const precoPrematuro = (t) => falaDeHonorario(t) && !perguntouPreco && !jaFalouHonorario && (valorAlto || msgsLead.length < 3 || !numerosExplicados);
     const MOTIVO_PRECO_CEDO =
-      'fala de honorário/preço, mas a pessoa não perguntou o custo e ainda é cedo (ou o caso é de valor alto e pede cautela). Reescreva SEM citar honorário, percentual do Gabriel nem oferecer "mostrar a conta": passe valor do serviço ligado ao caso dela, mostre confiança e, se já tiver trocado algumas mensagens, ofereça a conversa rápida com o Gabriel (sem compromisso)';
+      'fala de honorário/preço, mas a pessoa não perguntou o custo e ainda é cedo (o honorário só entra no FINAL da conversa, depois de explicar os números do cálculo; ou o caso é de valor alto e o foco é agendar a consultoria). Reescreva SEM citar honorário, percentual do Gabriel nem oferecer "mostrar a conta": se ainda não explicou os números do cálculo, explique-os agora (INSS estimado, redução e valor final, parcelamento); em caso de valor alto, passe confiança e ofereça a conversa rápida com o Gabriel (sem compromisso)';
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
     const temBusca = (documentos && documentos.total > 0) || (aprendizado && aprendizado.total > 0);
     const ferramentasApi = temBusca ? [...FERRAMENTAS, FERRAMENTA_DOCUMENTOS] : FERRAMENTAS;

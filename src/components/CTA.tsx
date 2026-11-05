@@ -11,11 +11,11 @@ export function CTA() {
         </div>
 
         <h2 className="mt-6 text-3xl font-extrabold text-white sm:text-4xl">
-          Descubra quanto você pode economizar na sua obra
+          Veja como reduzir o INSS da sua obra
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-base text-navy-200 sm:text-lg">
-          Faça uma simulação inicial gratuita e agende uma consultoria comigo para confirmar o potencial de redução
-          no INSS da sua obra — sem compromisso.
+          Faça a simulação gratuita e um analista entra em contato pelo WhatsApp para conversar sobre a sua obra — ou
+          agende uma consultoria comigo, sem compromisso.
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

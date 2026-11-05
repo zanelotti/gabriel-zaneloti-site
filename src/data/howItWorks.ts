@@ -8,7 +8,7 @@ export const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
   {
     numero: '01',
     titulo: 'Faça sua simulação',
-    descricao: 'Informe os dados básicos da sua obra na calculadora, em apenas 3 etapas rápidas.',
+    descricao: 'Informe os dados básicos da sua obra em 3 etapas rápidas. Um analista entra em contato pelo WhatsApp para conversar com você.',
   },
   {
     numero: '02',

@@ -80,7 +80,7 @@ export function GuiaCaminho() {
           </ul>
         </div>
 
-        <div className="rounded-xl2 border border-white/10 bg-white/[0.06] p-6 shadow-card backdrop-blur sm:p-8">
+        <div className="rounded-xl2 border border-white/10 bg-white/[0.06] p-6 shadow-card sm:p-8">
           {sent ? (
             <div className="text-center sm:text-left">
               <h3 className="text-lg font-bold text-white">Seu guia já está sendo baixado!</h3>

@@ -103,12 +103,12 @@ export function regimeApuracao(dataInicio) {
 
 // --- Honorários -------------------------------------------------------------
 export const HONORARIO_PERCENTUAL = 0.12;
-export const HONORARIO_MINIMO_PF = 600;
+export const HONORARIO_MINIMO_PF = 800;
 export const HONORARIO_BASE_PJ = 1000;
 
 /**
  * Honorário do Gabriel calculado em código (o modelo nunca faz essa conta):
- *  - Pessoa física: 12% da economia estimada pela calculadora; se der menos de R$ 600, fica R$ 600.
+ *  - Pessoa física: 12% da economia estimada pela calculadora; se der menos de R$ 800, fica R$ 800.
  *  - Pessoa jurídica: R$ 1.000 mais 12% sobre a economia que for conseguida (confirmada só na análise).
  */
 export function calcularHonorario(lead) {
@@ -125,14 +125,17 @@ export function calcularHonorario(lead) {
   return { tipo: 'PF', economiaConhecida: true, valor: Math.round(bruto), minimoAplicado: false, liquido: Math.round(Number(eco) - Math.round(bruto)) };
 }
 
-/** Honorário (em R$) a partir do qual o lead é tratado com cautela extra: decisão grande, a pessoa precisa de confiança antes do preço. */
-export const HONORARIO_ALTO_PADRAO = 1000;
+/**
+ * Honorário (em R$) ACIMA do qual o lead é "de valor alto": o objetivo da conversa é agendar a consultoria com o Gabriel
+ * (e o preço só entra se a pessoa perguntar). Até esse valor (inclusive), o bot explica os números e só no fim fala do honorário.
+ */
+export const HONORARIO_ALTO_PADRAO = 1300;
 
-/** Pessoa física com honorário alto (ex.: R$ 5.725 de honorário sobre R$ 47.705 de economia). Empresa não entra: a economia dela não é conhecida. */
+/** Pessoa física com honorário ACIMA de R$ 1.300 (ex.: R$ 5.725 de honorário sobre R$ 47.705 de economia). Empresa não entra: a economia dela não é conhecida. */
 export function leadValorAlto(lead, config = {}) {
   const limite = Number.isFinite(Number(config?.honorarioAlto)) && Number(config.honorarioAlto) > 0 ? Number(config.honorarioAlto) : HONORARIO_ALTO_PADRAO;
   const h = calcularHonorario(lead);
-  return h.tipo === 'PF' && h.economiaConhecida === true && Number(h.valor) >= limite;
+  return h.tipo === 'PF' && h.economiaConhecida === true && Number(h.valor) > limite;
 }
 
 /**
