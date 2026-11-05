@@ -2492,19 +2492,19 @@ const FRASES_SITE = {
   tranquilidade: 'quero deixar a minha obra em dia, sem dor de cabeça com a Receita',
   final: 'quero começar a análise gratuita da minha obra',
   flutuante: 'tenho uma dúvida sobre o INSS da minha obra',
-  rodape: 'tenho uma dúvida sobre o INSS da minha obra',
+  rodape: 'quero falar com você sobre o INSS da minha obra',
 };
-const msgSite = (cod) => `Olá, Gabriel! Vim pelo seu site e ${FRASES_SITE[cod]}.\n\n(ref: site-${cod})`;
-const msgEbook = (nome) => `Olá, Gabriel! Baixei o e-book "Como reduzir o INSS da sua obra" e gostaria de saber se a minha obra tem redução.${nome ? ` Meu nome é ${nome}.` : ''}\n\n(ref: site-ebook)`;
+const msgSite = (cod) => `Olá, Gabriel! Vim pelo seu site e ${FRASES_SITE[cod]}.`;
+const msgEbook = (nome) => `Olá, Gabriel! Baixei o e-book "Como reduzir o INSS da sua obra" e gostaria de saber se a minha obra tem redução.${nome ? ` Meu nome é ${nome}.` : ''}`;
 const TEL_SITE = '5521988887777';
 const chegou = (ctx, texto, extra = {}) => ctx.bot.aoReceber({ telefone: TEL_SITE, jid: `${TEL_SITE}@s.whatsapp.net`, texto, tipo: 'texto', waId: 'w1', ...extra });
 
-await teste('cada botão do site é reconhecido pelo código e o código sai do texto', () => {
+await teste('cada botão do site é reconhecido só pela frase (sem código na mensagem)', () => {
   for (const cod of Object.keys(FRASES_SITE)) {
     const d = detectarOrigemSite(msgSite(cod));
     assert.equal(d.origem, cod, cod);
     assert.equal(d.soModelo, true, cod);
-    assert.doesNotMatch(d.textoLimpo, /ref:/);
+    assert.doesNotMatch(d.textoLimpo, /ref:|site-/, 'a mensagem não leva código nenhum');
   }
   const e = detectarOrigemSite(msgEbook('Carlos Souza'));
   assert.equal(e.origem, 'ebook');
@@ -2512,13 +2512,16 @@ await teste('cada botão do site é reconhecido pelo código e o código sai do 
   assert.equal(e.soModelo, true);
 });
 
-await teste('se a pessoa apaga o código, a mensagem pronta ainda é reconhecida; texto qualquer não é', () => {
-  assert.equal(detectarOrigemSite('Olá, Gabriel! Vim pelo seu site e quero saber como reduzir o INSS da minha obra.').origem, 'site');
+await teste('mensagem pronta sem a frase conhecida vira origem geral; texto qualquer não é reconhecido', () => {
+  assert.equal(detectarOrigemSite('Olá, Gabriel! Vim pelo seu site e quero saber como reduzir o INSS da minha obra.').origem, 'topo');
   assert.equal(detectarOrigemSite('Olá, Gabriel! Baixei o e-book "Como reduzir o INSS da sua obra" e gostaria de saber.').origem, 'ebook');
   assert.equal(detectarOrigemSite('Oi, quanto custa o serviço?'), null);
   assert.equal(detectarOrigemSite('Olá, Gabriel! Fiz uma simulação no seu site e gostaria de analisar'), null, 'mensagem da calculadora não conta');
   assert.equal(detectarOrigemSite(`${msgSite('topo')}\nPreciso resolver até sexta, a venda está marcada.`).soModelo, false, 'ela acrescentou algo');
-  assert.equal(detectarOrigemSite('(ref: site-inventado) oi').origem, 'site', 'código desconhecido vira origem geral');
+  assert.equal(detectarOrigemSite('Olá, Gabriel! Vim pelo seu site e quero outra coisa.').origem, 'site', 'frase desconhecida vira origem geral');
+  assert.equal(detectarOrigemSite('olá gabriel! vim pelo seu site e quero SABER como reduzir o inss da minha obra').origem, 'topo', 'ignora maiúsculas e pontuação');
+  const pares = new Set(Object.keys(FRASES_SITE).map((c) => detectarOrigemSite(msgSite(c)).origem));
+  assert.equal(pares.size, 7, 'cada botão tem frase própria e é reconhecido como ele mesmo');
 });
 
 await teste('origem sai do id do lead (sem mudar o banco) e leads da calculadora não são externos', () => {
@@ -2568,6 +2571,7 @@ await teste('clique no botão: cria o lead, abre a conversa, manda a boas-vindas
   const hist = ctx.store.mensagens.filter((m) => m.conversa_id === c.id);
   assert.equal(hist[0].direcao, 'lead');
   assert.doesNotMatch(hist[0].texto, /ref:/);
+  assert.match(hist[0].texto, /^Olá, Gabriel! Vim pelo seu site e me identifiquei/);
   assert.equal(hist.filter((m) => m.direcao === 'bot').length, 2);
   assert.equal(ctx.avisos.filter((a) => a.tipo === 'Novo contato pelo WhatsApp do site').length, 1);
   ctx.bot.pararTimers();

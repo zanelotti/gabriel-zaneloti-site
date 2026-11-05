@@ -419,8 +419,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   // ---------------------------------------------------------------------------
 
   /**
-   * Primeira mensagem de alguém que ainda não tem conversa. Só reage se vier de um botão do site (mensagem pronta com o código
-   * "(ref: site-...)"): cria o lead no CRM, abre a conversa, manda a boas-vindas própria do botão e avisa o Gabriel por e-mail.
+   * Primeira mensagem de alguém que ainda não tem conversa. Só reage se vier de um botão do site (mensagem pronta "Olá, Gabriel!
+   * Vim pelo seu site e ...", cuja frase diz de qual botão veio): cria o lead no CRM, abre a conversa, manda a boas-vindas própria do botão e avisa o Gabriel por e-mail.
    * Qualquer outro número desconhecido continua sendo ignorado.
    */
   async function abrirPorSite({ telefone, jid, texto, tipo, nome, waId }) {

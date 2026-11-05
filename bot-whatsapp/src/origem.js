@@ -3,9 +3,9 @@
  * e quem baixa o e-book (tabela `guia_leads`).
  *
  * Como o bot reconhece cada situação:
- *  - Cada botão do site abre o WhatsApp com uma mensagem pronta que termina com um código, por exemplo
- *    "(ref: site-dores)". O bot lê esse código, descobre de qual botão a pessoa veio e conduz a conversa de acordo.
- *    Se a pessoa apagar o código, ainda reconhecemos o começo da mensagem ("Vim pelo seu site...").
+ *  - Cada botão do site abre o WhatsApp com uma mensagem pronta que parece escrita pela própria pessoa ("Olá, Gabriel! Vim pelo
+ *    seu site e ..."), sem nenhum código. A frase é diferente em cada botão e é por ela que o bot descobre de qual veio e conduz
+ *    a conversa de acordo (ver FRASES_ORIGEM).
  *  - Quem baixa o e-book vira um "lead" no CRM com id `ebook-<n>` (e quem manda mensagem pelo botão vira `wa-<origem>-<sufixo>`).
  *    A origem fica gravada no próprio id, então NÃO precisa mexer na estrutura do banco de dados.
  *
@@ -31,32 +31,59 @@ const ROTULO = {
 
 export const rotuloDaOrigem = (origem) => ROTULO[origem] || ROTULO.site;
 
-const REGEX_TAG = /\(\s*ref:\s*site-([a-z_]+)\s*\)/i;
+/**
+ * Frase de cada botão do site, depois de "Olá, Gabriel! Vim pelo seu site e ...". A mensagem pronta parece escrita pela própria
+ * pessoa (sem código nenhum): o bot reconhece o botão por esta frase, que é diferente em cada um.
+ * IMPORTANTE: precisam ser idênticas às de src/services/whatsapp.ts, no site (FRASE_ORIGEM).
+ */
+export const FRASES_ORIGEM = {
+  topo: 'quero saber como reduzir o INSS da minha obra',
+  beneficios: 'quero entender como funciona a regularização do INSS da minha obra',
+  dores: 'me identifiquei com uma das situações e quero falar sobre a minha obra',
+  tranquilidade: 'quero deixar a minha obra em dia, sem dor de cabeça com a Receita',
+  final: 'quero começar a análise gratuita da minha obra',
+  flutuante: 'tenho uma dúvida sobre o INSS da minha obra',
+  rodape: 'quero falar com você sobre o INSS da minha obra',
+};
+
+/** Minúsculas, sem acento, sem pontuação nas pontas e com espaços simples: deixa a comparação tolerante a pequenas diferenças. */
+const normalizar = (t) =>
+  String(t ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 /**
  * A mensagem veio de um botão do site?
  * @returns {{origem: string, textoLimpo: string, soModelo: boolean, nome: string|null} | null}
  */
 export function detectarOrigemSite(texto) {
-  const bruto = String(texto ?? '');
-  const tag = REGEX_TAG.exec(bruto);
+  const textoLimpo = String(texto ?? '').replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  const n = normalizar(textoLimpo);
+  const comeca = /^ola,? gabriel!? /.test(n);
+
   let origem = null;
-  if (tag) {
-    const cod = tag[1].toLowerCase();
-    origem = ORIGENS.includes(cod) && cod !== 'ebook_baixou' ? cod : 'site';
-  } else if (/baixei o e-?book/i.test(bruto) && /^\s*ol[aá],?\s*gabriel/i.test(bruto)) {
+  let soModelo = false;
+  let nome = null;
+
+  if (comeca && /baixei o e-?book/.test(n)) {
     origem = 'ebook';
-  } else if (/^\s*ol[aá],?\s*gabriel!?\s*vim pelo seu site/i.test(bruto)) {
+    soModelo = /^ola,? gabriel! baixei o e-?book "[^"\n]+" e gostaria de saber se a minha obra tem reducao\.( meu nome e [^.\n]+\.)?$/.test(n);
+    nome = /meu nome é ([^.\n]{2,60})\./i.exec(textoLimpo)?.[1]?.trim() || null;
+  } else if (comeca && n.includes('vim pelo seu site')) {
     origem = 'site';
+    for (const [cod, frase] of Object.entries(FRASES_ORIGEM)) {
+      if (n.includes(normalizar(frase))) {
+        origem = cod;
+        // "Só o modelo": a frase pronta exatamente como veio, sem nada acrescentado. Se a pessoa escreveu algo a mais, o assistente responde ao que ela disse.
+        soModelo = n.replace(/[.!\s]+$/, '') === normalizar(`Olá, Gabriel! Vim pelo seu site e ${frase}`);
+        break;
+      }
+    }
   }
   if (!origem) return null;
-
-  const textoLimpo = bruto.replace(REGEX_TAG, '').replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-  // "Só o modelo": a mensagem pronta do site exatamente como veio (uma frase, sem nada acrescentado). Se a pessoa escreveu algo a mais, o assistente responde ao que ela disse.
-  const soModelo =
-    /^ol[aá],?\s*gabriel!\s*vim pelo seu site e [^.\n]+\.$/i.test(textoLimpo) ||
-    /^ol[aá],?\s*gabriel!\s*baixei o e-?book\s+"[^"\n]+"\s+e gostaria de saber se a minha obra tem redução\.(\s*meu nome é [^.\n]+\.)?$/i.test(textoLimpo);
-  const nome = /meu nome é ([^.\n]{2,60})\./i.exec(textoLimpo)?.[1]?.trim() || null;
   return { origem, textoLimpo, soModelo, nome };
 }
 
