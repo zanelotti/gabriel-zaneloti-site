@@ -3,6 +3,8 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Hero } from '@/components/Hero';
 import { Destaques } from '@/components/Destaques';
+import { Dores } from '@/components/Dores';
+import { Tranquilidade } from '@/components/Tranquilidade';
 import { Numeros } from '@/components/Numeros';
 import { ExemplosMetragem } from '@/components/ExemplosMetragem';
 import { CarregarQuandoPerto } from '@/components/ui/CarregarQuandoPerto';
@@ -28,6 +30,7 @@ function App() {
       <main className="flex-1">
         <Hero />
         <Destaques />
+        <Dores />
         <Numeros />
         <ExemplosMetragem />
         <CarregarQuandoPerto id="todo-brasil" alturaMinima="34rem">
@@ -39,6 +42,7 @@ function App() {
         <About />
         <Benefits />
         <Depoimentos />
+        <Tranquilidade />
         <Agendamento />
         <GuiaCaminho />
         <FAQ />

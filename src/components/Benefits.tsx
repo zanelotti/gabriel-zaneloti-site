@@ -1,6 +1,7 @@
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { BENEFITS } from '@/data/benefits';
+import { BotaoWhatsApp } from '@/components/ui/BotaoWhatsApp';
 
 export function Benefits() {
   return (
@@ -18,6 +19,10 @@ export function Benefits() {
               <p className="mt-2 text-sm leading-relaxed text-navy-500">{benefit.descricao}</p>
             </div>
           ))}
+        </div>
+
+        <div className="mt-10 flex justify-center">
+          <BotaoWhatsApp origem="beneficios" className="w-full sm:w-auto" />
         </div>
       </Container>
     </section>

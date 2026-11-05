@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Container } from '@/components/ui/Container';
 import { Calculator } from '@/components/calculator/Calculator';
 import { trackEvent } from '@/services/analytics';
+import { BotaoWhatsApp } from '@/components/ui/BotaoWhatsApp';
 
 /** Topo do site: título + a calculadora logo de cara (a primeira coisa que o visitante vê). */
 export function Hero() {
@@ -52,6 +53,7 @@ export function Hero() {
               Agendar call gratuita
             </a>
             <p className="mt-3 text-sm text-navy-200">Prefere falar? Marque uma call com o Gabriel.</p>
+            <BotaoWhatsApp origem="hero" texto="Ou chame no WhatsApp" className="mt-3 w-full sm:w-auto" />
             <a
               href="#ebook"
               className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-accent-300 underline-offset-4 hover:underline"

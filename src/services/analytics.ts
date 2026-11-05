@@ -196,6 +196,8 @@ export function trackEvent(name: AnalyticsEventName, payload: AnalyticsEventPayl
     if (name === 'consultoria_agendada') window.fbq('track', 'Schedule');
     // Evento padrão da Meta para cadastros (e-book): permite criar anúncios otimizados por Lead.
     if (name === 'ebook_baixado') window.fbq('track', 'Lead');
+    // Clique no WhatsApp = contato iniciado (evento padrão da Meta, útil para otimizar anúncios).
+    if (name === 'whatsapp_clicked') window.fbq('track', 'Contact');
   }
 
   // Alimenta o dataLayer do Tag Manager (criado pelo snippet fixo no HTML de

@@ -1,0 +1,41 @@
+import { generateGenericWhatsAppLink } from '@/services/whatsapp';
+import { trackEvent } from '@/services/analytics';
+
+interface BotaoWhatsAppProps {
+  /** De qual parte da página o clique veio (vai para o analytics). */
+  origem: string;
+  /** Texto do botão. */
+  texto?: string;
+  /** Mensagem que já vem escrita no WhatsApp do visitante. */
+  mensagem?: string;
+  className?: string;
+}
+
+const MENSAGEM_PADRAO = 'Olá, Gabriel! Tenho interesse em reduzir e regularizar o INSS da minha obra.';
+
+/**
+ * Botão de WhatsApp com mensagem já preenchida — a pessoa só precisa apertar
+ * "enviar". Repetido em várias partes da página para o visitante nunca ficar
+ * longe de um botão de contato.
+ */
+export function BotaoWhatsApp({
+  origem,
+  texto = 'Quero reduzir o INSS da minha obra',
+  mensagem = MENSAGEM_PADRAO,
+  className = '',
+}: BotaoWhatsAppProps) {
+  return (
+    <a
+      href={generateGenericWhatsAppLink(mensagem)}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => trackEvent('whatsapp_clicked', { origem })}
+      className={`btn gap-2.5 bg-[#25D366] px-7 py-4 text-base text-white shadow-soft hover:bg-[#1fb757] hover:shadow-card active:scale-[0.98] ${className}`}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+        <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.29-1.38a9.87 9.87 0 004.7 1.2h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2zm5.8 14.06c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.11.11-1.79-.11-.41-.13-.94-.3-1.62-.6-2.85-1.23-4.71-4.1-4.85-4.29-.14-.19-1.16-1.54-1.16-2.94 0-1.4.73-2.08 1-2.37.26-.28.57-.35.76-.35.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.58.81 2 .88 2.14.07.14.12.31.02.5-.09.19-.14.31-.28.48-.14.16-.29.36-.42.48-.14.13-.28.27-.12.53.16.26.71 1.17 1.53 1.9 1.05.94 1.94 1.23 2.2 1.37.26.14.41.12.56-.07.16-.19.68-.79.86-1.06.18-.27.36-.22.6-.13.24.09 1.53.72 1.79.85.26.13.44.19.5.3.06.11.06.63-.18 1.31z" />
+      </svg>
+      {texto}
+    </a>
+  );
+}

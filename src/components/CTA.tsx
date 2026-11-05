@@ -1,5 +1,6 @@
 import { Container } from '@/components/ui/Container';
 import { RiskFreeBadge } from '@/components/ui/RiskFreeBadge';
+import { BotaoWhatsApp } from '@/components/ui/BotaoWhatsApp';
 import { trackEvent } from '@/services/analytics';
 
 export function CTA() {
@@ -33,6 +34,7 @@ export function CTA() {
           >
             Agendar consultoria gratuita
           </a>
+          <BotaoWhatsApp origem="cta_final" texto="Chamar no WhatsApp" className="w-full sm:w-auto" />
         </div>
       </Container>
     </section>
