@@ -98,6 +98,10 @@ create policy "crm altera bot_conhecimento" on public.bot_conhecimento for updat
 drop policy if exists "crm apaga bot_conhecimento" on public.bot_conhecimento;
 create policy "crm apaga bot_conhecimento" on public.bot_conhecimento for delete to authenticated using (true);
 
+-- Conversas: o CRM também pode apagar (botão "Apagar conversa"; mensagens e comandos saem junto, em cascata)
+drop policy if exists "crm apaga bot_conversas" on public.bot_conversas;
+create policy "crm apaga bot_conversas" on public.bot_conversas for delete to authenticated using (true);
+
 -- Comandos: o CRM cria e lê; quem executa é o bot
 drop policy if exists "crm le bot_comandos" on public.bot_comandos;
 create policy "crm le bot_comandos" on public.bot_comandos for select to authenticated using (true);

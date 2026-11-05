@@ -426,8 +426,14 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   async function abrirPorSite({ telefone, jid, texto, tipo, nome, waId }) {
     if (tipo !== 'texto') return;
     const det = detectarOrigemSite(texto);
-    if (!det) return;
-    if (foraDaListaTeste(telefone)) return;
+    if (!det) {
+      log.info(`[bot] mensagem de ${telefone} ignorada: esse número não tem conversa e a mensagem não é a mensagem pronta de um botão do site.`);
+      return;
+    }
+    if (foraDaListaTeste(telefone)) {
+      log.warn(`[bot] mensagem do botão do site de ${telefone} ignorada: o bot está em MODO DE TESTE (LISTA_TESTE no arquivo .env) e esse número não está na lista.`);
+      return;
+    }
     if (!(await abaixoDoTeto())) {
       await avisarTeto();
       return;
@@ -485,7 +491,9 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   }
 
   async function aoReceber({ telefone, texto, tipo = 'texto', waId = null, jid = null, nome = null }) {
-    const conversa = await store.conversaPorTelefone(telefone);
+    let conversa = await store.conversaPorTelefone(telefone);
+    // Conversa antiga já encerrada (ex.: teste anterior) e a pessoa voltou pelo botão do site: abre uma conversa nova.
+    if (conversa && conversa.estado === 'encerrada' && tipo === 'texto' && detectarOrigemSite(texto)) conversa = null;
     if (!conversa) {
       // Só reage a quem veio de um botão do site; qualquer outro número desconhecido é ignorado (o bot nunca puxa assunto sozinho).
       if (abrindoPorSite.has(telefone)) {
@@ -507,7 +515,10 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       await avisarLeadEsperando(conversa, conteudo);
       return;
     }
-    if (conversa.estado !== 'ativa') return;
+    if (conversa.estado !== 'ativa') {
+      log.info(`[bot] mensagem de ${telefone} guardada, mas não respondida: a conversa está "${conversa.estado}".`);
+      return;
+    }
 
     const lead = await store.leadPorId(conversa.lead_id);
     const historico = await store.historico(conversa.id);

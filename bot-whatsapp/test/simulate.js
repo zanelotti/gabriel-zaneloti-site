@@ -2773,4 +2773,30 @@ await teste('quem clicou no botão e pede para parar vira "Perdido" com o motivo
   assert.equal(c.estado, 'optout');
 });
 
+await teste('número que já teve conversa encerrada e volta pelo botão do site: abre conversa nova e responde', async () => {
+  const ctx = montar();
+  const antigo = lead({ whatsapp: '(21) 98888-7777' });
+  const c0 = await abrir(ctx, antigo);
+  await ctx.store.setEstado(c0.id, 'encerrada', 'teste antigo');
+  const antes = ctx.wa.enviados.length;
+  await chegou(ctx, msgSite('topo'));
+  assert.equal(ctx.store.conversas.length, 2);
+  assert.equal(ctx.store.conversas[1].estado, 'ativa');
+  assert.equal(ctx.wa.enviados.length, antes + 2, 'boas-vindas enviada');
+  ctx.bot.pararTimers();
+});
+
+await teste('conversa parada com o Gabriel (humano) ou que pediu para parar continua sem resposta', async () => {
+  for (const estado of ['humano', 'optout']) {
+    const ctx = montar();
+    const antigo = lead({ whatsapp: '(21) 98888-7777' });
+    const c0 = await abrir(ctx, antigo);
+    await ctx.store.setEstado(c0.id, estado);
+    const antes = ctx.wa.enviados.length;
+    await chegou(ctx, msgSite('topo'));
+    assert.equal(ctx.wa.enviados.length, antes, estado);
+    assert.equal(ctx.store.conversas.length, 1, estado);
+  }
+});
+
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

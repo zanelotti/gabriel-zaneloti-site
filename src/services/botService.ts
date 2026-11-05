@@ -262,6 +262,19 @@ export const botService = {
     }));
   },
 
+  /**
+   * Apaga a conversa e, junto, todas as mensagens, comandos e o consumo dela (o banco apaga em cascata).
+   * Se o Supabase não apagou nada, é porque falta liberar a exclusão (rodar o supabase_bot_painel.sql de novo).
+   */
+  async deleteConversa(id: string): Promise<void> {
+    const client = requireClient();
+    const { data, error } = await client.from('bot_conversas').delete().eq('id', id).select('id');
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('Não consegui apagar. Rode o arquivo supabase_bot_painel.sql de novo no Supabase (SQL Editor) e tente outra vez.');
+    }
+  },
+
   async listMensagens(conversaId: string): Promise<BotMensagem[]> {
     const client = requireClient();
     const { data, error } = await client

@@ -6,6 +6,7 @@ import {
   type BotMensagem,
   type BotMensagemResumo,
 } from '@/services/botService';
+import { crmLeadService } from '@/services/crmService';
 import type { Lead } from '@/types/lead';
 import { maskWhatsApp } from '@/utils/formatters';
 import { estaEmEspera } from './metricas';
@@ -127,7 +128,14 @@ export function BotConversasView({ leads, conversas, resumo, onChange }: BotConv
 
       <section className="rounded-xl2 border border-navy-100 bg-white shadow-soft">
         {selecionada ? (
-          <ConversaChat key={selecionada.id} conversa={selecionada} nome={nomeDe(selecionada)} onChange={onChange} />
+          <ConversaChat
+            key={selecionada.id}
+            conversa={selecionada}
+            lead={leads.find((l) => l.id === selecionada.leadId) ?? null}
+            nome={nomeDe(selecionada)}
+            onChange={onChange}
+            onApagada={() => setSelecionadaId(null)}
+          />
         ) : (
           <p className="p-10 text-center text-sm text-navy-400">Escolha uma conversa na lista para ver as mensagens.</p>
         )}
@@ -138,12 +146,17 @@ export function BotConversasView({ leads, conversas, resumo, onChange }: BotConv
 
 interface ConversaChatProps {
   conversa: BotConversa;
+  lead: Lead | null;
   nome: string;
   onChange: () => Promise<void>;
+  onApagada: () => void;
 }
 
-function ConversaChat({ conversa, nome, onChange }: ConversaChatProps) {
+function ConversaChat({ conversa, lead, nome, onChange, onApagada }: ConversaChatProps) {
   const [mensagens, setMensagens] = useState<BotMensagem[]>([]);
+  const [confirmandoApagar, setConfirmandoApagar] = useState(false);
+  const [apagarCard, setApagarCard] = useState(false);
+  const [apagando, setApagando] = useState(false);
   const [texto, setTexto] = useState('');
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -207,6 +220,27 @@ function ConversaChat({ conversa, nome, onChange }: ConversaChatProps) {
     }
   };
 
+  const apagar = async () => {
+    setApagando(true);
+    setAviso(null);
+    try {
+      await botService.deleteConversa(conversa.id);
+      if (lead) {
+        if (apagarCard) {
+          await crmLeadService.deleteLead(lead.id);
+        } else if (lead.status === 'novo') {
+          // Sem isto, o bot veria um card "novo" sem conversa e voltaria a chamar a pessoa quando for reiniciado.
+          await crmLeadService.updateStatus(lead.id, 'contatado');
+        }
+      }
+      await onChange();
+      onApagada();
+    } catch (err) {
+      setAviso({ tipo: 'erro', texto: err instanceof Error ? err.message : 'Falha ao apagar a conversa.' });
+      setApagando(false);
+    }
+  };
+
   const r = rotuloEstado(conversa);
   const podeEnviar = conversa.estado !== 'optout';
   const comBot = conversa.estado === 'ativa';
@@ -233,7 +267,45 @@ function ConversaChat({ conversa, nome, onChange }: ConversaChatProps) {
               </button>
             )
           )}
+          <button
+            onClick={() => setConfirmandoApagar((v) => !v)}
+            disabled={enviando || apagando}
+            className="rounded-full border-2 border-red-300 px-4 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+          >
+            Apagar conversa
+          </button>
         </div>
+        {confirmandoApagar && (
+          <div className="w-full rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <p className="font-semibold">Apagar toda a conversa com {nome}?</p>
+            <p className="mt-1 text-xs">
+              As mensagens somem do CRM e não dá para desfazer. O WhatsApp do lead não é afetado. Depois disso o bot trata esse número como
+              desconhecido: se a pessoa clicar de novo num botão do site, começa uma conversa nova.
+            </p>
+            {lead && (
+              <label className="mt-2 flex items-center gap-2 text-xs font-medium">
+                <input type="checkbox" checked={apagarCard} onChange={(e) => setApagarCard(e.target.checked)} />
+                Apagar também o card do lead no CRM
+              </label>
+            )}
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => void apagar()}
+                disabled={apagando}
+                className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {apagando ? 'Apagando…' : 'Sim, apagar'}
+              </button>
+              <button
+                onClick={() => setConfirmandoApagar(false)}
+                disabled={apagando}
+                className="rounded-full border border-navy-300 px-4 py-1.5 text-xs font-semibold text-navy-700 hover:bg-white disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       <div className="flex-1 space-y-2 overflow-y-auto bg-navy-50/60 px-5 py-4">
