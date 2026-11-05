@@ -82,7 +82,7 @@ export function criarWhatsApp({ pastaAuth = 'auth', log = console, modoTeste = f
     }
 
     if (key.fromMe) await aoHumano({ telefone, texto, waId: key.id });
-    else await aoReceber({ telefone, jid, texto, tipo, waId: key.id });
+    else await aoReceber({ telefone, jid, texto, tipo, waId: key.id, nome: m.pushName || null });
   }
 
   async function iniciar() {

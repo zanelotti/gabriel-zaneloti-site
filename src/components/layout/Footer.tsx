@@ -1,5 +1,5 @@
 import { Container } from '@/components/ui/Container';
-import { WHATSAPP_NUMBER_DISPLAY } from '@/services/whatsapp';
+import { WHATSAPP_NUMBER_DISPLAY, generateOrigemWhatsAppLink } from '@/services/whatsapp';
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -27,7 +27,7 @@ export function Footer() {
             <p className="mt-1 text-sm">
               WhatsApp:{' '}
               <a
-                href={`https://wa.me/5521985213949`}
+                href={generateOrigemWhatsAppLink('rodape')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent-400"

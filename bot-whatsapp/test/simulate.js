@@ -18,6 +18,7 @@ import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel
 import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAprendizado } from '../src/aprendizado.js';
 import { citouHonorarios, MOTIVOS_PERDA, podeMover } from '../src/funil.js';
 import { descreverQuando, lembreteDevido, montarFollowup, montarMensagemConsultoria, proximoFollowup } from '../src/acompanhamento.js';
+import { detectarOrigemSite, ehLeadExterno, montarBoasVindas, ORIGENS, origemDoLead } from '../src/origem.js';
 import { calcularHonorario, criarChamador, leadValorAlto, limparNomeInformado, mensagemDadosContrato, nomeParecePessoa, PERGUNTA_FECHAMENTO, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
 
 let passou = 0;
@@ -81,6 +82,22 @@ function criarStoreMemoria() {
     },
     async leadPorId(id) {
       return leads.get(id) || null;
+    },
+    guias: [],
+    async criarLeadExterno(l) {
+      if (leads.has(l.id)) return null;
+      const row = { notas: null, created_at: new Date().toISOString(), ...l };
+      leads.set(l.id, row);
+      return row;
+    },
+    async ebooksNovos() {
+      return this.guias;
+    },
+    async religarConversa(conversaId, leadId) {
+      conversas.find((c) => c.id === conversaId).lead_id = leadId;
+    },
+    async apagarLead(id) {
+      leads.delete(id);
     },
     async conversaPorLead(id) {
       return conversas.find((c) => c.lead_id === id) || null;
@@ -2462,6 +2479,294 @@ await teste('acompanhamento: conversa velha duplicada (só com mensagens do bot)
   assert.match(cv.observacao, /duplicada/);
   assert.equal(cn.estado, 'humano', 'a conversa do Gabriel não foi mexida');
   assert.equal((cv.followup_nivel ?? 0), 0, 'nem registrou acompanhamento');
+});
+
+
+console.log('\nContatos pelo WhatsApp do site e e-book');
+
+// Mesmas mensagens que os botões do site abrem (src/services/whatsappOrigens.ts).
+const FRASES_SITE = {
+  topo: 'quero saber como reduzir o INSS da minha obra',
+  beneficios: 'quero entender como funciona a regularização do INSS da minha obra',
+  dores: 'me identifiquei com uma das situações e quero falar sobre a minha obra',
+  tranquilidade: 'quero deixar a minha obra em dia, sem dor de cabeça com a Receita',
+  final: 'quero começar a análise gratuita da minha obra',
+  flutuante: 'tenho uma dúvida sobre o INSS da minha obra',
+  rodape: 'tenho uma dúvida sobre o INSS da minha obra',
+};
+const msgSite = (cod) => `Olá, Gabriel! Vim pelo seu site e ${FRASES_SITE[cod]}.\n\n(ref: site-${cod})`;
+const msgEbook = (nome) => `Olá, Gabriel! Baixei o e-book "Como reduzir o INSS da sua obra" e gostaria de saber se a minha obra tem redução.${nome ? ` Meu nome é ${nome}.` : ''}\n\n(ref: site-ebook)`;
+const TEL_SITE = '5521988887777';
+const chegou = (ctx, texto, extra = {}) => ctx.bot.aoReceber({ telefone: TEL_SITE, jid: `${TEL_SITE}@s.whatsapp.net`, texto, tipo: 'texto', waId: 'w1', ...extra });
+
+await teste('cada botão do site é reconhecido pelo código e o código sai do texto', () => {
+  for (const cod of Object.keys(FRASES_SITE)) {
+    const d = detectarOrigemSite(msgSite(cod));
+    assert.equal(d.origem, cod, cod);
+    assert.equal(d.soModelo, true, cod);
+    assert.doesNotMatch(d.textoLimpo, /ref:/);
+  }
+  const e = detectarOrigemSite(msgEbook('Carlos Souza'));
+  assert.equal(e.origem, 'ebook');
+  assert.equal(e.nome, 'Carlos Souza');
+  assert.equal(e.soModelo, true);
+});
+
+await teste('se a pessoa apaga o código, a mensagem pronta ainda é reconhecida; texto qualquer não é', () => {
+  assert.equal(detectarOrigemSite('Olá, Gabriel! Vim pelo seu site e quero saber como reduzir o INSS da minha obra.').origem, 'site');
+  assert.equal(detectarOrigemSite('Olá, Gabriel! Baixei o e-book "Como reduzir o INSS da sua obra" e gostaria de saber.').origem, 'ebook');
+  assert.equal(detectarOrigemSite('Oi, quanto custa o serviço?'), null);
+  assert.equal(detectarOrigemSite('Olá, Gabriel! Fiz uma simulação no seu site e gostaria de analisar'), null, 'mensagem da calculadora não conta');
+  assert.equal(detectarOrigemSite(`${msgSite('topo')}\nPreciso resolver até sexta, a venda está marcada.`).soModelo, false, 'ela acrescentou algo');
+  assert.equal(detectarOrigemSite('(ref: site-inventado) oi').origem, 'site', 'código desconhecido vira origem geral');
+});
+
+await teste('origem sai do id do lead (sem mudar o banco) e leads da calculadora não são externos', () => {
+  assert.equal(origemDoLead({ id: 'wa-dores-abc123' }), 'dores');
+  assert.equal(origemDoLead({ id: 'ebook-77' }), 'ebook_baixou');
+  assert.equal(origemDoLead({ id: 'lead-1' }), null);
+  assert.equal(ehLeadExterno({ id: 'ebook-77' }), true);
+  assert.equal(ehLeadExterno({ id: 'wa-topo-x' }), true);
+  assert.equal(ehLeadExterno({ id: 'lead-1' }), false);
+  assert.equal(ehLeadExterno({ id: 'wa-topo' }), false);
+});
+
+await teste('boas-vindas de todas as origens passam pelas travas e terminam com UMA pergunta', () => {
+  for (const origem of ORIGENS) {
+    const msgs = montarBoasVindas({ origem, nome: 'Carlos', assistente: 'Lia' });
+    assert.ok(msgs.length >= 1 && msgs.length <= 3, origem);
+    const lead0 = { id: `wa-${origem}-x`, nome: 'Carlos' };
+    for (const m of msgs) {
+      assert.equal(validarSaida(m, lead0).ok, true, `${origem}: ${m}`);
+      assert.doesNotMatch(m, /R\$|honor[aá]rio|12\s?%/i, `${origem}: sem número nem honorário`);
+    }
+    const ultima = msgs[msgs.length - 1];
+    assert.equal(ultima.split('?').length - 1, 1, `${origem}: uma pergunta só`);
+    assert.match(ultima, /\?\s*(\n|$)|Pode responder só com o número\.$/, origem);
+  }
+  assert.match(montarBoasVindas({ origem: 'dores' })[1], /1\).*\n2\).*\n3\).*\n4\).*\n5\)/s);
+  assert.match(montarBoasVindas({ origem: 'tranquilidade' })[1], /certidão/);
+  assert.match(montarBoasVindas({ origem: 'ebook' })[0], /e-book/);
+  assert.match(montarBoasVindas({ origem: 'topo', nome: 'Carlos' })[0], /^Oi, Carlos, tudo bem\?/);
+});
+
+await teste('clique no botão: cria o lead, abre a conversa, manda a boas-vindas da origem e avisa o Gabriel', async () => {
+  const ctx = montar();
+  await chegou(ctx, msgSite('dores'), { nome: 'Carlos Souza' });
+  const lead0 = [...ctx.store.leads.values()][0];
+  assert.match(lead0.id, /^wa-dores-/);
+  assert.equal(lead0.status, 'contatado');
+  assert.equal(lead0.nome, 'Carlos Souza');
+  assert.match(lead0.observacoes, /Origem:.*situações/);
+  const c = ctx.store.conversas[0];
+  assert.equal(c.lead_id, lead0.id);
+  assert.equal(c.telefone, TEL_SITE);
+  assert.equal(c.estado, 'ativa');
+  assert.equal(ctx.wa.enviados.length, 2);
+  assert.match(ctx.wa.enviados[0].texto, /^Oi, Carlos, tudo bem\?/);
+  assert.match(ctx.wa.enviados[1].texto, /5\)/);
+  const hist = ctx.store.mensagens.filter((m) => m.conversa_id === c.id);
+  assert.equal(hist[0].direcao, 'lead');
+  assert.doesNotMatch(hist[0].texto, /ref:/);
+  assert.equal(hist.filter((m) => m.direcao === 'bot').length, 2);
+  assert.equal(ctx.avisos.filter((a) => a.tipo === 'Novo contato pelo WhatsApp do site').length, 1);
+  ctx.bot.pararTimers();
+});
+
+await teste('quem manda duas mensagens seguidas não abre duas conversas', async () => {
+  const ctx = montar();
+  await Promise.all([chegou(ctx, msgSite('topo')), chegou(ctx, 'e aí?')]);
+  assert.equal(ctx.store.conversas.length, 1);
+  assert.equal([...ctx.store.leads.values()].length, 1);
+  ctx.bot.pararTimers();
+});
+
+await teste('número desconhecido sem o código do site continua ignorado', async () => {
+  const ctx = montar();
+  await chegou(ctx, 'Oi, quanto custa?');
+  await chegou(ctx, 'Olá, Gabriel! Fiz uma simulação no seu site e gostaria de analisar a redução do INSS.');
+  assert.equal(ctx.store.conversas.length, 0);
+  assert.equal(ctx.wa.enviados.length, 0);
+});
+
+await teste('contato pelo botão não é atendido fora da lista de teste, com o bot parado ou acima do teto', async () => {
+  const a = montar({ cfg: { listaTeste: ['11999990000'] } });
+  await chegou(a, msgSite('topo'));
+  assert.equal(a.store.conversas.length, 0, 'lista de teste');
+  const b = montar({ parado: () => true });
+  await chegou(b, msgSite('topo'));
+  assert.equal(b.wa.enviados.length, 0, 'bot parado não responde');
+  assert.equal(b.store.conversas.length, 1, 'mas o contato é registrado');
+  assert.match(b.avisos[0].motivo, /PARADO/, 'e o Gabriel é avisado');
+  const c = montar({ cfg: { tetoMensagens24h: 0 } });
+  await chegou(c, msgSite('topo'));
+  assert.equal(c.wa.enviados.length, 0, 'teto');
+  assert.equal(c.store.conversas.length, 0);
+});
+
+await teste('se ela escreve algo além da mensagem pronta, o assistente responde (sem boas-vindas pronta)', async () => {
+  const ctx = montar({
+    roteiro: [texto('Entendi, a venda está marcada e a certidão é a prioridade. A obra já foi concluída?')],
+  });
+  await chegou(ctx, `${msgSite('tranquilidade')}\nTenho uma venda marcada para o fim do mês.`);
+  assert.equal(ctx.wa.enviados.length, 0, 'nada pronto sai: o assistente vai responder depois do tempo de espera');
+  const c = ctx.store.conversas[0];
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.wa.enviados.length, 1);
+  assert.match(ctx.client.chamadas[0].system, /ORIGEM DO CONTATO: botão da seção "Sua obra em dia/);
+  assert.match(ctx.client.chamadas[0].system, /ROTEIRO DESTE LEAD \(CONTATO PELO WHATSAPP, SEM SIMULAÇÃO\)/);
+  assert.match(ctx.client.chamadas[0].system, /AINDA NÃO SABEMOS se a obra é em nome de pessoa física ou de empresa/);
+});
+
+await teste('depois da boas-vindas, a resposta dela segue o roteiro da origem (sem números inventados)', async () => {
+  const ctx = montar({
+    roteiro: [texto('Entendi, é a situação 2. Para a certidão sair rápido, a obra já foi concluída?')],
+  });
+  await chegou(ctx, msgSite('dores'));
+  const c = ctx.store.conversas[0];
+  await chegou(ctx, '2');
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  const sistema = ctx.client.chamadas[0].system;
+  assert.match(sistema, /1\) recebeu o valor do INSS da obra/);
+  assert.match(sistema, /NUNCA cite valores de INSS, de economia/);
+  assert.match(sistema, /honorário/i);
+  assert.doesNotMatch(sistema, /INSS estimado pela calculadora/);
+  assert.doesNotMatch(sistema, /MÃO DE OBRA \(pessoa física\)/);
+  assert.match(sistema, /Razão social/, 'a lista de dados do contrato de empresa também vai para o assistente');
+  assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /situação 2/);
+});
+
+await teste('contato pelo botão: honorário de R$ 800 e R$ 1.000 pode ser citado, outros valores não; fala de CLT não bloqueia', () => {
+  const l0 = { id: 'wa-topo-abc', nome: 'Carlos' };
+  assert.equal(validarSaida('Para pessoa física o honorário é 12% da economia comprovada, com mínimo de R$ 800.', l0).ok, true);
+  assert.equal(validarSaida('Para empresa são R$ 1.000 mais 12% da economia.', l0).ok, true);
+  assert.equal(validarSaida('Você deve pagar uns R$ 30.000 de INSS.', l0).ok, false);
+  assert.equal(validarSaida('Para empresa vale o funcionário registrado em CLT ligado ao CNO.', l0).ok, true);
+  assert.equal(validarSaida('Para empresa vale o funcionário registrado em CLT ligado ao CNO.', lead()).ok, false, 'lead da calculadora continua protegido');
+});
+
+await teste('e-book baixado: vira lead, o bot abre a conversa com a abertura do e-book e não repete', async () => {
+  const ctx = montar();
+  ctx.store.guias.push({ id: 'g1', nome: 'Marina Lopes', email: 'm@x.com', whatsapp: '(21) 97777-1234', material: 'ebook-reduzir-inss-obra', created_at: new Date().toISOString() });
+  assert.equal(await ctx.bot.processarNovosEbooks(), 1);
+  const l1 = ctx.store.leads.get('ebook-g1');
+  assert.equal(l1.status, 'novo');
+  assert.match(l1.observacoes, /e-book/);
+  await ctx.bot.processarNovosLeads();
+  assert.equal(ctx.store.conversas.length, 1);
+  assert.equal(ctx.wa.enviados.length, 1);
+  assert.match(ctx.wa.enviados[0].texto, /^Oi, Marina, tudo bem\? Aqui é Lia/);
+  assert.match(ctx.wa.enviados[0].texto, /e-book "Como reduzir o INSS da sua obra"/);
+  assert.match(ctx.wa.enviados[0].texto, /concluída ou ainda está em andamento\?$/);
+  assert.equal(ctx.store.leads.get('ebook-g1').status, 'contatado');
+  // roda de novo (e com um bot "novo", como se tivesse reiniciado): nada se repete
+  assert.equal(await ctx.bot.processarNovosEbooks(), 0);
+  await ctx.bot.processarNovosLeads();
+  assert.equal(ctx.wa.enviados.length, 1);
+  const bot2 = criarBot({ store: ctx.store, wa: ctx.wa, cerebro: null, site: null, notificar: { async avisar() {}, async enviar() {} }, config, log: silencioso, dormirFn: async () => {} });
+  assert.equal(await bot2.processarNovosEbooks(), 0, 'depois de reiniciar o mesmo download não gera outro card');
+  ctx.bot.pararTimers();
+});
+
+await teste('e-book baixado: quando ela responde, o assistente usa o roteiro do e-book', async () => {
+  const ctx = montar({ roteiro: [texto('Que bom! A obra é em nome de pessoa física ou de empresa?')] });
+  ctx.store.guias.push({ id: 'g2', nome: 'Marina Lopes', email: 'm@x.com', whatsapp: '(21) 97777-1234', material: 'ebook-reduzir-inss-obra', created_at: new Date().toISOString() });
+  await ctx.bot.processarNovosEbooks();
+  await ctx.bot.processarNovosLeads();
+  const c = ctx.store.conversas[0];
+  await ctx.bot.aoReceber({ telefone: c.telefone, texto: 'Está em andamento, termina em dezembro' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.match(ctx.client.chamadas[0].system, /ORIGEM DO CONTATO: download do e-book/);
+  assert.match(ctx.client.chamadas[0].system, /o bot falou primeiro/);
+});
+
+await teste('e-book baixado por quem já conversa com o bot: não abre outra conversa e o card provisório some', async () => {
+  const ctx = montar();
+  const antigo = lead({ whatsapp: '(21) 97777-1234' });
+  await abrir(ctx, antigo);
+  const antes = ctx.wa.enviados.length;
+  ctx.store.guias.push({ id: 'g3', nome: 'Marina', email: 'm@x.com', whatsapp: '(21) 97777-1234', material: 'ebook-reduzir-inss-obra', created_at: new Date().toISOString() });
+  await ctx.bot.processarNovosEbooks();
+  await ctx.bot.processarNovosLeads();
+  assert.equal(ctx.wa.enviados.length, antes, 'nada novo enviado');
+  assert.equal(ctx.store.leads.has('ebook-g3'), false);
+  assert.match(ctx.store.leads.get(antigo.id).notas, /baixou o e-book/i);
+  ctx.bot.pararTimers();
+});
+
+await teste('quem veio pelo botão e depois preenche a simulação continua na MESMA conversa, ligada ao lead da calculadora', async () => {
+  const ctx = montar();
+  await chegou(ctx, msgSite('topo'));
+  const c = ctx.store.conversas[0];
+  const stubId = c.lead_id;
+  const real = lead({ whatsapp: '(21) 98888-7777' });
+  await abrir(ctx, real);
+  assert.equal(ctx.store.conversas.length, 1, 'continua uma conversa só');
+  assert.equal(c.lead_id, real.id);
+  assert.equal(ctx.store.leads.has(stubId), false, 'o card provisório sai do quadro');
+  assert.equal(ctx.store.leads.get(real.id).status, 'contatado');
+  assert.match(ctx.store.leads.get(real.id).notas, /Já conversava com o bot pelo WhatsApp/);
+  const ultima = ctx.wa.enviados[ctx.wa.enviados.length - 1].texto;
+  assert.match(ultima, /Recebi aqui os dados da sua obra/);
+  assert.equal(validarSaida(ultima, real).ok, true);
+  assert.equal(ctx.wa.enviados.filter((e) => /Aqui é Lia/.test(e.texto)).length, 1, 'não repete a apresentação');
+  ctx.bot.pararTimers();
+});
+
+await teste('o assistente passa a usar os números da calculadora depois que ela faz a simulação', async () => {
+  const ctx = montar({ roteiro: [texto('Perfeito, com os dados da sua obra já consigo te orientar melhor. Posso te explicar de onde vem a economia?')] });
+  await chegou(ctx, msgSite('topo'));
+  const c = ctx.store.conversas[0];
+  const real = lead({ whatsapp: '(21) 98888-7777' });
+  await abrir(ctx, real);
+  await ctx.bot.aoReceber({ telefone: c.telefone, texto: 'fiz a simulação agora' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.match(ctx.client.chamadas[0].system, /INSS estimado pela calculadora/);
+  assert.doesNotMatch(ctx.client.chamadas[0].system, /ORIGEM DO CONTATO/);
+});
+
+await teste('card de quem clicou no botão: nasce em "Contatado" e evolui sozinho (Proposta enviada, Decidindo)', async () => {
+  const ctx = montar({
+    roteiro: [texto('O honorário é 12% sobre a economia comprovada na análise, com valor mínimo de R$ 800 para pessoa física.\n\nPosso te passar a lista de dados para o Gabriel já preparar o seu contrato?')],
+  });
+  await chegou(ctx, msgSite('final'));
+  const c = ctx.store.conversas[0];
+  const card = ctx.store.leads.get(c.lead_id);
+  assert.equal(card.status, 'contatado');
+  await chegou(ctx, 'Quanto é o seu honorário?');
+  await ctx.bot.responder(c.id);
+  assert.equal(ctx.store.leads.get(c.lead_id).status, 'proposta_enviada', 'citou honorários: Proposta enviada');
+  await chegou(ctx, 'foto', { tipo: 'imagem', texto: '' });
+  assert.equal(ctx.store.leads.get(c.lead_id).status, 'decidindo', 'mandou documento: Decidindo');
+  ctx.bot.pararTimers();
+});
+
+await teste('card de quem baixou o e-book e não responde vai para "Sem resposta"; se responder, volta para "Contatado"', async () => {
+  const ctx = montar();
+  ctx.store.guias.push({ id: 'g9', nome: 'Rafael Dias', email: 'r@x.com', whatsapp: '(21) 96666-1234', material: 'ebook-reduzir-inss-obra', created_at: new Date().toISOString() });
+  await ctx.bot.processarNovosEbooks();
+  await ctx.bot.processarNovosLeads();
+  assert.equal(ctx.store.leads.get('ebook-g9').status, 'contatado');
+  assert.equal(await ctx.bot.marcarSemResposta(24), 1);
+  assert.equal(ctx.store.leads.get('ebook-g9').status, 'sem_resposta');
+  await ctx.bot.aoReceber({ telefone: ctx.store.conversas[0].telefone, texto: 'oi, vi agora' });
+  assert.equal(ctx.store.leads.get('ebook-g9').status, 'contatado');
+  ctx.bot.pararTimers();
+});
+
+await teste('quem clicou no botão e pede para parar vira "Perdido" com o motivo certo', async () => {
+  const ctx = montar();
+  await chegou(ctx, msgSite('flutuante'));
+  const c = ctx.store.conversas[0];
+  await chegou(ctx, 'pare');
+  const card = ctx.store.leads.get(c.lead_id);
+  assert.equal(card.status, 'perdido');
+  assert.equal(card.motivo_perda, 'pediu_para_parar');
+  assert.equal(c.estado, 'optout');
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

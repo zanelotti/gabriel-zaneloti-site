@@ -11,6 +11,7 @@
  * sem mencionar honorários na abertura, e sem as palavras "legal", "direito" ou "advogado"
  * (nem "jurídico" fora de "pessoa jurídica").
  */
+import { montarAberturaEbook, ehLeadExterno } from './origem.js';
 import { formatarArea, leadValorAlto, primeiroNomePessoa, regimeApuracao } from './util.js';
 
 const FRASE_PARCELAMENTO = 'E o saldo do INSS da obra ainda pode ser parcelado em até 60 vezes.';
@@ -24,6 +25,8 @@ function comParcelamento(corpo) {
 }
 
 export function montarAbertura(lead, nomeAssistente = 'Lia', config = {}) {
+  // Quem baixou o e-book (sem simulação): abertura própria, sem números.
+  if (ehLeadExterno(lead)) return montarAberturaEbook({ nome: primeiroNomePessoa(lead.nome), assistente: nomeAssistente });
   const isPJ = lead.responsavel === 'PJ';
   const primeiro = primeiroNomePessoa(lead.nome); // empresa/sigla/vazio: abre sem nome (a assistente pergunta depois)
   const saudacao = primeiro

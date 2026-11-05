@@ -105,9 +105,53 @@ export function generateGenericWhatsAppLink(message?: string): string {
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message ?? defaultMessage)}`;
 }
 
-/** WhatsApp para quem acabou de baixar o e-book "Como reduzir o INSS da sua obra". */
+/**
+ * WhatsApp para quem acabou de baixar o e-book "Como reduzir o INSS da sua obra".
+ * A mensagem termina com o código "(ref: site-ebook)": é assim que o bot do WhatsApp reconhece de onde a pessoa veio.
+ */
 export function generateEbookWhatsAppLink(nome?: string): string {
   const quem = nome && nome.trim() ? ` Meu nome é ${nome.trim()}.` : '';
-  const texto = `Olá, Gabriel! Baixei o e-book "Como reduzir o INSS da sua obra" e gostaria de saber se a minha obra tem redução.${quem}`;
+  const texto = `Olá, Gabriel! Baixei o e-book "Como reduzir o INSS da sua obra" e gostaria de saber se a minha obra tem redução.${quem}\n\n(ref: site-ebook)`;
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(texto)}`;
+}
+
+/**
+ * ============================================================================
+ *  BOTÕES DE WHATSAPP DO SITE → BOT
+ * ============================================================================
+ * Cada botão abre o WhatsApp com uma mensagem pronta que termina com um código, por exemplo "(ref: site-dores)".
+ * O bot do WhatsApp (bot-whatsapp/src/origem.js) lê esse código, cria o card no CRM e conversa de acordo com o botão.
+ * Os códigos e as frases abaixo precisam ser os mesmos do bot: se mudar um, avise para mudar o outro.
+ */
+export type OrigemWhatsApp = 'topo' | 'beneficios' | 'dores' | 'tranquilidade' | 'final' | 'flutuante' | 'rodape';
+
+const FRASE_ORIGEM: Record<OrigemWhatsApp, string> = {
+  topo: 'quero saber como reduzir o INSS da minha obra',
+  beneficios: 'quero entender como funciona a regularização do INSS da minha obra',
+  dores: 'me identifiquei com uma das situações e quero falar sobre a minha obra',
+  tranquilidade: 'quero deixar a minha obra em dia, sem dor de cabeça com a Receita',
+  final: 'quero começar a análise gratuita da minha obra',
+  flutuante: 'tenho uma dúvida sobre o INSS da minha obra',
+  rodape: 'tenho uma dúvida sobre o INSS da minha obra',
+};
+
+/** Nome usado no analytics (`origem` do trackEvent) → código que vai na mensagem para o bot. */
+const ORIGEM_ANALYTICS: Record<string, OrigemWhatsApp> = {
+  hero: 'topo',
+  beneficios: 'beneficios',
+  dores: 'dores',
+  tranquilidade: 'tranquilidade',
+  cta_final: 'final',
+  botao_flutuante: 'flutuante',
+  rodape: 'rodape',
+};
+
+/** Mensagem pronta do botão. Aceita o código do bot ("dores") ou o nome do analytics ("cta_final"); desconhecido vira "topo". */
+export function buildOrigemWhatsAppMessage(origem: string): string {
+  const codigo: OrigemWhatsApp = ORIGEM_ANALYTICS[origem] ?? (origem in FRASE_ORIGEM ? (origem as OrigemWhatsApp) : 'topo');
+  return `Olá, Gabriel! Vim pelo seu site e ${FRASE_ORIGEM[codigo]}.\n\n(ref: site-${codigo})`;
+}
+
+export function generateOrigemWhatsAppLink(origem: string): string {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(buildOrigemWhatsAppMessage(origem))}`;
 }

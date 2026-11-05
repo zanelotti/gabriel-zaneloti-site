@@ -1,11 +1,11 @@
-import { generateGenericWhatsAppLink } from '@/services/whatsapp';
+import { generateOrigemWhatsAppLink } from '@/services/whatsapp';
 import { trackEvent } from '@/services/analytics';
 
 /** Botão flutuante de WhatsApp, fixo no canto inferior direito em todas as telas. */
 export function WhatsAppButton() {
   return (
     <a
-      href={generateGenericWhatsAppLink()}
+      href={generateOrigemWhatsAppLink('botao_flutuante')}
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => trackEvent('whatsapp_clicked', { origem: 'botao_flutuante' })}

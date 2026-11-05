@@ -6,6 +6,7 @@
  * Para mudar o jeito do bot falar, é aqui que você mexe.
  */
 import { calcularHonorario, formatarArea, formatarReaisInteiros, HONORARIO_ALTO_PADRAO, HONORARIO_MINIMO_PF, leadValorAlto, mensagemDadosContrato, nomeParecePessoa, PERGUNTA_FECHAMENTO, primeiroNome, regimeApuracao } from './util.js';
+import { ehLeadExterno, origemDoLead, rotuloDaOrigem, roteiroDaOrigem } from './origem.js';
 
 const montarBase = (nome, trabalho) => `Você é ${nome}, assistente do Gabriel Zaneloti, consultor em regularização e redução de INSS de obra (construção civil). Você conversa por WhatsApp com pessoas que acabaram de simular a obra na calculadora do site dele. Escreva sempre em português do Brasil.
 
@@ -143,7 +144,10 @@ Vale quando a POLÍTICA DE REUNIÃO permite oferecer reunião/consultoria. Se a 
 
 function descreverLead(lead, config, nomeContato = '') {
   const isPJ = lead.responsavel === 'PJ';
+  const externo = ehLeadExterno(lead); // veio de botão de WhatsApp do site ou do e-book, sem simulação
+  const origem = externo ? origemDoLead(lead) : null;
   const linhas = [];
+  if (externo) linhas.push(`ORIGEM DO CONTATO: ${rotuloDaOrigem(origem)}. A pessoa NÃO preencheu a simulação do site (não há números, tipo de obra, área nem datas).`);
   if (nomeContato) {
     linhas.push(`Nome da pessoa: ${nomeContato} (ela mesma informou; trate por "${primeiroNome(nomeContato)}"). O cadastro do site diz "${lead.nome || 'sem nome'}".`);
   } else if (nomeParecePessoa(lead.nome)) {
@@ -153,7 +157,7 @@ function descreverLead(lead, config, nomeContato = '') {
       `Nome da pessoa: AINDA NÃO SABEMOS. O cadastro do site diz "${lead.nome || 'sem nome'}", que não parece nome de pessoa (parece empresa, sigla ou está vazio). Não use isso para chamá-la. Na sua PRIMEIRA resposta, depois de responder o que ela disse, pergunte de forma simpática como ela prefere ser chamada (ex.: "A propósito, como posso te chamar?"). Se a sua resposta já termina com outra pergunta, deixe a pergunta do nome para a resposta seguinte (uma pergunta por mensagem). Quando ela disser, use a ferramenta registrar_nome e passe a tratá-la por esse nome. Se ela não responder, siga a conversa sem nome, sem insistir.`
     );
   }
-  linhas.push(`Tipo: ${isPJ ? 'Pessoa jurídica (empresa)' : 'Pessoa física'}`);
+  linhas.push(externo ? 'Tipo: AINDA NÃO SABEMOS se a obra é em nome de pessoa física ou de empresa (descubra na conversa)' : `Tipo: ${isPJ ? 'Pessoa jurídica (empresa)' : 'Pessoa física'}`);
   if (lead.tipo_obra) linhas.push(`Tipo construtivo: ${lead.tipo_obra}`);
   if (lead.destinacao) linhas.push(`Destinação: ${lead.destinacao}`);
   if (lead.categoria) linhas.push(`Categoria: ${lead.categoria}`);
@@ -167,7 +171,9 @@ function descreverLead(lead, config, nomeContato = '') {
   if (lead.data_fim) linhas.push(`Fim da obra: ${lead.data_fim}`);
   if (lead.observacoes) linhas.push(`Observações escritas pela pessoa: ${lead.observacoes}`);
 
-  if (isPJ) {
+  if (externo) {
+    linhas.push('VALORES: não há nenhum número de cálculo para este contato. NÃO cite valores de INSS nem de economia. Os únicos valores em reais que você pode citar são os do honorário (veja a linha HONORÁRIO).');
+  } else if (isPJ) {
     linhas.push(
       'VALORES: empresa. O Fator de Ajuste não se aplica, então NÃO cite nenhum valor de economia. Mesmo assim, se ela perguntar COMO a redução funciona, EXPLIQUE as frentes que valem para empresa com base no CONHECIMENTO ("formas de reduzir") e nos documentos: funcionários registrados na época ligados ao CNO, notas fiscais de pré-moldado, contabilidade da obra, desoneração. Explique em geral e diga que o Gabriel confirma o que vale no caso dela; não diga apenas que "depende" ou "só o Gabriel confirma", dê o conteúdo.'
     );
@@ -184,11 +190,13 @@ function descreverLead(lead, config, nomeContato = '') {
       linhas.push('Obra iniciada antes de 10/2021: o cálculo automático só estima o INSS devido, sem estimativa de redução. O caso exige análise (decadência, provas da época da obra).');
   }
 
-  if (!isPJ) {
+  if (!isPJ && !externo) {
     linhas.push('MÃO DE OBRA (pessoa física): a frente é o trabalhador AUTÔNOMO com INSS recolhido vinculado ao CNO, inclusive recolhimento RETROATIVO, mesmo que nada tenha sido recolhido na época. Nunca fale em funcionário registrado/CLT para ela e nunca diga que a falta de recolhimento anterior atrapalha.');
   }
   const h = calcularHonorario(lead);
-  if (h.tipo === 'PJ') {
+  if (externo) {
+    linhas.push(`HONORÁRIO (o tipo da obra ainda não é conhecido): pessoa física = 12% sobre a economia comprovada na análise do Gabriel, com valor mínimo de ${formatarReaisInteiros(HONORARIO_MINIMO_PF)} quando 12% der menos que isso; empresa = ${formatarReaisInteiros(1000)} mais 12% sobre a economia conseguida. Só fale disso se ela perguntar o custo ou no final da conversa. Não calcule nenhum outro valor.`);
+  } else if (h.tipo === 'PJ') {
     linhas.push(`HONORÁRIO (empresa): ${formatarReaisInteiros(h.base)} mais 12% sobre a economia que for conseguida com as frentes de redução (notas fiscais de pré-moldado, vinculação de créditos de mão de obra registrada etc.). A economia da empresa só se confirma na análise do Gabriel: não cite valor de economia.`);
   } else if (h.economiaConhecida && h.minimoAplicado) {
     linhas.push(`HONORÁRIO: 12% da economia estimada daria ${formatarReaisInteiros(h.doze)}, que é menos de ${formatarReaisInteiros(HONORARIO_MINIMO_PF)}; por isso o honorário fica em ${formatarReaisInteiros(h.valor)} (valor mínimo). Se perguntarem, explique isso com naturalidade.`);
@@ -221,8 +229,11 @@ function descreverLead(lead, config, nomeContato = '') {
 
   const roteiroSemNumeros = `\n\nROTEIRO DESTE LEAD: não há números do cálculo para apresentar. Entenda a obra (UMA pergunta por mensagem), passe valor em doses e explique, em geral e em linguagem simples, como a redução funciona para o caso dela (com base no CONHECIMENTO). O honorário só entra no FINAL da conversa ou se ela perguntar o custo. Se o caso for complexo (obra antiga, empresa, muitos documentos), a consultoria gratuita com o Gabriel é o caminho.`;
 
-  const cautela = valorAlto ? roteiroAlto : temNumeros ? roteiroComum : roteiroSemNumeros;
-  const contrato = `\n\nMENSAGEM DOS DADOS DO CONTRATO (envie EXATAMENTE assim, quando ela aceitar a pergunta "${PERGUNTA_FECHAMENTO}" ou disser que quer contratar; não acrescente nada e não pergunte mais nada antes):\n\"\"\"\n${mensagemDadosContrato(lead)}\n\"\"\"`;
+  const cautela = externo ? roteiroDaOrigem(origem, { siteUrl: config?.siteUrl }) : valorAlto ? roteiroAlto : temNumeros ? roteiroComum : roteiroSemNumeros;
+  const textoContrato = externo
+    ? `${mensagemDadosContrato({ responsavel: 'PF' })}\n"""\n(se a obra for de EMPRESA, envie esta no lugar da anterior:)\n"""\n${mensagemDadosContrato({ responsavel: 'PJ' })}`
+    : mensagemDadosContrato(lead);
+  const contrato = `\n\nMENSAGEM DOS DADOS DO CONTRATO (envie EXATAMENTE assim, quando ela aceitar a pergunta "${PERGUNTA_FECHAMENTO}" ou disser que quer contratar; não acrescente nada e não pergunte mais nada antes):\n\"\"\"\n${textoContrato}\n\"\"\"`;
   return `# DADOS DO LEAD (única fonte de números que você pode citar)\n${linhas.map((l) => `- ${l}`).join('\n')}\n\n${politica}${cautela}${contrato}`;
 }
 

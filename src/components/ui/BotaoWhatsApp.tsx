@@ -1,4 +1,4 @@
-import { generateGenericWhatsAppLink } from '@/services/whatsapp';
+import { generateGenericWhatsAppLink, generateOrigemWhatsAppLink } from '@/services/whatsapp';
 import { trackEvent } from '@/services/analytics';
 
 interface BotaoWhatsAppProps {
@@ -6,27 +6,26 @@ interface BotaoWhatsAppProps {
   origem: string;
   /** Texto do botão. */
   texto?: string;
-  /** Mensagem que já vem escrita no WhatsApp do visitante. */
+  /** Só use para uma mensagem diferente do padrão. Sem isso, a mensagem pronta é a da origem (com o código que o bot reconhece). */
   mensagem?: string;
   className?: string;
 }
 
-const MENSAGEM_PADRAO = 'Olá, Gabriel! Tenho interesse em reduzir e regularizar o INSS da minha obra.';
-
 /**
  * Botão de WhatsApp com mensagem já preenchida — a pessoa só precisa apertar
  * "enviar". Repetido em várias partes da página para o visitante nunca ficar
- * longe de um botão de contato.
+ * longe de um botão de contato. A mensagem leva um código da origem (ex.: "(ref: site-dores)"),
+ * e o bot do WhatsApp usa esse código para conduzir a conversa de acordo com o botão.
  */
 export function BotaoWhatsApp({
   origem,
   texto = 'Quero reduzir o INSS da minha obra',
-  mensagem = MENSAGEM_PADRAO,
+  mensagem,
   className = '',
 }: BotaoWhatsAppProps) {
   return (
     <a
-      href={generateGenericWhatsAppLink(mensagem)}
+      href={mensagem ? generateGenericWhatsAppLink(mensagem) : generateOrigemWhatsAppLink(origem)}
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => trackEvent('whatsapp_clicked', { origem })}

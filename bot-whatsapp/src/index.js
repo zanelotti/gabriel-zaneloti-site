@@ -105,6 +105,7 @@ async function principal() {
           await bot.retomarPendentes();
         }
         avisouParado = false;
+        await bot.processarNovosEbooks().catch((e) => log.warn(`[ebook] ${e.message}`));
         await bot.processarNovosLeads();
       }
     } catch (e) {

@@ -14,7 +14,8 @@ import { dentroDaJanelaAutomatica, lembreteDevido, montarFollowup, montarMensage
 import { citouHonorarios, ehDocumentoDoLead, movimentoDaConsultoria, podeMover } from './funil.js';
 import { dividirMensagens, pediuParar, validarSaida } from './guards.js';
 import { montarAbertura } from './opening.js';
-import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, leadValorAlto, limparNomeInformado, normalizarTelefoneBR } from './util.js';
+import { detectarOrigemSite, ehLeadExterno, idLeadEbook, montarBoasVindas, novoIdLeadExterno, origemDoLead, rotuloDaOrigem } from './origem.js';
+import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, leadValorAlto, limparNomeInformado, normalizarTelefoneBR, primeiroNomePessoa } from './util.js';
 
 const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
 const TRINTA_MIN = 30 * 60 * 1000;
@@ -24,7 +25,10 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   const timers = new Map(); // conversaId -> timeout do "espera o lead terminar de escrever"
   const emAndamento = new Set(); // conversas sendo respondidas agora
   const vistos = new Set(); // leads já tratados nesta execução
+  const ebooksVistos = new Set(); // downloads do e-book já registrados nesta execução
   const falhasLead = new Map();
+  const falhasEbook = new Map();
+  const abrindoPorSite = new Map(); // telefone -> promessa (evita abrir duas conversas quando a pessoa manda duas mensagens seguidas)
   const falhasResposta = new Map();
   const avisosEspera = new Map(); // conversaId -> quando avisamos que o lead está esperando
   const avisosDocumento = new Map(); // conversaId -> quando o lead mandou documento pela última vez (aviso + card)
@@ -127,6 +131,39 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     if (existente && ['ativa', 'humano', 'optout'].includes(existente.estado)) {
       const idadeDias = (Date.now() - Date.parse(existente.criado_em)) / 86400000;
       if (existente.estado === 'optout' || !(idadeDias > 60)) {
+        const leadAntigo = existente.estado === 'ativa' ? await store.leadPorId(existente.lead_id) : null;
+
+        // Quem veio pelo botão de WhatsApp (ou pelo e-book) e agora preencheu a simulação: a MESMA conversa continua, ligada ao lead
+        // da calculadora (com os números dele). O card provisório some do quadro e a pessoa recebe um aviso curto.
+        if (leadAntigo && ehLeadExterno(leadAntigo) && !ehLeadExterno(lead)) {
+          const origem = origemDoLead(leadAntigo);
+          await store.religarConversa(existente.id, lead.id);
+          await store.apagarLead(leadAntigo.id);
+          await store.atualizarLead(lead.id, {
+            status: ['novo', 'contatado'].includes(leadAntigo.status) ? 'contatado' : leadAntigo.status,
+            nota: `Já conversava com o bot pelo WhatsApp (origem: ${rotuloDaOrigem(origem)}) antes de preencher a simulação.`,
+          });
+          try {
+            await enviar({ ...existente, lead_id: lead.id }, 'Recebi aqui os dados da sua obra que você preencheu no site, obrigada! Com eles consigo te orientar com mais precisão.');
+          } catch (e) {
+            log.warn(`[bot] não consegui avisar que recebi a simulação: ${e.message}`);
+          }
+          log.info(`[bot] lead ${lead.id} juntado à conversa que já existia (${origem}).`);
+          return;
+        }
+
+        // Contato do e-book que já está falando com o bot por outro caminho: o card provisório é só ruído, some do quadro.
+        if (ehLeadExterno(lead)) {
+          await store.apagarLead(lead.id);
+          try {
+            await store.atualizarLead(existente.lead_id, { nota: 'Também baixou o e-book "Como reduzir o INSS da sua obra".' });
+          } catch (e) {
+            log.warn(`[bot] não consegui anotar o e-book no lead: ${e.message}`);
+          }
+          log.info(`[bot] contato do e-book ${lead.id} já tem conversa (${existente.estado}): não abri outra.`);
+          return;
+        }
+
         // O "telefone" da linha de controle leva um prefixo para ela NUNCA ser achada como a conversa deste número.
         await store.criarConversa({ lead_id: lead.id, telefone: `duplicado:${digitosJid}`, jid, estado: 'encerrada', observacao: `duplicado: este telefone já tem conversa (${existente.estado})` });
         await store.atualizarLead(lead.id, { nota: 'Telefone repetido: este número já tem conversa com o bot, então ele não abriu outra.' });
@@ -347,12 +384,121 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     }
   }
 
+  /**
+   * Quem baixou o e-book vira um lead no CRM (id `ebook-<n>`), e daí em diante segue o mesmo caminho dos outros leads novos
+   * (processarNovosLeads confere o número, cria a conversa e manda a abertura própria do e-book).
+   * A chave `ebook:<n>` em bot_estado garante que o mesmo download nunca gere dois cards, mesmo se o bot reiniciar.
+   */
+  async function processarNovosEbooks() {
+    if (parado() || !wa.conectado()) return 0;
+    inicioDoBot ??= await store.inicioDoBot();
+    const lista = await store.ebooksNovos(inicioDoBot);
+    let criados = 0;
+    for (const g of lista) {
+      const chave = `ebook:${g.id}`;
+      if (ebooksVistos.has(g.id)) continue;
+      ebooksVistos.add(g.id);
+      try {
+        if (await store.lerEstado(chave)) continue;
+        await store.gravarEstado(chave, new Date().toISOString());
+        const obs = `Baixou o e-book "Como reduzir o INSS da sua obra".${g.email ? ` E-mail: ${g.email}.` : ''}`;
+        await store.criarLeadExterno({ id: idLeadEbook(g.id), nome: g.nome, whatsapp: g.whatsapp, observacoes: obs, status: 'novo', created_at: g.created_at });
+        criados += 1;
+      } catch (e) {
+        const n = (falhasEbook.get(g.id) || 0) + 1;
+        falhasEbook.set(g.id, n);
+        log.error(`[bot] erro ao registrar o download do e-book ${g.id} (tentativa ${n}):`, e.message);
+        if (n < 3) ebooksVistos.delete(g.id);
+      }
+    }
+    return criados;
+  }
+
   // ---------------------------------------------------------------------------
   // 2) Mensagens que chegam
   // ---------------------------------------------------------------------------
-  async function aoReceber({ telefone, texto, tipo = 'texto', waId = null }) {
+
+  /**
+   * Primeira mensagem de alguém que ainda não tem conversa. Só reage se vier de um botão do site (mensagem pronta com o código
+   * "(ref: site-...)"): cria o lead no CRM, abre a conversa, manda a boas-vindas própria do botão e avisa o Gabriel por e-mail.
+   * Qualquer outro número desconhecido continua sendo ignorado.
+   */
+  async function abrirPorSite({ telefone, jid, texto, tipo, nome, waId }) {
+    if (tipo !== 'texto') return;
+    const det = detectarOrigemSite(texto);
+    if (!det) return;
+    if (foraDaListaTeste(telefone)) return;
+    if (!(await abaixoDoTeto())) {
+      await avisarTeto();
+      return;
+    }
+
+    const nomePessoa = det.nome || limparNomeInformado(nome) || '';
+    const lead = await store.criarLeadExterno({
+      id: novoIdLeadExterno(det.origem),
+      nome: nomePessoa || null,
+      whatsapp: telefone,
+      observacoes: `Origem: ${rotuloDaOrigem(det.origem)}. Mensagem: ${det.textoLimpo}`.slice(0, 600),
+      status: 'contatado',
+    });
+    if (!lead) return;
+    const jidFinal = jid || (await wa.resolverJid(telefone));
+    const conversa = await store.criarConversa({ lead_id: lead.id, telefone, jid: jidFinal });
+    if (!conversa) return;
+    await store.addMensagem({ conversa_id: conversa.id, direcao: 'lead', texto: det.textoLimpo, wa_id: waId });
+    await store.atualizarLead(lead.id, { nota: `Chamou pelo WhatsApp do site (${rotuloDaOrigem(det.origem)}).` });
+
+    const pausado = parado();
+    await notificar.avisar({
+      tipo: 'Novo contato pelo WhatsApp do site',
+      lead,
+      telefone,
+      motivo: `Veio do ${rotuloDaOrigem(det.origem)}.${pausado ? ' O bot está PARADO, então ninguém respondeu: chame a pessoa.' : ' O bot já está conversando.'}`,
+      historico: [{ direcao: 'lead', texto: det.textoLimpo }],
+    });
+    if (pausado) return;
+
+    if (!det.soModelo) {
+      // Ela escreveu algo além da mensagem pronta: o assistente responde ao que ela disse (com o roteiro da origem).
+      agendarResposta(conversa.id, config.debounceMs);
+      return;
+    }
+
+    const mensagens = montarBoasVindas({ origem: det.origem, nome: primeiroNomePessoa(nomePessoa), assistente: config.assistenteNome });
+    await dormirFn(aleatorio(config.aberturaMinMs, config.aberturaMaxMs));
+    for (const m of mensagens) {
+      const v = validarSaida(m, lead);
+      if (!v.ok) {
+        await notificar.avisar({ tipo: 'Bot não enviou a boas-vindas', lead, telefone, motivo: `A mensagem foi bloqueada (${v.motivo}). Responda a pessoa manualmente.` });
+        return;
+      }
+      try {
+        await enviar(conversa, m);
+      } catch (e) {
+        await store.setEstado(conversa.id, 'encerrada', `falha ao enviar: ${e.message}`);
+        await notificar.avisar({ tipo: 'Bot falhou ao enviar', lead, telefone, motivo: `Não consegui enviar a boas-vindas (${e.message}). Responda a pessoa manualmente.` });
+        return;
+      }
+      if (m !== mensagens[mensagens.length - 1]) await dormirFn(aleatorio(1200, 2500));
+    }
+    log.info(`[bot] boas-vindas enviadas a ${telefone} (origem: ${det.origem})`);
+  }
+
+  async function aoReceber({ telefone, texto, tipo = 'texto', waId = null, jid = null, nome = null }) {
     const conversa = await store.conversaPorTelefone(telefone);
-    if (!conversa) return; // nunca responde quem não foi abordado pelo bot
+    if (!conversa) {
+      // Só reage a quem veio de um botão do site; qualquer outro número desconhecido é ignorado (o bot nunca puxa assunto sozinho).
+      if (abrindoPorSite.has(telefone)) {
+        await abrindoPorSite.get(telefone);
+        return aoReceber({ telefone, texto, tipo, waId, jid, nome });
+      }
+      const tarefa = abrirPorSite({ telefone, jid, texto, tipo, nome, waId })
+        .catch((e) => log.error(`[bot] erro ao abrir conversa pelo botão do site (${telefone}):`, e.message))
+        .finally(() => abrindoPorSite.delete(telefone));
+      abrindoPorSite.set(telefone, tarefa);
+      await tarefa;
+      return;
+    }
 
     const conteudo = texto && texto.trim() ? texto.trim() : `[o lead enviou ${tipo}]`;
     await store.addMensagem({ conversa_id: conversa.id, direcao: 'lead', texto: conteudo, wa_id: waId });
@@ -680,5 +826,5 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     timers.clear();
   }
 
-  return { processarNovosLeads, marcarSemResposta, sincronizarCardsConsultorias, processarFollowups, processarConsultorias, aoReceber, aoHumano, responder, assumir, devolver, enviarComoGabriel, retomarPendentes, pararTimers, _dividir: dividirMensagens };
+  return { processarNovosLeads, processarNovosEbooks, marcarSemResposta, sincronizarCardsConsultorias, processarFollowups, processarConsultorias, aoReceber, aoHumano, responder, assumir, devolver, enviarComoGabriel, retomarPendentes, pararTimers, _dividir: dividirMensagens };
 }

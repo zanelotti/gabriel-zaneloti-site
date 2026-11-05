@@ -53,6 +53,46 @@ export function criarStore({ url, key }) {
       return checar(await db.from('leads').select('*').eq('id', id).maybeSingle(), 'lead por id');
     },
 
+    /**
+     * Contato que não veio da calculadora (botão de WhatsApp do site ou e-book): cria o "lead" no CRM para o card aparecer no quadro.
+     * Retorna null se o id já existia (idempotente: nunca cria dois cards para o mesmo contato).
+     */
+    async criarLeadExterno({ id, nome, whatsapp, observacoes = null, status = 'novo', created_at = null }) {
+      const linha = { id, nome: nome || null, whatsapp, observacoes, status };
+      if (created_at) linha.created_at = created_at;
+      const { data, error } = await db.from('leads').insert(linha).select().single();
+      if (error) {
+        if (error.code === '23505') return null;
+        throw new Error(`Supabase (criar lead externo): ${error.message}`);
+      }
+      return data;
+    },
+
+    /** Downloads novos do e-book (tabela guia_leads), criados depois que o bot foi ligado. */
+    async ebooksNovos(desdeIso) {
+      return (
+        checar(
+          await db
+            .from('guia_leads')
+            .select('*')
+            .eq('material', 'ebook-reduzir-inss-obra')
+            .gte('created_at', desdeIso)
+            .order('created_at', { ascending: true })
+            .limit(25),
+          'downloads do e-book'
+        ) || []
+      );
+    },
+
+    /** A conversa passa a pertencer a outro lead (quando quem veio pelo WhatsApp depois preenche a simulação). */
+    async religarConversa(conversaId, leadId) {
+      checar(await db.from('bot_conversas').update({ lead_id: leadId, atualizado_em: new Date().toISOString() }).eq('id', conversaId), 'religar conversa');
+    },
+
+    async apagarLead(id) {
+      checar(await db.from('leads').delete().eq('id', id), 'apagar lead');
+    },
+
     async conversaPorLead(leadId) {
       return checar(await db.from('bot_conversas').select('*').eq('lead_id', leadId).maybeSingle(), 'conversa por lead');
     },
