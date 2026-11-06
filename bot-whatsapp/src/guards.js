@@ -4,7 +4,7 @@
  */
 
 import { calcularHonorario, HONORARIO_BASE_PJ, HONORARIO_MINIMO_PF } from './util.js';
-import { ehLeadExterno } from './origem.js';
+import { semSimulacao } from './origem.js';
 
 /** O lead pediu para não receber mais mensagens? */
 export function pediuParar(texto) {
@@ -59,7 +59,7 @@ export function extrairValoresReais(texto) {
 /** Valores que o bot pode citar: somente os dos dados do lead (calculados pelo sistema). */
 export function valoresPermitidos(lead) {
   // Contato pelo botão de WhatsApp ou e-book (sem simulação): não há números de cálculo; só o honorário de pessoa física (R$ 800 mínimo) e de empresa (R$ 1.000).
-  if (ehLeadExterno(lead)) return [HONORARIO_MINIMO_PF, HONORARIO_BASE_PJ];
+  if (semSimulacao(lead)) return [HONORARIO_MINIMO_PF, HONORARIO_BASE_PJ];
   const h = calcularHonorario(lead);
   if (h.tipo === 'PJ') return [h.base]; // empresa: nunca valor de economia; só a base do honorário
   const extras = [];
@@ -95,7 +95,7 @@ export function validarSaida(texto, lead, valoresExtras = [], { ignorarClt = fal
   }
 
   // Pessoa física: a frente de mão de obra é o autônomo com recolhimento (inclusive retroativo); CLT/funcionário registrado é de empresa.
-  if (!ignorarClt && lead?.responsavel !== 'PJ' && !ehLeadExterno(lead) && REGEX_CLT_PF.test(t)) {
+  if (!ignorarClt && lead?.responsavel !== 'PJ' && !semSimulacao(lead) && REGEX_CLT_PF.test(t)) {
     return {
       ok: false,
       motivo:

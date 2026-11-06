@@ -89,6 +89,14 @@ export function criarStore({ url, key }) {
       checar(await db.from('bot_conversas').update({ lead_id: leadId, atualizado_em: new Date().toISOString() }).eq('id', conversaId), 'religar conversa');
     },
 
+    /** Grava no card (tabela leads) os dados da obra que a pessoa passou na conversa e o resultado da simulação. */
+    async salvarDadosObra(leadId, campos) {
+      const permitidas = ['responsavel', 'estado', 'destinacao', 'tipo_obra', 'categoria', 'situacao', 'area_principal', 'area_piscina', 'data_inicio', 'data_fim', 'inss_estimado', 'economia_estimada', 'percentual_reducao', 'valor_apos_reducao'];
+      const patch = Object.fromEntries(Object.entries(campos || {}).filter(([k]) => permitidas.includes(k)));
+      if (Object.keys(patch).length === 0) return;
+      checar(await db.from('leads').update(patch).eq('id', leadId), 'salvar dados da obra');
+    },
+
     async apagarLead(id) {
       checar(await db.from('leads').delete().eq('id', id), 'apagar lead');
     },

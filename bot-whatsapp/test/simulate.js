@@ -19,6 +19,8 @@ import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAp
 import { citouHonorarios, MOTIVOS_PERDA, podeMover } from '../src/funil.js';
 import { descreverQuando, lembreteDevido, montarFollowup, montarMensagemConsultoria, proximoFollowup } from '../src/acompanhamento.js';
 import { detectarOrigemSite, ehLeadExterno, montarBoasVindas, ORIGENS, origemDoLead } from '../src/origem.js';
+import { camposDoLead, lerTabelasDoSite, montarEmailSimulacao, montarMensagemSimulacao, normalizarEntrada, origemDasTabelas, simular, sincronizarTabelasDoSite } from '../src/simulacao.js';
+import { semSimulacao } from '../src/origem.js';
 import { calcularHonorario, criarChamador, leadValorAlto, limparNomeInformado, mensagemDadosContrato, nomeParecePessoa, PERGUNTA_FECHAMENTO, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
 
 let passou = 0;
@@ -98,6 +100,9 @@ function criarStoreMemoria() {
     },
     async apagarLead(id) {
       leads.delete(id);
+    },
+    async salvarDadosObra(leadId, campos) {
+      Object.assign(leads.get(leadId), campos);
     },
     async conversaPorLead(id) {
       return conversas.find((c) => c.lead_id === id) || null;
@@ -272,8 +277,8 @@ function montar({ roteiro = [], siteFalso, parado = () => false, cfg = {}, docum
     async avisar(a) {
       (/^Lead grande/.test(a.tipo) ? avisosGrandes : avisos).push(a);
     },
-    async enviar(assunto) {
-      avisos.push({ tipo: assunto });
+    async enviar(assunto, html) {
+      avisos.push({ tipo: assunto, html });
     },
   };
   const client = clienteFalso(roteiro);
@@ -2534,23 +2539,31 @@ await teste('origem sai do id do lead (sem mudar o banco) e leads da calculadora
   assert.equal(ehLeadExterno({ id: 'wa-topo' }), false);
 });
 
-await teste('boas-vindas de todas as origens passam pelas travas e terminam com UMA pergunta', () => {
-  for (const origem of ORIGENS) {
+await teste('boas-vindas dos botões: quem é, Fator de Ajuste e pedido dos dados da obra; passam pelas travas, sem números nem honorário', () => {
+  for (const origem of ORIGENS.filter((o) => o !== 'ebook_baixou')) {
     const msgs = montarBoasVindas({ origem, nome: 'Carlos', assistente: 'Lia' });
-    assert.ok(msgs.length >= 1 && msgs.length <= 3, origem);
+    assert.equal(msgs.length, 3, origem);
     const lead0 = { id: `wa-${origem}-x`, nome: 'Carlos' };
     for (const m of msgs) {
       assert.equal(validarSaida(m, lead0).ok, true, `${origem}: ${m}`);
       assert.doesNotMatch(m, /R\$|honor[aá]rio|12\s?%/i, `${origem}: sem número nem honorário`);
     }
-    const ultima = msgs[msgs.length - 1];
-    assert.equal(ultima.split('?').length - 1, 1, `${origem}: uma pergunta só`);
-    assert.match(ultima, /\?\s*(\n|$)|Pode responder só com o número\.$/, origem);
+    assert.match(msgs[0], /Com quem eu falo\?$/, `${origem}: pergunta quem é`);
+    assert.match(msgs[1], /Fator de Ajuste/, `${origem}: explica o Fator de Ajuste`);
+    assert.match(msgs[1], /50%/);
+    assert.match(msgs[1], /70%/);
+    assert.match(msgs[1], /60 vezes/);
+    for (const item of ['pessoa física ou de empresa', 'Estado', 'alvenaria, madeira ou mista', 'obra nova, acréscimo, reforma ou demolição', 'Área construída', 'início da obra']) {
+      assert.match(msgs[2], new RegExp(item), `${origem}: pede ${item}`);
+    }
+    assert.equal(msgs[2].split('?').length - 1, 0, 'o pedido é uma lista, sem pergunta solta');
   }
-  assert.match(montarBoasVindas({ origem: 'dores' })[1], /1\).*\n2\).*\n3\).*\n4\).*\n5\)/s);
-  assert.match(montarBoasVindas({ origem: 'tranquilidade' })[1], /certidão/);
-  assert.match(montarBoasVindas({ origem: 'ebook' })[0], /e-book/);
-  assert.match(montarBoasVindas({ origem: 'topo', nome: 'Carlos' })[0], /^Oi, Carlos, tudo bem\?/);
+  const confirmado = montarBoasVindas({ origem: 'ebook', nome: 'Carlos', nomeConfirmado: true });
+  assert.match(confirmado[0], /^Oi, Carlos! Aqui é Lia/);
+  assert.doesNotMatch(confirmado[0], /Com quem eu falo/, 'nome que a própria pessoa disse não é perguntado de novo');
+  const ebook = montarBoasVindas({ origem: 'ebook_baixou', nome: 'Marina' });
+  assert.match(ebook[0], /e-book/);
+  assert.match(ebook[1], /concluída ou ainda está em andamento\?$/);
 });
 
 await teste('clique no botão: cria o lead, abre a conversa, manda a boas-vindas da origem e avisa o Gabriel', async () => {
@@ -2565,14 +2578,15 @@ await teste('clique no botão: cria o lead, abre a conversa, manda a boas-vindas
   assert.equal(c.lead_id, lead0.id);
   assert.equal(c.telefone, TEL_SITE);
   assert.equal(c.estado, 'ativa');
-  assert.equal(ctx.wa.enviados.length, 2);
-  assert.match(ctx.wa.enviados[0].texto, /^Oi, Carlos, tudo bem\?/);
-  assert.match(ctx.wa.enviados[1].texto, /5\)/);
+  assert.equal(ctx.wa.enviados.length, 3);
+  assert.match(ctx.wa.enviados[0].texto, /^Oi! Aqui é Lia.*Com quem eu falo\?$/s, 'o nome do perfil do WhatsApp não vale: pergunta quem é');
+  assert.match(ctx.wa.enviados[1].texto, /Fator de Ajuste/);
+  assert.match(ctx.wa.enviados[2].texto, /1\) Obra em nome de pessoa física ou de empresa/);
   const hist = ctx.store.mensagens.filter((m) => m.conversa_id === c.id);
   assert.equal(hist[0].direcao, 'lead');
   assert.doesNotMatch(hist[0].texto, /ref:/);
   assert.match(hist[0].texto, /^Olá, Gabriel! Vim pelo seu site e me identifiquei/);
-  assert.equal(hist.filter((m) => m.direcao === 'bot').length, 2);
+  assert.equal(hist.filter((m) => m.direcao === 'bot').length, 3);
   assert.equal(ctx.avisos.filter((a) => a.tipo === 'Novo contato pelo WhatsApp do site').length, 1);
   ctx.bot.pararTimers();
 });
@@ -2619,7 +2633,9 @@ await teste('se ela escreve algo além da mensagem pronta, o assistente responde
   ctx.bot.pararTimers();
   assert.equal(ctx.wa.enviados.length, 1);
   assert.match(ctx.client.chamadas[0].system, /ORIGEM DO CONTATO: botão da seção "Sua obra em dia/);
-  assert.match(ctx.client.chamadas[0].system, /ROTEIRO DESTE LEAD \(CONTATO PELO WHATSAPP, SEM SIMULAÇÃO\)/);
+  assert.match(ctx.client.chamadas[0].system, /ROTEIRO DESTE LEAD \(CONTATO PELO WHATSAPP, AINDA SEM SIMULAÇÃO\)/);
+  assert.match(ctx.client.chamadas[0].system, /calcular_simulacao/);
+  assert.ok(ctx.client.chamadas[0].tools.some((f) => f.name === 'calcular_simulacao'), 'a ferramenta da simulação é oferecida');
   assert.match(ctx.client.chamadas[0].system, /AINDA NÃO SABEMOS se a obra é em nome de pessoa física ou de empresa/);
 });
 
@@ -2633,14 +2649,16 @@ await teste('depois da boas-vindas, a resposta dela segue o roteiro da origem (s
   await ctx.bot.responder(c.id);
   ctx.bot.pararTimers();
   const sistema = ctx.client.chamadas[0].system;
-  assert.match(sistema, /1\) recebeu o valor do INSS da obra/);
-  assert.match(sistema, /NUNCA cite valores de INSS, de economia/);
+  assert.match(sistema, /clicou no botão da seção das situações comuns/);
+  assert.match(sistema, /FAZER A SIMULAÇÃO da obra aqui na conversa/);
+  assert.match(sistema, /você não tem números|Você NÃO escreve os números|NÃO tem números|AINDA NÃO tem números/i);
   assert.match(sistema, /honorário/i);
   assert.doesNotMatch(sistema, /INSS estimado pela calculadora/);
   assert.doesNotMatch(sistema, /MÃO DE OBRA \(pessoa física\)/);
   assert.match(sistema, /Razão social/, 'a lista de dados do contrato de empresa também vai para o assistente');
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /situação 2/);
 });
+
 
 await teste('contato pelo botão: honorário de R$ 800 e R$ 1.000 pode ser citado, outros valores não; fala de CLT não bloqueia', () => {
   const l0 = { id: 'wa-topo-abc', nome: 'Carlos' };
@@ -2782,7 +2800,7 @@ await teste('número que já teve conversa encerrada e volta pelo botão do site
   await chegou(ctx, msgSite('topo'));
   assert.equal(ctx.store.conversas.length, 2);
   assert.equal(ctx.store.conversas[1].estado, 'ativa');
-  assert.equal(ctx.wa.enviados.length, antes + 2, 'boas-vindas enviada');
+  assert.equal(ctx.wa.enviados.length, antes + 3, 'boas-vindas enviada');
   ctx.bot.pararTimers();
 });
 
@@ -2797,6 +2815,255 @@ await teste('conversa parada com o Gabriel (humano) ou que pediu para parar cont
     assert.equal(ctx.wa.enviados.length, antes, estado);
     assert.equal(ctx.store.conversas.length, 1, estado);
   }
+});
+
+
+// ===========================================================================
+console.log('\nSimulação feita pelo bot na conversa (quem chega pelo botão do site)');
+
+const HOJE_FIXO = '2026-11-05';
+
+await teste('a conta bate com o simulador do site (mesmos números, data fixa)', () => {
+  // Valores conferidos rodando src/services/calculateRMTIndireta.ts + calculateFatorAjuste.ts (o motor do site) com a mesma data.
+  const casos = [
+    [{ estado: 'SP', destinacao: 'residencial_unifamiliar', tipoObra: 'alvenaria', categoria: 'obra_nova', areaPrincipal: 241.87, dataInicio: '2023-03-01', dataFim: '2024-12-01' }, 23572.98, 14002.38, 9570.6],
+    [{ estado: 'MG', destinacao: 'residencial_unifamiliar', tipoObra: 'mista', categoria: 'obra_nova', areaPrincipal: 120, areaComplementar: 30, dataInicio: '2025-06-01', dataFim: null }, 7750.9, 3721.33, 4029.57],
+    [{ estado: 'RJ', destinacao: 'multifamiliar', tipoObra: 'alvenaria', categoria: 'obra_nova', areaPrincipal: 800, dataInicio: '2022-01-01', dataFim: '2024-06-01' }, 127321.65, 69075.91, 58245.74],
+    [{ estado: 'BA', destinacao: 'comercial_salas_lojas', tipoObra: 'alvenaria', categoria: 'reforma', areaPrincipal: 350, areaComplementar: 20, dataInicio: '2024-02-01', dataFim: '2025-02-01' }, 14579.72, 6860.14, 7719.58],
+    [{ estado: 'PR', destinacao: 'galpao_industrial', tipoObra: 'alvenaria', categoria: 'acrescimo', areaPrincipal: 600, dataInicio: '2021-05-01', dataFim: '2023-08-01' }, 55053.19, 28997.29, 26055.9],
+    [{ estado: 'SC', destinacao: 'residencial_unifamiliar', tipoObra: 'madeira', categoria: 'obra_nova', areaPrincipal: 90, dataInicio: '2018-01-01', dataFim: '2019-03-01' }, 0, 0, 0],
+    [{ estado: 'GO', destinacao: 'edificio_garagem', tipoObra: 'alvenaria', categoria: 'obra_nova', areaPrincipal: 4000, dataInicio: '2026-01-01', dataFim: '2027-06-01' }, 475891.16, 278564.88, 197326.28],
+    [{ estado: 'CE', destinacao: 'conjunto_habitacional', tipoObra: 'alvenaria', categoria: 'demolicao', areaPrincipal: 150, dataInicio: '2026-10-01', dataFim: null }, 440.32, 320.66, 119.66],
+    [{ estado: 'DF', destinacao: 'residencial_unifamiliar', tipoObra: 'alvenaria', categoria: 'obra_nova', areaPrincipal: 400, areaComplementar: 60, dataInicio: '2029-01-01', dataFim: null }, 71364.93, 44215.23, 27149.7],
+  ];
+  for (const [d, inss, eco, apos] of casos) {
+    const r = simular(d, { hoje: HOJE_FIXO });
+    assert.equal(r.inssEstimado, inss, `${d.estado} INSS`);
+    assert.equal(r.economiaEstimada, eco, `${d.estado} economia`);
+    assert.equal(r.valorAposReducao, apos, `${d.estado} após a redução`);
+  }
+  assert.equal(simular(casos[0][0], { hoje: HOJE_FIXO }).detalhe.percentualFator, 50, 'até 350 m²: 50%');
+  assert.equal(simular(casos[2][0], { hoje: HOJE_FIXO }).detalhe.percentualFator, 70, 'acima de 350 m²: 70%');
+  assert.equal(simular(casos[4][0], { hoje: HOJE_FIXO }).regime, 'esocial_ajustado');
+  assert.equal(simular(casos[5][0], { hoje: HOJE_FIXO }).regime, 'gfip_anterior_2021');
+});
+
+await teste('tabelas: lê as do site quando existem e cai na cópia do bot quando não existem', () => {
+  const log = { info() {}, warn() {}, error() {} };
+  assert.equal(sincronizarTabelasDoSite({ log, pasta: join(tmpdir(), 'nao-existe-xyz') }), false);
+  const copia = origemDasTabelas();
+  assert.equal(copia.origem, 'cópia do bot');
+  assert.match(copia.vauCompetencia, /^\d{4}-\d{2}$/);
+  assert.ok(simular({ estado: 'SP', destinacao: 'residencial_unifamiliar', tipoObra: 'alvenaria', categoria: 'obra_nova', areaPrincipal: 150, dataInicio: '2024-01-01' }, { hoje: HOJE_FIXO }).inssEstimado > 0);
+  const ok = sincronizarTabelasDoSite({ log });
+  if (ok) {
+    assert.equal(origemDasTabelas().origem, 'site');
+    const t = lerTabelasDoSite(new URL('../../src/data', import.meta.url).pathname);
+    assert.equal(Object.keys(t.VAU_ESTADUAL).length, 27);
+  }
+  assert.throws(() => lerTabelasDoSite(tmpdir()), 'pasta sem as tabelas dá erro (o bot segue com a cópia)');
+});
+
+await teste('dados que a pessoa informou: confere, interpreta datas e diz o que falta', () => {
+  const completo = { responsavel: 'PF', estado: 'sp', destinacao: 'residencial_unifamiliar', tipo_obra: 'Alvenaria', categoria: 'obra_nova', area_principal: '180,5', data_inicio: '2023-03', data_fim: '2024/12' };
+  assert.equal(normalizarEntrada(completo).ok, false, 'data com barra em formato errado');
+  completo.data_fim = '12/2024';
+  const r = normalizarEntrada(completo);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.dados, { responsavel: 'PF', estado: 'SP', destinacao: 'residencial_unifamiliar', tipoObra: 'alvenaria', categoria: 'obra_nova', areaPrincipal: 180.5, dataInicio: '2023-03-01', dataFim: '2024-12-01' });
+  const faltando = normalizarEntrada({ responsavel: 'PF', estado: 'SP', area_principal: 100 });
+  assert.equal(faltando.ok, false);
+  assert.deepEqual(faltando.faltando, ['destinacao', 'tipo_obra', 'categoria', 'data_inicio']);
+  assert.equal(normalizarEntrada({ responsavel: 'PF', estado: 'XX' }).ok, false, 'estado inválido');
+  assert.equal(normalizarEntrada({ ...completo, area_principal: 3 }).ok, false, 'área absurda');
+  assert.equal(normalizarEntrada({ ...completo, data_fim: '2022-01' }).ok, false, 'término antes do início');
+  assert.equal(normalizarEntrada({ ...completo, responsavel: '' }).ok, false);
+  assert.equal(normalizarEntrada({ responsavel: 'empresa' }).ok, true, 'empresa: só registra o tipo');
+  assert.equal(normalizarEntrada({ responsavel: 'PJ' }).dados.responsavel, 'PJ');
+  assert.deepEqual(camposDoLead(r.dados), { responsavel: 'PF', estado: 'SP', destinacao: 'residencial_unifamiliar', tipo_obra: 'alvenaria', categoria: 'obra_nova', area_principal: 180.5, data_inicio: '2023-03-01', data_fim: '2024-12-01' });
+});
+
+const DADOS_SIM = { responsavel: 'PF', estado: 'SP', destinacao: 'residencial_unifamiliar', tipo_obra: 'alvenaria', categoria: 'obra_nova', area_principal: 241.87, data_inicio: '2023-03', data_fim: '2024-12' };
+
+await teste('a mensagem da simulação passa nas travas, tem os números do cálculo e nunca mostra honorário nem "quanto sobra"', () => {
+  const { dados } = normalizarEntrada(DADOS_SIM);
+  const r = simular(dados, { hoje: HOJE_FIXO });
+  const msg = montarMensagemSimulacao(dados, r, { nome: 'Carlos Souza' });
+  assert.match(msg, /^Pronto, Carlos!/);
+  assert.match(msg, /Residencial|casa \(residencial unifamiliar\)/);
+  assert.match(msg, /03\/2023 a 12\/2024/);
+  assert.match(msg, /Fator de Ajuste \(50%\)/);
+  const cardSim = { id: 'wa-topo-x', nome: 'Carlos', ...Object.fromEntries(Object.entries(camposDoLead(dados, r))) };
+  assert.equal(semSimulacao(cardSim), false);
+  assert.equal(validarSaida(msg, cardSim, [r.parcelamento.valorParcela]).ok, true, 'cada valor da mensagem está nos dados do card (e o da parcela, calculado junto)');
+  assert.doesNotMatch(msg, /honor[aá]rio|12\s?%|sobra|l[ií]quid|m[ií]nimo/i);
+  const valores = extrairValoresReais(msg);
+  assert.ok(valores.some((v) => Math.abs(v - r.inssEstimado) <= 1) && valores.some((v) => Math.abs(v - r.economiaEstimada) <= 1) && valores.some((v) => Math.abs(v - r.valorAposReducao) <= 1));
+  assert.ok(msg.length < 900, 'mensagem curta o bastante para WhatsApp');
+  // obra antiga: só o INSS estimado, sem economia
+  const antiga = normalizarEntrada({ ...DADOS_SIM, data_inicio: '2019-01', data_fim: '2020-06' }).dados;
+  const ra = simular(antiga, { hoje: HOJE_FIXO });
+  const msgA = montarMensagemSimulacao(antiga, ra, {});
+  assert.doesNotMatch(msgA, /Economia estimada|Fator de Ajuste \(/);
+  assert.match(msgA, /5 anos/);
+  assert.equal(camposDoLead(antiga, ra).economia_estimada, null);
+  assert.equal(validarSaida(msgA, { id: 'wa-topo-x', nome: 'C', ...camposDoLead(antiga, ra) }).ok, true);
+});
+
+await teste('e-mail para o Gabriel: dados, resultado, honorário, líquido e mês a mês', () => {
+  const { dados } = normalizarEntrada(DADOS_SIM);
+  const r = simular(dados, { hoje: HOJE_FIXO });
+  const e = montarEmailSimulacao({ nome: 'Carlos', telefone: TEL_SITE, origem: 'botão de WhatsApp do topo do site', dados, r });
+  assert.equal(e.assunto, 'Simulação feita pelo bot: Carlos');
+  assert.match(e.html, /INSS estimado sem planejamento/);
+  assert.match(e.html, /Honorário \(12%/);
+  assert.match(e.html, /Economia líquida do cliente/);
+  assert.match(e.html, /Mês a mês/);
+  assert.match(e.html, new RegExp(`wa.me/${TEL_SITE}`));
+  assert.ok(r.detalhe.honorarios >= 800);
+});
+
+/** Botão do topo, os 3 textos de boas-vindas já foram, e a pessoa responde com os dados. */
+async function conversaDoBotao(roteiro) {
+  const ctx = montar({ roteiro });
+  await chegou(ctx, msgSite('topo'), { nome: 'Carlos Souza' });
+  const c = ctx.store.conversas[0];
+  const lead0 = ctx.store.leads.get(c.lead_id);
+  return { ctx, c, lead0 };
+}
+
+await teste('fluxo completo: ela passa os dados, o bot envia a simulação na conversa, manda e-mail ao Gabriel e preenche o card', async () => {
+  const { ctx, c, lead0 } = await conversaDoBotao([
+    [uso('registrar_nome', { nome: 'Carlos' }), uso('calcular_simulacao', DADOS_SIM)],
+    texto('É uma estimativa inicial e o Gabriel confirma com os documentos. Durante a obra houve pedreiro, pintor ou outro prestador autônomo?'),
+  ]);
+  const antes = ctx.wa.enviados.length;
+  await chegou(ctx, 'Sou o Carlos, pessoa física, em SP. Casa de alvenaria, obra nova, 241,87 m², de março de 2023 a dezembro de 2024.');
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+
+  const novas = ctx.wa.enviados.slice(antes).map((m) => m.texto);
+  assert.equal(novas.length, 2, 'simulação + uma mensagem de continuação');
+  assert.match(novas[0], /^Pronto, Carlos!/, 'a simulação sai primeiro');
+  assert.match(novas[0], /Economia estimada/);
+  assert.match(novas[1], /prestador autônomo\?$/);
+  assert.doesNotMatch(novas[1], /R\$/, 'a continuação não repete números');
+
+  // o card do CRM ficou com os dados da obra e os números
+  const card = ctx.store.leads.get(lead0.id);
+  const esperado = simular(normalizarEntrada(DADOS_SIM).dados);
+  assert.equal(card.responsavel, 'PF');
+  assert.equal(card.estado, 'SP');
+  assert.equal(card.area_principal, 241.87);
+  assert.equal(card.data_inicio, '2023-03-01');
+  assert.equal(card.inss_estimado, esperado.inssEstimado);
+  assert.equal(card.economia_estimada, esperado.economiaEstimada);
+  assert.equal(card.valor_apos_reducao, esperado.valorAposReducao);
+  assert.match(card.notas, /Simulação feita pelo bot na conversa/);
+  assert.equal(card.status, 'contatado');
+
+  // e-mail para o Gabriel
+  const email = ctx.avisos.find((a) => /^Simulação feita pelo bot/.test(a.tipo));
+  assert.ok(email, 'e-mail enviado');
+  assert.match(email.html, /Honorário/);
+  assert.match(email.html, /Carlos/);
+
+  // a simulação foi gravada no histórico como mensagem do bot (os números contam como "já explicados")
+  const hist = ctx.store.mensagens.filter((m) => m.conversa_id === c.id && m.direcao === 'bot');
+  assert.ok(hist.some((m) => /Economia estimada/.test(m.texto)));
+});
+
+await teste('depois da simulação o assistente passa a tratar como lead com números (sem repetir a simulação)', async () => {
+  const { ctx, c } = await conversaDoBotao([
+    [uso('calcular_simulacao', DADOS_SIM)],
+    texto('É uma estimativa inicial. Durante a obra houve algum prestador autônomo?'),
+    texto('Entendi. Ele cuida do cadastro e do recolhimento, e o saldo ainda pode ser parcelado.'),
+  ]);
+  await chegou(ctx, 'Casa em SP, alvenaria, obra nova, 241,87 m², março/2023 a dezembro/2024. Sou pessoa física.');
+  await ctx.bot.responder(c.id);
+  await chegou(ctx, 'Teve pedreiro sim, mas não recolhi nada');
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  const sistema2 = ctx.client.chamadas[2].system;
+  assert.match(sistema2, /SIMULAÇÃO JÁ FOI ENVIADA/);
+  assert.match(sistema2, /INSS estimado pela calculadora, antes da redução/);
+  assert.match(sistema2, /MÃO DE OBRA \(pessoa física\)/);
+  assert.doesNotMatch(sistema2, /AINDA SEM SIMULAÇÃO/);
+  assert.doesNotMatch(sistema2, /TEXTO DOS NÚMEROS:/);
+  assert.match(sistema2, /JÁ FORAM enviados na simulação/);
+  assert.ok(ctx.client.chamadas[2].tools.some((f) => f.name === 'calcular_simulacao'), 'ainda pode corrigir os dados');
+});
+
+await teste('falta dado: a ferramenta devolve o que falta e nada é enviado nem gravado como simulação', async () => {
+  const { ctx, c, lead0 } = await conversaDoBotao([
+    [uso('calcular_simulacao', { responsavel: 'PF', estado: 'SP', area_principal: 120 })],
+    texto('Para fechar a simulação preciso só de mais três informações: o tipo da obra, a categoria e quando ela começou.'),
+  ]);
+  const antes = ctx.wa.enviados.length;
+  await chegou(ctx, 'PF, em SP, 120 m²');
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.wa.enviados.length, antes + 1, 'só a pergunta do assistente');
+  assert.equal(ctx.store.leads.get(lead0.id).inss_estimado, undefined);
+  const resultado = ctx.client.chamadas[1].messages.at(-1).content[0].content;
+  assert.match(resultado, /"faltando":\["destinacao","tipo_obra","categoria","data_inicio"\]/);
+  assert.equal(ctx.avisos.filter((a) => /^Simulação feita pelo bot/.test(a.tipo)).length, 0);
+});
+
+await teste('empresa: não há simulação com valores; o tipo é registrado e nada de valores é enviado', async () => {
+  const { ctx, c, lead0 } = await conversaDoBotao([
+    [uso('calcular_simulacao', { responsavel: 'PJ', estado: 'MG' })],
+    texto('Para empresa o Fator de Ajuste não se aplica; a redução vem da contabilidade da obra e dos funcionários registrados na época. Na época havia funcionários registrados na obra?'),
+  ]);
+  const antes = ctx.wa.enviados.length;
+  await chegou(ctx, 'A obra é da minha empresa, em Minas');
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.wa.enviados.length, antes + 1);
+  assert.doesNotMatch(ctx.wa.enviados.at(-1).texto, /Economia estimada/);
+  const card = ctx.store.leads.get(lead0.id);
+  assert.equal(card.responsavel, 'PJ');
+  assert.equal(card.estado, 'MG');
+  assert.equal(card.inss_estimado, undefined);
+  assert.match(card.notas, /EMPRESA/);
+  assert.equal(ctx.avisos.filter((a) => /^Simulação feita pelo bot/.test(a.tipo)).length, 0, 'sem simulação, sem e-mail de simulação');
+});
+
+await teste('obra anterior a 2021: envia só o INSS estimado, sem economia, e o card fica sem estimativa de economia', async () => {
+  const { ctx, c, lead0 } = await conversaDoBotao([
+    [uso('calcular_simulacao', { ...DADOS_SIM, data_inicio: '2020-01', data_fim: '2022-06' })],
+    texto('Como a obra começou antes de 2021, o Gabriel analisa o período. Você tem documentos da época, como habite-se ou IPTU?'),
+  ]);
+  const antes = ctx.wa.enviados.length;
+  await chegou(ctx, 'dados da obra: PF, SP, casa alvenaria obra nova 241 m², jan/2020 a jun/2022');
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  const simMsg = ctx.wa.enviados[antes].texto;
+  assert.match(simMsg, /INSS estimado sem planejamento/);
+  assert.doesNotMatch(simMsg, /Economia estimada/);
+  const card = ctx.store.leads.get(lead0.id);
+  assert.equal(card.economia_estimada, null);
+  assert.ok(card.inss_estimado >= 0);
+});
+
+await teste('no máximo 3 simulações por conversa (trava contra repetição)', async () => {
+  const chamadas = [];
+  for (let i = 0; i < 4; i++) chamadas.push([uso('calcular_simulacao', { ...DADOS_SIM, area_principal: 200 + i }, `tu_${i}`)]);
+  const { ctx, c } = await conversaDoBotao([...chamadas.slice(0, 1), [...chamadas[1], ...chamadas[2], ...chamadas[3]], texto('Pronto, enviei as simulações com os valores que você corrigiu.')]);
+  await chegou(ctx, 'dados da obra completos');
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  const enviadas = ctx.wa.enviados.filter((m) => /Economia estimada|INSS estimado sem planejamento/.test(m.texto));
+  assert.equal(enviadas.length, 3);
+});
+
+await teste('quem veio da calculadora não recebe a ferramenta da simulação', async () => {
+  const ctx = montar({ roteiro: [texto('Oi! Vi aqui os dados da sua obra.')] });
+  const c = await abrir(ctx, lead());
+  await ctx.bot.aoReceber({ telefone: c.telefone, texto: 'Oi' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.ok(!ctx.client.chamadas[0].tools.some((f) => f.name === 'calcular_simulacao'));
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

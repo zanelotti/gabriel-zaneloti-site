@@ -8,6 +8,7 @@ import { citouNumerosDoCalculo, dividirMensagens, falaDeHonorario, leadPerguntou
 import { citouHonorarios } from './funil.js';
 import { formatarTrechos } from './documentos.js';
 import { formatarAprendidos } from './aprendizado.js';
+import { ehLeadExterno } from './origem.js';
 import { montarSistema } from './prompt.js';
 import { criarChamador, leadValorAlto, primeiroNome, primeiroNomePessoa } from './util.js';
 
@@ -84,6 +85,33 @@ export const FERRAMENTAS = [
     },
   },
 ];
+
+/** Só é oferecida para quem chegou pelo botão de WhatsApp do site ou pelo e-book (quem veio da calculadora já tem a simulação). */
+export const FERRAMENTA_SIMULACAO = {
+  name: 'calcular_simulacao',
+  description:
+    'Faz a simulação do INSS da obra com os dados que a pessoa informou na conversa. O sistema calcula, ENVIA a simulação para a pessoa no WhatsApp, manda por e-mail para o Gabriel e registra os dados no card. Você NÃO escreve os números. Para pessoa física precisa de: estado, destinacao, tipo_obra, categoria, area_principal e data_inicio. Para empresa (PJ) só registra o tipo e os dados que já tiver (não há simulação com valores). Se faltar algo, devolve o que falta: pergunte só isso. Se a pessoa corrigir um dado depois, chame de novo com todos os dados corrigidos.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      responsavel: { type: 'string', enum: ['PF', 'PJ'], description: 'PF = obra em nome de pessoa física; PJ = em nome de empresa.' },
+      estado: { type: 'string', description: 'Sigla do estado onde fica a obra (ex.: SP).' },
+      destinacao: {
+        type: 'string',
+        enum: ['residencial_unifamiliar', 'multifamiliar', 'comercial_salas_lojas', 'galpao_industrial', 'conjunto_habitacional', 'edificio_garagem'],
+        description: 'Uso da obra: casa = residencial_unifamiliar; prédio de apartamentos = multifamiliar; salas e lojas = comercial_salas_lojas.',
+      },
+      tipo_obra: { type: 'string', enum: ['alvenaria', 'madeira', 'mista'] },
+      categoria: { type: 'string', enum: ['obra_nova', 'acrescimo', 'reforma', 'demolicao'] },
+      area_principal: { type: 'number', description: 'Área construída principal, em m² (só o número).' },
+      area_complementar: { type: 'number', description: 'Piscina ou área externa/complementar, em m². Omita se não houver.' },
+      data_inicio: { type: 'string', description: 'Início da obra: AAAA-MM ou AAAA-MM-DD (mês e ano bastam).' },
+      data_fim: { type: 'string', description: 'Término da obra: AAAA-MM ou AAAA-MM-DD. Omita se a obra ainda está em andamento.' },
+    },
+    required: ['responsavel'],
+    additionalProperties: false,
+  },
+};
 
 /** Só é oferecida quando existe a pasta de documentos (normativa, manual do SERO...). */
 const FERRAMENTA_DOCUMENTOS = {
@@ -181,7 +209,8 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
       'fala de honorário/preço, mas a pessoa não perguntou o custo e ainda é cedo (o honorário só entra no FINAL da conversa, depois de explicar os números do cálculo; ou o caso é de valor alto e o foco é agendar a consultoria). Reescreva SEM citar honorário, percentual do Gabriel nem oferecer "mostrar a conta": se ainda não explicou os números do cálculo, explique-os agora (INSS estimado, redução e valor final, parcelamento); em caso de valor alto, passe confiança e ofereça a conversa rápida com o Gabriel (sem compromisso)';
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
     const temBusca = (documentos && documentos.total > 0) || (aprendizado && aprendizado.total > 0);
-    const ferramentasApi = temBusca ? [...FERRAMENTAS, FERRAMENTA_DOCUMENTOS] : FERRAMENTAS;
+    const base = ehLeadExterno(lead) ? [...FERRAMENTAS, FERRAMENTA_SIMULACAO] : FERRAMENTAS;
+    const ferramentasApi = temBusca ? [...base, FERRAMENTA_DOCUMENTOS] : base;
     let consultas = 0;
     const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato, aprendidos, parcelamentoCitado);
     const messages = montarHistorico(historico);

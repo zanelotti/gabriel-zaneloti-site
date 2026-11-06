@@ -10,6 +10,7 @@ import { indexarDocumentos } from './documentos.js';
 import { config, validarConfig } from './config.js';
 import { criarNotificador } from './notify.js';
 import { criarSite } from './site.js';
+import { sincronizarTabelasDoSite } from './simulacao.js';
 import { criarStore } from './store.js';
 import { dormir } from './util.js';
 import { criarWhatsApp } from './whatsapp.js';
@@ -32,6 +33,7 @@ const parado = controle.parado;
 const store = criarStore({ url: config.supabaseUrl, key: config.supabaseKey });
 const site = criarSite({ siteUrl: config.siteUrl });
 const notificar = criarNotificador({ resendKey: config.resendKey, para: config.emailAviso, log });
+sincronizarTabelasDoSite({ log }); // VAU e Selic do site, para a simulação feita na conversa
 const conhecimento = carregarConhecimento();
 log.info(`Conhecimento carregado: ${conhecimento.arquivos.length ? conhecimento.arquivos.join(', ') : 'nenhum arquivo'}`);
 let documentos = null;

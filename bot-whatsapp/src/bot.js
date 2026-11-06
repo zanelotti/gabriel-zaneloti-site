@@ -15,6 +15,7 @@ import { citouHonorarios, ehDocumentoDoLead, movimentoDaConsultoria, podeMover }
 import { dividirMensagens, pediuParar, validarSaida } from './guards.js';
 import { montarAbertura } from './opening.js';
 import { detectarOrigemSite, ehLeadExterno, idLeadEbook, montarBoasVindas, novoIdLeadExterno, origemDoLead, rotuloDaOrigem } from './origem.js';
+import { camposDoLead, montarEmailSimulacao, montarMensagemSimulacao, normalizarEntrada, simular } from './simulacao.js';
 import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, leadValorAlto, limparNomeInformado, normalizarTelefoneBR, primeiroNomePessoa } from './util.js';
 
 const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
@@ -30,6 +31,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   const falhasEbook = new Map();
   const abrindoPorSite = new Map(); // telefone -> promessa (evita abrir duas conversas quando a pessoa manda duas mensagens seguidas)
   const falhasResposta = new Map();
+  const simulacoesFeitas = new Map(); // conversaId -> quantas simulações o bot já mandou (trava contra repetição)
   const avisosEspera = new Map(); // conversaId -> quando avisamos que o lead está esperando
   const avisosDocumento = new Map(); // conversaId -> quando o lead mandou documento pela última vez (aviso + card)
   const cardsFeitos = new Set(); // 'card:agendamento:status'
@@ -470,7 +472,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       return;
     }
 
-    const mensagens = montarBoasVindas({ origem: det.origem, nome: primeiroNomePessoa(nomePessoa), assistente: config.assistenteNome });
+    const mensagens = montarBoasVindas({ origem: det.origem, nome: primeiroNomePessoa(det.nome || ''), nomeConfirmado: Boolean(det.nome), assistente: config.assistenteNome });
     await dormirFn(aleatorio(config.aberturaMinMs, config.aberturaMaxMs));
     for (const m of mensagens) {
       const v = validarSaida(m, lead);
@@ -687,6 +689,62 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       registrar_status: async ({ status, nota, motivo_perda: motivoPerda }) => {
         await store.atualizarLead(lead.id, { status, nota, motivoPerda });
         return { ok: true };
+      },
+      // Simulação do INSS feita na conversa (quem chegou pelo botão do site): calcula, ENVIA ao cliente, avisa o Gabriel por e-mail e preenche o card.
+      calcular_simulacao: async (args) => {
+        const entrada = normalizarEntrada(args);
+        if (!entrada.ok) return { ok: false, erro: entrada.erro, ...(entrada.faltando ? { faltando: entrada.faltando } : {}) };
+        const { dados } = entrada;
+        const origem = origemDoLead(lead);
+        const nomeCliente = nomeAtual || primeiroNomePessoa(lead.nome) || '';
+
+        if (dados.responsavel === 'PJ') {
+          await store.salvarDadosObra(lead.id, camposDoLead(dados));
+          try {
+            await store.atualizarLead(lead.id, { nota: 'Obra em nome de EMPRESA: o Fator de Ajuste não se aplica, então o bot não fez simulação com valores.' });
+          } catch (e) {
+            log.warn(`[bot] não consegui anotar que é empresa: ${e.message}`);
+          }
+          return {
+            ok: true,
+            simulacao: false,
+            orientacao:
+              'É empresa: o Fator de Ajuste não se aplica e não existe simulação com valores. O tipo já foi registrado no cadastro. Explique em 2 frases as frentes que valem para empresa (use o CONHECIMENTO, "formas de reduzir"), sem citar valores em reais, e faça UMA pergunta de diagnóstico (por exemplo, se na época da obra havia funcionários registrados ou se a obra tem contabilidade própria).',
+          };
+        }
+
+        const feitas = simulacoesFeitas.get(conversa.id) || 0;
+        if (feitas >= 3) return { ok: false, erro: 'o limite de simulações desta conversa foi atingido; se ela quiser outra, use passar_para_gabriel' };
+
+        const r = simular(dados);
+        await store.salvarDadosObra(lead.id, camposDoLead(dados, r));
+        await enviar(conversa, montarMensagemSimulacao(dados, r, { nome: nomeCliente }));
+        simulacoesFeitas.set(conversa.id, feitas + 1);
+        log.info(`[bot] simulação enviada a ${conversa.telefone} (${dados.estado}, ${dados.areaPrincipal} m²).`);
+
+        const temEconomia = r.regime !== 'gfip_anterior_2021' && r.economiaEstimada > 0;
+        try {
+          await store.atualizarLead(lead.id, {
+            nota: `Simulação feita pelo bot na conversa: INSS estimado ${formatarReaisInteiros(r.inssEstimado)}${temEconomia ? `, economia estimada ${formatarReaisInteiros(r.economiaEstimada)}` : ' (sem estimativa de economia: caso para análise)'}.`,
+          });
+        } catch (e) {
+          log.warn(`[bot] não consegui anotar a simulação no card: ${e.message}`);
+        }
+        try {
+          const email = montarEmailSimulacao({ nome: nomeCliente || lead.nome, telefone: conversa.telefone, origem: origem ? rotuloDaOrigem(origem) : '', dados, r });
+          const enviado = await notificar.enviar(email.assunto, email.html);
+          if (enviado === false) log.warn('[bot] a simulação foi enviada ao cliente, mas o e-mail para o Gabriel não saiu (confira RESEND_API_KEY).');
+        } catch (e) {
+          log.warn(`[bot] não consegui mandar o e-mail da simulação: ${e.message}`);
+        }
+        return {
+          ok: true,
+          enviada: true,
+          tem_estimativa_de_economia: temEconomia,
+          orientacao: temEconomia
+            ? 'A simulação JÁ foi enviada à pessoa na conversa e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais e sem repetir os números: diga que é uma estimativa inicial que o Gabriel confirma com os documentos da obra e faça UMA pergunta para avançar (por exemplo, se durante a obra houve pedreiro, pintor, eletricista ou outro prestador autônomo).'
+            : 'A simulação JÁ foi enviada à pessoa (só o INSS estimado, sem economia: o caso depende de análise) e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais, dizendo que o Gabriel analisa o caso e faça UMA pergunta sobre os documentos da época da obra (habite-se, alvará, IPTU, contas de consumo) ou sobre a mão de obra.',
+        };
       },
     };
   }
