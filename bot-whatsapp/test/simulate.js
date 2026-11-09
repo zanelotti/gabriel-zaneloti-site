@@ -21,7 +21,7 @@ import { descreverQuando, lembreteDevido, montarFollowup, montarMensagemConsulto
 import { detectarOrigemSite, ehLeadExterno, montarBoasVindas, ORIGENS, origemDoLead } from '../src/origem.js';
 import { camposDoLead, lerTabelasDoSite, montarEmailSimulacao, montarMensagemSimulacao, normalizarEntrada, origemDasTabelas, simular, sincronizarTabelasDoSite } from '../src/simulacao.js';
 import { semSimulacao } from '../src/origem.js';
-import { calcularHonorario, criarChamador, leadValorAlto, limparNomeInformado, mensagemDadosContrato, nomeParecePessoa, PERGUNTA_FECHAMENTO, normalizarTelefoneBR, primeiroNomePessoa } from '../src/util.js';
+import { calcularHonorario, criarChamador, leadValorAlto, limparNomeInformado, mensagemDadosContrato, nomeParecePessoa, PERGUNTA_FECHAMENTO, normalizarTelefoneBR, obraEmAndamento, primeiroNomePessoa } from '../src/util.js';
 
 let passou = 0;
 const teste = async (nome, fn) => {
@@ -385,7 +385,8 @@ await teste('prompt contém dados do lead, regras e política de reunião', () =
   const grande = montarSistema(lead(), config);
   assert.match(grande, /12%/);
   assert.match(grande, /R\$\s?42\.000/);
-  assert.match(grande, /pode oferecer a consultoria/);
+  assert.match(grande, /POLÍTICA DE REUNIÃO: NÃO ofereça reunião, consultoria nem ligação por iniciativa própria/);
+  assert.match(grande, /Se a PESSOA pedir reunião, consultoria ou chamada/);
   const pequena = montarSistema(lead({ economia_estimada: 2386 }), config);
   assert.match(pequena, /NÃO ofereça reunião/);
   const pj = montarSistema(lead({ responsavel: 'PJ' }), config);
@@ -565,32 +566,35 @@ await teste('agendamento: ver_horarios → agendar_consultoria → confirmação
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /marcado/);
 });
 
-await teste('ligação rápida hoje: prompt traz o plano C nas duas estratégias e o aviso "LIGAR HOJE" sai na hora, mesmo já em modo espera', async () => {
-  for (const estrategia of ['conversa', 'consultoria']) {
-    const sis = montarSistema(lead(), { ...config, estrategia });
-    assert.match(sis, /PLANO C: LIGAÇÃO RÁPIDA PELO CELULAR, NO MESMO DIA/);
-    assert.match(sis, /HOJE mesmo/);
-    assert.match(sis, /motivo começando exatamente por "LIGAÇÃO HOJE:"/);
-    assert.match(sis, /Não ofereça a ligação mais de uma vez/);
+await teste('parcelamento: obra em andamento não parcela (trava barra a frase, simulação não mostra, obra concluída continua parcelando)', async () => {
+  const emAndamento = lead({ situacao: 'em_construcao' });
+  const concluida = lead({ situacao: 'concluida_com_habite_se' });
+  const frases = [
+    'Dá para parcelar o saldo em até 60 vezes.',
+    'O saldo do INSS ainda pode ser parcelado.',
+    'Você pode parcelar o INSS da obra em 60 parcelas.',
+  ];
+  for (const f of frases) {
+    assert.equal(validarSaida(f, emAndamento).ok, false, `barra em obra em andamento: ${f}`);
+    assert.equal(validarSaida(f, concluida).ok, true, `libera em obra concluída: ${f}`);
   }
-  const ctx = montar({
-    roteiro: [
-      [...texto('Vou pedir para o Gabriel continuar essa conversa com você pessoalmente, ele te responde por aqui.'), uso('passar_para_gabriel', { motivo: 'pediu desconto', resumo: 'Quer fechar com 8%.' })],
-      [...texto('Combinado, o Gabriel te liga hoje por volta das 15h.'), uso('passar_para_gabriel', { motivo: 'LIGAÇÃO HOJE: aceitou ligação rápida', resumo: 'Melhor horário 15h, neste número.' })],
-    ],
-  });
-  const c = await abrir(ctx, lead());
-  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'faz por 8%?' });
-  await ctx.bot.responder(c.id);
-  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'pode ligar hoje às 15h nesse número' });
-  await ctx.bot.responder(c.id);
-  ctx.bot.pararTimers();
-  const aviso = ctx.avisos.find((a) => a.tipo === 'LIGAR HOJE');
-  assert.ok(aviso, 'aviso próprio de ligação, sem esperar os 30 min');
-  assert.match(aviso.motivo, /15h/);
-  assert.equal(ctx.avisos.filter((a) => a.tipo === 'LIGAR HOJE').length, 1);
-  assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /liga hoje/);
+  assert.equal(validarSaida('O honorário pode ser parcelado em até 6x sem juros no cartão.', emAndamento).ok, true, 'parcelar o honorário no cartão continua liberado');
+  assert.equal(validarSaida('Em obra em andamento o INSS é pago mês a mês, conforme a obra avança.', emAndamento).ok, true);
+  const base = { responsavel: 'PF', estado: 'MG', destinacao: 'residencial_unifamiliar', tipoObra: 'alvenaria', categoria: 'obra_nova', areaPrincipal: 150, dataInicio: '2023-01-01' };
+  const aberta = simular({ ...base }, { hoje: '2026-10-05' });
+  assert.equal(aberta.emAndamento, true);
+  assert.equal(aberta.parcelamento.aplicavel, false, 'obra em andamento: sem parcelamento');
+  assert.match(montarMensagemSimulacao({ ...base }, aberta, { nome: 'Maria' }), /pago mês a mês/);
+  assert.doesNotMatch(montarMensagemSimulacao({ ...base }, aberta, { nome: 'Maria' }), /parcelado/);
+  assert.equal(camposDoLead({ ...base }, aberta).situacao, 'em_construcao');
+  const fechada = simular({ ...base, dataFim: '2024-06-01' }, { hoje: '2026-10-05' });
+  assert.equal(fechada.emAndamento, false);
+  assert.equal(fechada.parcelamento.aplicavel, true, 'obra concluída com meses em atraso parcela');
+  assert.equal(obraEmAndamento({ situacao: 'iniciar_em_breve' }), true);
+  assert.equal(obraEmAndamento({ situacao: 'concluida_sem_habite_se' }), false);
 });
+
+
 
 await teste('passar_para_gabriel: manda a mensagem, avisa, e o bot segue disponível em modo espera', async () => {
   const ctx = montar({
@@ -877,12 +881,6 @@ await teste('falha técnica deixa a conversa com você: lead que escreve de novo
   assert.equal(ctx.avisos.length, 2);
 });
 
-await teste('prompt: dúvida técnica geral é respondida e passar_para_gabriel é último recurso', () => {
-  const s = montarSistema(lead(), config, '', 'trecho qualquer');
-  assert.match(s, /você responde de forma geral e simples/);
-  assert.match(s, /você NÃO responde mais nessa conversa/);
-  assert.match(s, /consultoria já está agendada/);
-});
 
 
 console.log('\nPainel do CRM');
@@ -1275,41 +1273,8 @@ await teste('fluxo: lead PF pergunta o custo e a Lia responde com o valor calcul
 
 console.log('\nEstratégia de venda');
 
-await teste('estratégia "conversa" (padrão): vende pela conversa, passa valor antes do honorário e usa a consultoria como plano B', () => {
-  const sis = montarSistema(lead(), { ...config, estrategia: 'conversa' });
-  assert.match(sis, /VENDER PELA CONVERSA/);
-  assert.match(sis, /PASSAR VALOR antes de falar de honorário/);
-  assert.match(sis, /plano B/);
-  assert.match(sis, /ARSENAL DE TÉCNICAS/);
-  assert.match(sis, /não vai fechar só pela conversa/);
-  assert.match(sis, /SOMENTE nos casos previstos/);
-  assert.doesNotMatch(sis, /LEVAR PARA A CONSULTORIA/);
-  const semCampo = montarSistema(lead(), config);
-  assert.match(semCampo, /VENDER PELA CONVERSA/, 'sem o campo, o padrão é vender pela conversa');
-});
 
-await teste('segundo livro: técnicas de escuta/necessidades entram nas duas estratégias, sem frases proibidas', () => {
-  for (const estrategia of ['conversa', 'consultoria']) {
-    const sis = montarSistema(lead(), { ...config, estrategia });
-    assert.match(sis, /ESCUTA, NECESSIDADES E COMUNICAÇÃO CLARA/);
-    assert.match(sis, /Pedido x necessidade/);
-    assert.match(sis, /Conte a intenção antes de perguntar/);
-    assert.match(sis, /Receita como problema a resolver/);
-    assert.match(sis, /Admita o que não sabe/);
-  }
-  const sis = montarSistema(lead(), config);
-  const bloco = sis.slice(sis.indexOf('ARSENAL COMPLEMENTAR'), sis.indexOf('# ESTRATÉGIA'));
-  assert.ok(bloco.length > 1500, 'bloco presente');
-  assert.doesNotMatch(bloco, /só paga|risco zero|sem risco|advogado|jurídic|direito/i);
-});
 
-await teste('estratégia "consultoria": leva para a consultoria, mas também passa valor antes do honorário', () => {
-  const sis = montarSistema(lead(), { ...config, estrategia: 'consultoria' });
-  assert.match(sis, /LEVAR PARA A CONSULTORIA/);
-  assert.match(sis, /sempre passe valor/);
-  assert.doesNotMatch(sis, /VENDER PELA CONVERSA/);
-  assert.match(sis, /POLÍTICA DE REUNIÃO: pode oferecer a consultoria gratuita/);
-});
 
 await teste('economia pequena continua sem oferecer reunião, em qualquer estratégia', () => {
   for (const estrategia of ['conversa', 'consultoria']) {
@@ -1336,29 +1301,7 @@ await teste('mensagens de valor um pouco mais longas passam (até 1.200 caracter
 
 console.log('\nMensagens cortadas e mensagens prontas');
 
-await teste('sucinto: prompt tem a regra "SEJA SUCINTA" nas duas estratégias e mantém as técnicas de venda', () => {
-  for (const estrategia of ['conversa', 'consultoria']) {
-    const sis = montarSistema(lead(), { ...config, estrategia });
-    assert.match(sis, /SEJA SUCINTA/);
-    assert.match(sis, /no máximo 2 frases curtas/);
-    assert.match(sis, /Uma técnica por mensagem/);
-    assert.match(sis, /Valor em doses/);
-    assert.match(sis, /ARSENAL DE TÉCNICAS/);
-    assert.match(sis, /AUDITORIA antes do preço|sempre passe valor/);
-    assert.doesNotMatch(sis, /1 a 3 frases; até 4/);
-  }
-});
 
-await teste('foco em fechar: estratégia "conversa" manda mostrar a conta cedo, convidar ao fechamento e puxar toda dúvida de volta para a decisão, sem pressão', () => {
-  const sis = montarSistema(lead(), { ...config, estrategia: 'conversa' });
-  assert.match(sis, /FOCO AGORA: FECHAR O CONTRATO/);
-  assert.match(sis, /já na 2ª ou 3ª resposta/);
-  assert.match(sis, /puxe de volta para a decisão/);
-  assert.match(sis, /nunca autoriza pressão, urgência inventada/);
-  assert.match(sis, /PASSAR VALOR antes de falar de honorário/);
-  const bloco = sis.slice(sis.indexOf('FOCO AGORA'), sis.indexOf('1. ENTENDER'));
-  assert.doesNotMatch(bloco, /só paga|risco zero|sem risco|advogado|jurídic|direito/i);
-});
 
 await teste('sucinto: muitoLonga ignora mensagem pronta (lista) e pega parágrafo grande', () => {
   assert.equal(muitoLonga('Oi! Tudo bem?'), false);
@@ -1407,13 +1350,6 @@ await teste('resposta cortada por limite de tamanho nunca é enviada: o bot pede
   assert.ok(!r2.mensagens.join(' ').includes('anter'), 'texto cortado não sai');
 });
 
-await teste('prompt manda usar mensagens prontas do conhecimento como estão e pedir dados do contrato', () => {
-  const sis = montarSistema(lead(), config, '## Documentos\nSe o lead perguntar quais documentos precisa, enviar essa msg:\n* Alvará');
-  assert.match(sis, /MENSAGENS PRONTAS/);
-  assert.match(sis, /COMO ESTÁ/);
-  assert.match(sis, /MENSAGEM DOS DADOS DO CONTRATO/);
-  assert.match(sis, /Se o lead perguntar quais documentos precisa/);
-});
 
 await teste('lista pronta em uma só mensagem (sem linhas em branco) sai inteira em uma mensagem', async () => {
   const lista = 'José, esses são os documentos que o Gabriel costuma pedir:\n* Dados do profissional\n* Procuração digital\n* Alvará\n* Projeto\n* CNO (se tiver)\n* Habite-se (se tiver)\n* Cadastro imobiliário (guia do IPTU)\n* Localização do terreno no Google Maps';
@@ -1455,26 +1391,25 @@ await teste('chamada ao Claude desliga o pensamento; se a API recusar o parâmet
 
 console.log('\nAbertura sem números (o site não mostra mais o resultado)');
 
-await teste('abertura apresenta o valor do serviço e a obra, sem nenhum número do cálculo (pessoa física)', () => {
-  const l = lead({ area_principal: 180, inss_estimado: 16760, valor_apos_reducao: 9311, economia_estimada: 7449, percentual_reducao: 44.4 });
+await teste('abertura: apresenta a Lia, diz que vai preparar a simulação e confirma metragem e prazo, sem nenhum número do cálculo', () => {
+  const l = lead({ area_principal: 180, data_inicio: '2023-03-01', data_fim: null, inss_estimado: 16760, valor_apos_reducao: 9311, economia_estimada: 7449, percentual_reducao: 44.4 });
   const a = montarAbertura(l, 'Lia');
   assert.equal(a.variante, 'Padrão');
-  assert.equal(
-    a.texto.replace(/\u00a0/g, ' '),
-    'Oi, Maria, tudo bem? Aqui é Lia, assistente do Gabriel Zaneloti, especialista em regularização de INSS de obra. Recebi os dados da obra de 180 m² pelo site. O Gabriel cuida de todo o processo para reduzir o INSS que a Receita cobraria da obra, do começo ao fim. E o saldo do INSS da obra ainda pode ser parcelado em até 60 vezes. Esta é uma hora ruim para eu te fazer umas perguntas rápidas sobre ela?');
+  const t = a.texto.replace(/\u00a0/g, ' ');
+  assert.match(t, /^Oi, Maria, tudo bem\? Aqui é Lia, assistente do Gabriel Zaneloti/);
+  assert.match(t, /vou preparar a sua simulação/);
+  assert.match(t, /Só para confirmar: a obra tem 180 m², com início em 03\/2023/);
+  assert.match(t, /Está certo\?$/);
   assert.equal(validarSaida(a.texto, l).ok, true, 'passa nas travas');
-  assert.doesNotMatch(a.texto, /honor[aá]rio|12%|R\$/i);
+  assert.doesNotMatch(a.texto, /honor[aá]rio|12%|R\$|parcel|reuni[aã]o/i);
 });
 
-await teste('abertura nunca traz valores, para economia pequena, média ou grande; a faixa só muda a variante (valor alto = acima de R$ 1.300 de honorário)', () => {
-  const esperado = { 3000: 'Padrão', 9000: 'Padrão', 10834: 'Padrão', 11000: 'Valor alto', 40000: 'Valor alto' };
-  for (const [eco, variante] of Object.entries(esperado)) {
-    const e = Number(eco);
-    const l = lead({ inss_estimado: e * 2, valor_apos_reducao: e, economia_estimada: e, percentual_reducao: 50 });
+await teste('abertura nunca traz valores nem parcelamento, para economia pequena, média ou grande, e sempre termina confirmando os dados', () => {
+  for (const eco of [3000, 9000, 11000, 40000]) {
+    const l = lead({ inss_estimado: eco * 2, valor_apos_reducao: eco, economia_estimada: eco, percentual_reducao: 50 });
     const a = montarAbertura(l, 'Lia', config);
-    assert.equal(a.variante, variante, `economia ${eco}`);
-    assert.doesNotMatch(a.texto, /R\$|\d+%|simulou/);
-    assert.match(a.texto, /60 vezes/);
+    assert.doesNotMatch(a.texto, /R\$|\d+%|simulou|parcel|60 vezes/i, `economia ${eco}`);
+    assert.match(a.texto, /Só para confirmar/);
     assert.equal(validarSaida(a.texto, l).ok, true);
   }
 });
@@ -1487,10 +1422,10 @@ await teste('empresa nunca recebe valores na abertura', () => {
 await teste('a área na abertura soma a principal com a complementar; o prompt traz a área total', () => {
   const l = lead({ area_principal: 180, area_piscina: 20, inss_estimado: 15542, valor_apos_reducao: 5758, economia_estimada: 9784, percentual_reducao: 63 });
   const a = montarAbertura(l, 'Lia');
-  assert.match(a.texto, /a obra de 200 m²/);
+  assert.match(a.texto, /a obra tem 200 m²/);
   assert.match(montarSistema(l, config), /Área total \(principal \+ complementar\): 200 m²/);
   const sem = montarAbertura(lead({ area_principal: 180, area_piscina: null }), 'Lia');
-  assert.match(sem.texto, /a obra de 180 m²/);
+  assert.match(sem.texto, /a obra tem 180 m²/);
   assert.doesNotMatch(montarSistema(lead({ area_principal: 180, area_piscina: null }), config), /Área total/);
 });
 
@@ -1513,12 +1448,11 @@ await teste('pessoa física: bloqueia falar em funcionário registrado/CLT; empr
   assert.equal(validarSaida('Durante a obra, teve pedreiro ou algum prestador autônomo? Mesmo sem recolhimento, dá para regularizar recolhendo depois.', pf).ok, true);
 });
 
-await teste('prompt e conhecimento trazem a regra: autônomo com recolhimento retroativo para pessoa física', () => {
+await teste('prompt e conhecimento trazem a regra: autônomo com recolhimento retroativo para pessoa física, sem perguntas sobre trabalhadores', () => {
   const sis = montarSistema(lead({ responsavel: 'PF' }), config, carregarConhecimento().texto);
   assert.match(sis, /AUTÔNOMO \(contribuinte individual\)/);
   assert.match(sis, /RETROATIVA/);
-  assert.match(sis, /MÃO DE OBRA \(pessoa física\)/);
-  assert.match(sis, /nunca tenha recolhido nada/);
+  assert.match(sis, /NÃO faz perguntas sobre os trabalhadores/);
   const c = carregarConhecimento().texto;
   assert.match(c, /inclusive de forma retroativa/);
   assert.doesNotMatch(c, /quem teve funcionário registrado na obra costuma ter o melhor resultado/);
@@ -1567,48 +1501,15 @@ await teste('texto corrigido do conhecimento substitui a versão antiga do CRM s
 
 console.log('\nParcelamento como diferencial');
 
-await teste('prompt manda citar o parcelamento (até 60 parcelas, Gabriel cuida) e lembra enquanto ainda não foi citado', () => {
+await teste('prompt: parcelamento só para meses em atraso (obra em andamento não parcela)', () => {
   const base = montarSistema(lead(), config);
-  assert.match(base, /DIFERENCIAL OBRIGATÓRIO, O PARCELAMENTO/);
+  assert.match(base, /11\. PARCELAMENTO \(regra técnica/);
+  assert.match(base, /OBRA EM ANDAMENTO .* NÃO PARCELA/);
   assert.match(base, /até 60 parcelas/);
-  assert.doesNotMatch(base, /AINDA NÃO CITOU O PARCELAMENTO/, 'por padrão não há lembrete');
-  const lembrete = montarSistema(lead(), config, '', '', null, '', '', false);
-  assert.match(lembrete, /AINDA NÃO CITOU O PARCELAMENTO/);
-  assert.doesNotMatch(montarSistema(lead(), config, '', '', 'preço', '', '', false), /AINDA NÃO CITOU/, 'em modo espera não cobra');
+  assert.doesNotMatch(base, /AINDA NÃO CITOU O PARCELAMENTO/);
 });
 
-await teste('cérebro só lembra o parcelamento até o bot citá-lo (a abertura não conta)', async () => {
-  const mk = () => {
-    const chamadas = [];
-    return { chamadas, messages: { async create(p) { chamadas.push(p); return { content: [{ type: 'text', text: 'Claro, vamos ver isso.' }], stop_reason: 'end_turn' }; } } };
-  };
-  const c1 = mk();
-  const r1 = criarCerebro({ modelo: 't', config, client: c1 });
-  await r1.gerarResposta({ lead: lead(), historico: [{ direcao: 'bot', texto: 'Oi, sou a Lia. Posso te explicar de onde vêm esses números?' }, { direcao: 'lead', texto: 'pode' }], ferramentas: {}, log: silencioso });
-  assert.match(c1.chamadas[0].system, /AINDA NÃO CITOU O PARCELAMENTO/);
-  const c2 = mk();
-  const r2 = criarCerebro({ modelo: 't', config, client: c2 });
-  await r2.gerarResposta({ lead: lead(), historico: [{ direcao: 'bot', texto: 'O saldo ainda pode ser parcelado em até 60 vezes e o Gabriel cuida disso.' }, { direcao: 'lead', texto: 'legal, e como funciona?' }], ferramentas: {}, log: silencioso });
-  assert.doesNotMatch(c2.chamadas[0].system, /AINDA NÃO CITOU O PARCELAMENTO/);
-});
 
-await teste('toda abertura cita o parcelamento (até 60 vezes) antes da pergunta final', () => {
-  const casos = [
-    lead({ inss_estimado: 16760, valor_apos_reducao: 9311, economia_estimada: 7449, percentual_reducao: 44 }),
-    lead({ inss_estimado: 16760, valor_apos_reducao: 9311, economia_estimada: 40000, percentual_reducao: 80 }),
-    lead({ inss_estimado: 16760, valor_apos_reducao: 9311, economia_estimada: 3000 }),
-    lead({ responsavel: 'PJ', economia_estimada: null, inss_estimado: null }),
-    lead({ data_inicio: '2019-05-01' }),
-    lead({ inss_estimado: null, economia_estimada: null }),
-    lead({ nome: '' }),
-  ];
-  for (const l of casos) {
-    const a = montarAbertura(l, 'Lia');
-    assert.match(a.texto, /E o saldo do INSS da obra ainda pode ser parcelado em até 60 vezes\./, a.variante);
-    assert.match(a.texto, /parcelado em até 60 vezes\. [^.!?]*\?$/, `parcelamento vem antes da pergunta final (${a.variante})`);
-    assert.equal(validarSaida(a.texto, l).ok, true, `${a.variante}: ${validarSaida(a.texto, l).motivo}`);
-  }
-});
 
 console.log('\nAprendizado automático');
 
@@ -1640,9 +1541,9 @@ await teste('índice: dúvida parecida encontra o item aprendido e o prompt rece
   const texto = formatarAprendidos(achados);
   assert.match(texto, /Dúvida parecida/);
   const com = montarSistema(lead(), config, '', '', null, '', texto);
-  assert.match(com, /O QUE O GABRIEL JÁ RESPONDEU/);
+  assert.match(com, /# O QUE O GABRIEL JÁ RESPONDEU EM CASOS PARECIDOS/);
   assert.match(com, /40% do custo/);
-  assert.doesNotMatch(montarSistema(lead(), config), /O QUE O GABRIEL JÁ RESPONDEU/);
+  assert.doesNotMatch(montarSistema(lead(), config), /# O QUE O GABRIEL JÁ RESPONDEU EM CASOS PARECIDOS/);
 });
 
 await teste('cérebro: usa o aprendizado ao responder e a ferramenta de consulta passa a existir', async () => {
@@ -1872,7 +1773,7 @@ await teste('modelos de acompanhamento: tempos, textos e sem valor para empresa'
   assert.doesNotMatch(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: false }), /R\$|o site mostrou/, 'o lead não viu números: o lembrete não cita valores');
   assert.match(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: false }), /como funciona a redução/);
   assert.match(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: true }), /Ficou alguma dúvida/);
-  assert.match(montarFollowup({ lead: pf, nivel: 2, respondeuAntes: false }), /60 vezes/);
+  assert.doesNotMatch(montarFollowup({ lead: pf, nivel: 2, respondeuAntes: false }), /parcel/i, 'acompanhamento não promete parcelamento');
   assert.match(montarFollowup({ lead: pf, nivel: 3, respondeuAntes: false }), /desistiu de regularizar/);
   for (const nivel of [1, 2, 3]) {
     assert.doesNotMatch(montarFollowup({ lead: lead({ responsavel: 'PJ', economia_estimada: 42000 }), nivel, respondeuAntes: false }), /R\$/, 'empresa: nunca cita economia');
@@ -1897,7 +1798,7 @@ await teste('acompanhamento: 1 dia, 3 dias e 7 dias de silêncio; depois para', 
   assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0, 'não repete');
   envelhecer(ctx, 49);
   assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
-  assert.match(ctx.wa.enviados[enviados() - 1].texto, /60 vezes/);
+  assert.match(ctx.wa.enviados[enviados() - 1].texto, /compensa mexer nisso/);
   envelhecer(ctx, 97);
   assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
   assert.match(ctx.wa.enviados[enviados() - 1].texto, /desistiu/);
@@ -2099,57 +2000,41 @@ await teste('motivo da perda: o bot grava o motivo e não sobrescreve o que o Ga
   assert.equal(ctx.store.leads.get(l.id).motivo_perda, 'desconfianca');
 });
 
-await teste('valor antes do preço: o prompt traz economia e honorário, SEM a conta líquida (quanto sobra), e o guard barra o valor que sobra', () => {
+await teste('prompt: papel de assistente de simulação (escopo, respostas curtas, sem vender, agendamento não é na hora)', () => {
+  const s = montarSistema(lead(), config);
+  assert.match(s, /14\. SEU ESCOPO/);
+  assert.match(s, /15\. RESPOSTAS CURTAS/);
+  assert.match(s, /SEU FLUXO: SIMULAÇÃO/);
+  assert.match(s, /NÃO é na hora/);
+  assert.match(s, /próximo horário livre do Gabriel/);
+  assert.match(s, /passar_para_gabriel/);
+  assert.doesNotMatch(s, /AINDA NÃO CITOU/);
+  assert.doesNotMatch(s, /Razão social/);
+  assert.doesNotMatch(s, /estratégia de conversa|ESTRATEGIA_CONSULTORIA/i);
+});
+
+await teste('config.estrategia é ignorada: o prompt é o mesmo de simulação', () => {
+  const a = montarSistema(lead(), { ...config, estrategia: 'consultoria' });
+  const b = montarSistema(lead(), { ...config, estrategia: 'conversa' });
+  assert.equal(a, b);
+  assert.match(a, /SEU FLUXO: SIMULAÇÃO/);
+});
+
+await teste('valor antes do preço: o prompt traz economia e honorário só se ela perguntar o custo, SEM a conta líquida, e o guard barra o valor que sobra', () => {
   const l = lead({ economia_estimada: 42000 });
   const sistema = montarSistema(l, config);
-  assert.match(sistema, /COMO APRESENTAR O PREÇO[^\n]*honorário de R\$\s5\.040[^\n]*economia estimada de R\$\s42\.000/);
+  assert.match(sistema, /SE ELA PERGUNTAR O CUSTO/);
   assert.doesNotMatch(sistema, /sobra para a pessoa/);
   assert.equal(validarSaida('Os honorários são de R$ 5.040, sobre a economia estimada de R$ 42.000.', l).ok, true);
-  // O valor líquido (42.000 - 5.040 = 36.960) não é mais um número permitido nem pode ser dito de nenhum jeito.
   assert.equal(validarSaida('Você economizaria R$ 42.000, pagaria R$ 5.040 e ficariam R$ 36.960 com você.', l).ok, false);
   assert.equal(validarSaida('Ficariam R$ 36.960 com você.', l).ok, false);
   assert.equal(validarSaida('Sobram R$ 36.960 para você.', l).ok, false);
   assert.equal(validarSaida('Isso fica no seu bolso.', l).ok, false);
   assert.equal(validarSaida('R$ 36.960 ficam no seu bolso.', l).ok, false);
   assert.equal(validarSaida('Com a redução, o INSS ficaria em R$ 12.000.', lead({ economia_estimada: 42000, valor_apos_reducao: 12000 })).ok, true, 'o valor do INSS após a redução continua permitido');
-  assert.doesNotMatch(montarSistema(lead({ responsavel: 'PJ' }), config), /COMO APRESENTAR O PREÇO/, 'empresa não tem economia confiável');
-  assert.doesNotMatch(montarSistema(lead({ economia_estimada: null }), config), /COMO APRESENTAR O PREÇO/);
 });
 
-await teste('fechamento objetivo: pergunta de sim ou não (nunca "como você gostaria de seguir?") e lista de dados do contrato quando ela aceitar', () => {
-  const l = lead({ economia_estimada: 8000 });
-  const sistema = montarSistema(l, config);
-  assert.ok(sistema.includes(PERGUNTA_FECHAMENTO), 'o prompt traz a pergunta objetiva de fechamento');
-  assert.match(sistema, /Proibido pergunta aberta de fechamento/);
-  // A pergunta aberta antiga é barrada pelo guard (e a objetiva passa).
-  for (const aberta of ['Como você gostaria de seguir?', 'Como você gostaria de seguir daqui?', 'Como prefere seguir?', 'Como você quer prosseguir?']) {
-    assert.equal(validarSaida(aberta, l).ok, false, aberta);
-  }
-  assert.equal(validarSaida(PERGUNTA_FECHAMENTO, l).ok, true);
-  // Mensagem pronta com os dados do contrato: PF e empresa, uma mensagem só (sem linha em branco).
-  const pf = mensagemDadosContrato(l);
-  for (const item of ['Nome completo', 'CPF', 'Endereço completo', 'E-mail']) assert.match(pf, new RegExp(item));
-  assert.equal(dividirMensagens(pf).length, 1);
-  assert.equal(validarSaida(pf, l).ok, true);
-  const pj = mensagemDadosContrato(lead({ responsavel: 'PJ' }));
-  assert.match(pj, /CNPJ/);
-  assert.match(pj, /representante/);
-  assert.ok(sistema.includes(pf), 'o prompt do lead traz a mensagem exata para enviar quando ela aceitar');
-  assert.match(sistema, /MENSAGEM DOS DADOS DO CONTRATO/);
-  assert.match(montarSistema(lead({ responsavel: 'PJ' }), config), /CNPJ/);
-});
 
-await teste('prova social: regra no prompt e depoimentos reais (sem nome e sem valores) na base de conhecimento', () => {
-  const sistema = montarSistema(lead(), config);
-  assert.match(sistema, /PROVA SOCIAL/);
-  assert.match(sistema, /SOMENTE se ele estiver escrito/);
-  const k = carregarConhecimento();
-  assert.ok(k.arquivos.includes('06-casos-de-sucesso.md'));
-  assert.match(k.texto, /feedbacks REAIS/);
-  const casos = k.texto.split('## Arquivo: 06-casos-de-sucesso.md')[1].split('## Arquivo:')[0];
-  assert.doesNotMatch(casos, /R\$/, 'os depoimentos não têm valores inventados');
-  assert.match(k.texto, /nunca prometa que o mesmo resultado/);
-});
 
 
 console.log('\nCautela com lead grande e preço');
@@ -2163,20 +2048,6 @@ function cerebroRoteiro(roteiro) {
 const leadPequeno = () => lead({ economia_estimada: 8000, inss_estimado: 20000, valor_apos_reducao: 12000 });
 const hist = (...textos) => textos.map((t, i) => ({ direcao: i % 2 === 0 ? 'lead' : 'bot', texto: t }));
 
-await teste('lead de valor alto: o prompt manda ter cautela, não falar de honorário sozinha e oferecer a conversa cedo; lead pequeno não recebe o bloco', () => {
-  assert.equal(leadValorAlto(lead()), true);
-  assert.equal(leadValorAlto(leadPequeno()), false);
-  assert.equal(leadValorAlto(lead({ responsavel: 'PJ' })), false);
-  const alto = montarSistema(lead(), config);
-  assert.match(alto, /LEAD DE VALOR ALTO/);
-  assert.match(alto, /AGENDAR A CONSULTORIA GRATUITA/);
-  assert.match(alto, /NÃO fale em honorário/);
-  assert.match(alto, /NÃO apresente o texto dos números/);
-  assert.match(alto, /já na 2ª ou 3ª resposta/);
-  assert.doesNotMatch(montarSistema(leadPequeno(), config), /LEAD DE VALOR ALTO/);
-  assert.match(alto, /PERGUNTA GERAL NÃO É MOTIVO PARA PASSAR/);
-  assert.doesNotMatch(alto, /sem esperar ela perguntar/);
-});
 
 await teste('valor alto = honorário ACIMA de R$ 1.300 (exatamente R$ 1.300 ainda é lead comum)', () => {
   // 12% de 10.833 = 1.299,96 -> R$ 1.300; 12% de 10.900 = 1.308
@@ -2188,24 +2059,6 @@ await teste('valor alto = honorário ACIMA de R$ 1.300 (exatamente R$ 1.300 aind
   assert.equal(leadValorAlto(lead({ economia_estimada: null })), false);
 });
 
-await teste('prompt: cada faixa recebe o seu roteiro (alto agenda consultoria; comum explica os números e só no fim fala do honorário)', () => {
-  const alto = montarSistema(lead(), config);
-  assert.match(alto, /acima de R\$\s1\.300/);
-  const comum = montarSistema(leadPequeno(), config);
-  assert.match(comum, /ROTEIRO DESTE LEAD: honorário até R\$\s1\.300/);
-  assert.match(comum, /TEXTO DOS NÚMEROS/);
-  assert.match(comum, /HONORÁRIO SÓ NO FINAL/);
-  assert.doesNotMatch(comum, /LEAD DE VALOR ALTO/);
-  const pj = montarSistema(lead({ responsavel: 'PJ' }), config);
-  assert.match(pj, /não há números do cálculo para apresentar/);
-  const sem = montarSistema(lead({ economia_estimada: null, inss_estimado: null }), config);
-  assert.match(sem, /não há números do cálculo para apresentar/);
-  for (const sis of [alto, comum, pj]) {
-    assert.match(sis, /A PESSOA AINDA NÃO VIU NENHUM VALOR/);
-    assert.match(sis, /DUAS FAIXAS DE HONORÁRIO/);
-    assert.doesNotMatch(sis, /valor que o site mostrou|Economia estimada pelo site/);
-  }
-});
 
 await teste('lead de valor alto: o limite de honorário pode ser ajustado pela configuração', () => {
   assert.equal(leadValorAlto(lead({ economia_estimada: 20000 }), { honorarioAlto: 3000 }), false); // honorário 2.400
@@ -2421,13 +2274,6 @@ await teste('repetição: o cérebro pede UMA reescrita sem o nome repetido; se 
   assert.deepEqual(r2.mensagens, [ruim]);
 });
 
-await teste('repetição: o prompt manda usar pouco o nome, não repetir "o Gabriel", não fazer pergunta de enchimento e avançar para a conversa depois de 2 perguntas', () => {
-  const p = montarSistema(lead(), config);
-  assert.match(p, /NOMES, REPETIÇÃO E PERGUNTAS/);
-  assert.match(p, /no máximo 1 vez a cada 4 mensagens/);
-  assert.match(p, /Isso combina com o que você precisa/);
-  assert.match(p, /depois de no máximo 2 perguntas de diagnóstico/);
-});
 
 console.log('\nLead repetido (mesmo telefone em dois leads)');
 
@@ -2655,7 +2501,6 @@ await teste('depois da boas-vindas, a resposta dela segue o roteiro da origem (s
   assert.match(sistema, /honorário/i);
   assert.doesNotMatch(sistema, /INSS estimado pela calculadora/);
   assert.doesNotMatch(sistema, /MÃO DE OBRA \(pessoa física\)/);
-  assert.match(sistema, /Razão social/, 'a lista de dados do contrato de empresa também vai para o assistente');
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /situação 2/);
 });
 

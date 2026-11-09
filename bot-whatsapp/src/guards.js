@@ -3,7 +3,7 @@
  * bot pretende enviar. Nada sai para o lead sem passar por `validarSaida`.
  */
 
-import { calcularHonorario, HONORARIO_BASE_PJ, HONORARIO_MINIMO_PF } from './util.js';
+import { calcularHonorario, HONORARIO_BASE_PJ, HONORARIO_MINIMO_PF, obraEmAndamento } from './util.js';
 import { semSimulacao } from './origem.js';
 
 /** O lead pediu para não receber mais mensagens? */
@@ -41,6 +41,10 @@ const PROIBIDAS = [
   // Fechamento tem de ser pergunta objetiva (sim/não), nunca pergunta aberta.
   [/\b(como|de que (?:forma|maneira)|qual (?:o |seu )?(?:melhor )?caminho)\b[^.!?\n]{0,25}\b(voc[eê]|vc|prefere|gostaria|quer|deseja)\b[^.!?\n]{0,20}\b(seguir|prosseguir|avan[cç]ar|continuar|prefere)\b/i, 'pergunta aberta de fechamento (como você gostaria de seguir?); use a pergunta objetiva de sim ou não'],
 ];
+
+/** Parcelamento do saldo/INSS da obra (não pega o parcelamento do honorário no cartão). */
+export const REGEX_PARCELA_SALDO =
+  /parcel\w*[^.?!\n]{0,70}\b(saldo|inss|d[ée]bito|d[ií]vida)\b|\b(saldo|inss|d[ée]bito|d[ií]vida)\b[^.?!\n]{0,70}parcel\w*|\b60\s*(vezes|parcelas|x)\b/i;
 
 export const REGEX_CLT_PF = /funcion[aá]rios?\s+(registrad|com\s+carteira|contratad)|registrad[oa]s?\s+(em\s+)?(clt|na\s+carteira)|\bclt\b|carteira\s+assinada/i;
 
@@ -100,6 +104,15 @@ export function validarSaida(texto, lead, valoresExtras = [], { ignorarClt = fal
       ok: false,
       motivo:
         'fala em funcionário registrado/CLT para pessoa física. Para pessoa física a frente é o trabalhador AUTÔNOMO com INSS recolhido ligado ao CNO, inclusive de forma retroativa (mesmo que nada tenha sido recolhido); funcionário registrado é só para empresa. Reescreva sem insinuar que a falta de recolhimento atrapalha',
+    };
+  }
+
+  // Obra em andamento NÃO parcela o INSS (é pago mês a mês, conforme a obra avança). O parcelamento em até 6x do HONORÁRIO no cartão é outro assunto e continua liberado.
+  if (obraEmAndamento(lead) && REGEX_PARCELA_SALDO.test(t)) {
+    return {
+      ok: false,
+      motivo:
+        'fala em parcelar o saldo/INSS da obra, mas esta obra está EM ANDAMENTO e obra em andamento não parcela: o INSS é pago mês a mês, conforme a obra avança (o parcelamento só vale para meses já em atraso). Reescreva sem falar em parcelamento do INSS.',
     };
   }
 
@@ -176,7 +189,7 @@ export function falaDeHonorario(texto) {
  * ("como funciona?") se responde na conversa.
  */
 export function passagemJustificada(motivo) {
-  return /liga[cç][aã]o hoje|desconto|negocia|condi[cç][aã]o|pessoa|humano|atendente|falar com (o )?gabriel|irrit|reclam|document|[aá]udio|proposta formal|decidid|contrat|fechar|dados do contrato|pediu para falar/i.test(String(motivo ?? ''));
+  return /corre[cç][aã]o de dados|liga[cç][aã]o hoje|desconto|negocia|condi[cç][aã]o|pessoa|humano|atendente|falar com (o )?gabriel|irrit|reclam|document|[aá]udio|proposta formal|decidid|contrat|fechar|dados do contrato|pediu para falar/i.test(String(motivo ?? ''));
 }
 
 // ---------------------------------------------------------------------------

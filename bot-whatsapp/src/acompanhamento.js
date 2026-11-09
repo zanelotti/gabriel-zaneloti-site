@@ -56,7 +56,7 @@ export function montarFollowup({ lead, nivel, respondeuAntes, nomeContato = '' }
     return `${oi} Só passando para ver se você conseguiu ler minha mensagem sobre o INSS da sua obra. Posso te explicar como funciona a redução, sem compromisso?`;
   }
   if (nivel === 2) {
-    return `${oi} Muita gente fica na dúvida se compensa mexer nisso. O saldo do INSS da obra ainda pode ser parcelado em até 60 vezes, e a análise pode reduzir o que a Receita cobraria. Faz sentido a gente conversar uns minutinhos?`;
+    return `${oi} Muita gente fica na dúvida se compensa mexer nisso. A análise pode reduzir o que a Receita cobraria da sua obra. Faz sentido a gente conversar uns minutinhos?`;
   }
   return `${oi} Como não tive retorno, devo entender que você desistiu de regularizar o INSS da sua obra? Se for só falta de tempo, sem problema: é só me chamar aqui que eu retomo de onde paramos.`;
 }

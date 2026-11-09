@@ -69,7 +69,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   }
 
   /**
-   * Lead de valor alto (honorário acima de R$ 1.300, o mesmo limite que faz o bot tentar agendar a consultoria): avisa o Gabriel por e-mail, uma vez por tipo de aviso,
+   * Lead de valor alto (honorário acima de R$ 1.300): avisa o Gabriel por e-mail, uma vez por tipo de aviso,
    * para ele entrar pessoalmente (áudio de 1 minuto ou ligação) enquanto o lead está quente.
    */
   async function avisarLeadGrande(conversa, lead, tipoAviso, historico = []) {

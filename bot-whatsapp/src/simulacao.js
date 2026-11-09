@@ -309,14 +309,18 @@ export function simular(d, { hoje = hojeISO() } = {}) {
   const fimCalculo = maxISO(inicioCalculo, dataFimEfetiva);
   const f = calcularFatorAjuste({ rmt100: rmt.rmt100, areaM2: rmt.areaTotal, dataInicio: inicioCalculo, dataFim: fimCalculo, responsavel: 'PF', dataCalculo: hoje });
   const honorarios = round2(Math.max(HONORARIO_MINIMO_PF, f.reducao * 0.12));
+  // Obra em andamento NÃO parcela: o INSS é pago mês a mês, conforme a obra avança. Só o saldo de meses em atraso (obra concluída) parcela.
+  const emAndamento = !d.dataFim || d.dataFim.slice(0, 7) >= hoje.slice(0, 7);
+  const parcelamento = emAndamento ? { aplicavel: false, totalParcelavel: 0, numeroParcelas: 0, valorParcela: 0 } : f.parcelamento;
   return {
+    emAndamento,
     regime,
     dataCalculo: hoje,
     inssEstimado: f.totalSemFator,
     economiaEstimada: f.reducao,
     percentualReducao: f.reducaoPercentual,
     valorAposReducao: f.totalComFator,
-    parcelamento: f.parcelamento,
+    parcelamento,
     detalhe: {
       rmt100: round2(rmt.rmt100),
       areaTotal: rmt.areaTotal,
@@ -434,6 +438,7 @@ export function camposDoLead(dados, r = null) {
     ...(dados.dataInicio ? { data_inicio: dados.dataInicio } : {}),
     ...(dados.dataFim ? { data_fim: dados.dataFim } : {}),
   };
+  if (r?.emAndamento) campos.situacao = 'em_construcao'; // mesmo valor do site; a trava de parcelamento usa isso
   if (r) {
     campos.inss_estimado = r.inssEstimado;
     // Obra anterior a 2021 ou sem redução: o site também não mostra economia (o caso é de análise).
@@ -470,7 +475,11 @@ export function montarMensagemSimulacao(d, r, { nome = '' } = {}) {
   if (!(r.economiaEstimada > 0)) {
     return `${topo}\n• INSS estimado sem planejamento: ${reais(r.inssEstimado)}\n\nCom esses dados, o Fator de Ajuste sozinho não mostra economia, mas há outras frentes (notas fiscais, mão de obra comprovada, tempo da obra). O Gabriel analisa o seu caso e confirma o que vale.`;
   }
-  const parcela = r.parcelamento?.aplicavel ? `\nO saldo ainda pode ser parcelado em até ${r.parcelamento.numeroParcelas} vezes (parcelas de cerca de ${reais(r.parcelamento.valorParcela)}).` : '';
+  const parcela = r.parcelamento?.aplicavel
+    ? `\nO saldo dos meses em atraso ainda pode ser parcelado em até ${r.parcelamento.numeroParcelas} vezes (parcelas de cerca de ${reais(r.parcelamento.valorParcela)}).`
+    : r.emAndamento
+      ? '\nComo a obra está em andamento, o INSS dela é pago mês a mês, conforme a obra avança.'
+      : '';
   return `${topo}\n• INSS estimado sem planejamento: ${reais(r.inssEstimado)}\n• Com o Fator de Ajuste (${r.detalhe.percentualFator}%): ${reais(r.valorAposReducao)}\n• Economia estimada: ${reais(r.economiaEstimada)} (${Number(r.percentualReducao).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%)${parcela}\n\nÉ uma estimativa: o Gabriel confirma o valor final na análise dos documentos da obra.`;
 }
 

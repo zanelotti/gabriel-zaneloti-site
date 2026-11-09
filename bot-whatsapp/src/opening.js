@@ -4,8 +4,7 @@
  * (ASSISTENTE_NOME) como assistente do Gabriel, e não como se fosse o próprio Gabriel.
  *
  * IMPORTANTE: o site NÃO mostra mais o resultado do cálculo ao visitante. Por isso a abertura NÃO cita nenhum valor
- * (INSS, economia, honorário): ela apresenta o valor do SERVIÇO (reduzir o INSS, cuidar de tudo, parcelar o saldo em até
- * 60 vezes) e puxa conversa sobre a obra. Os números só aparecem depois, na conversa, na hora certa.
+ * (INSS, economia, honorário): ela só confirma a metragem e o prazo da obra. Os números aparecem depois, na simulação enviada na conversa.
  *
  * Regras de conteúdo (alinhadas com o Gabriel): nada de "só paga se economizar",
  * sem mencionar honorários na abertura, e sem as palavras "legal", "direito" ou "advogado"
@@ -14,14 +13,21 @@
 import { montarAberturaEbook, ehLeadExterno } from './origem.js';
 import { formatarArea, leadValorAlto, primeiroNomePessoa, regimeApuracao } from './util.js';
 
-const FRASE_PARCELAMENTO = 'E o saldo do INSS da obra ainda pode ser parcelado em até 60 vezes.';
+/** "2023-03-01" -> "03/2023" */
+function mesAno(iso) {
+  const m = /^(\d{4})-(\d{2})/.exec(String(iso || ''));
+  return m ? `${m[2]}/${m[1]}` : '';
+}
 
-/** Coloca a vantagem do parcelamento antes da pergunta final da abertura, para o lead já saber que ela existe. */
-function comParcelamento(corpo) {
-  let corte = -1;
-  for (const m of corpo.matchAll(/[.!?] /g)) corte = m.index + 2;
-  if (corte < 0) return `${FRASE_PARCELAMENTO} ${corpo}`;
-  return `${corpo.slice(0, corte)}${FRASE_PARCELAMENTO} ${corpo.slice(corte)}`;
+/** Pergunta de confirmação da metragem e do prazo da obra (o papel do bot é só confirmar os dados básicos e passar a simulação). */
+function pedidoDeConfirmacao(lead) {
+  const area = Number(lead.area_principal) + (Number(lead.area_piscina) > 0 ? Number(lead.area_piscina) : 0);
+  const inicio = mesAno(lead.data_inicio);
+  const fim = mesAno(lead.data_fim);
+  if (Number.isFinite(area) && area > 0 && inicio) {
+    return `Só para confirmar: a obra tem ${formatarArea(area)}, com início em ${inicio} ${fim ? `e término em ${fim}` : 'e ainda em andamento'}. Está certo?`;
+  }
+  return 'Para fazer a sua simulação, me confirma a metragem da obra e o prazo (mês e ano de início e de término)?';
 }
 
 export function montarAbertura(lead, nomeAssistente = 'Lia', config = {}) {
@@ -47,20 +53,20 @@ export function montarAbertura(lead, nomeAssistente = 'Lia', config = {}) {
 
   if (isPJ) {
     variante = 'PJ';
-    corpo = `Recebi os dados da obra da sua empresa pelo site. Para obra feita em nome de empresa o caminho de redução é outro (contabilidade da obra, desoneração da folha, créditos abatíveis) e depende de cada empresa; é aí que o Gabriel atua. Está podendo me contar rapidinho como está a obra?`;
+    corpo = `Recebi os dados da obra da sua empresa pelo site. Para obra em nome de empresa o caminho de redução é outro e o Gabriel analisa o seu caso. ${pedidoDeConfirmacao(lead)}`;
   } else if (gfipAnterior) {
     variante = 'Obra antes de 10/2021';
-    corpo = `Recebi os dados ${obra} pelo site. Obra iniciada antes de 2021 tem um cálculo diferente, e podem existir pontos que mudam bastante o valor e que só aparecem numa análise cuidadosa. Esta é uma hora ruim para eu te perguntar sobre a obra?`;
+    corpo = `Recebi os dados ${obra} pelo site. Obra iniciada antes de 2021 tem um cálculo diferente e passa por uma análise do Gabriel. ${pedidoDeConfirmacao(lead)}`;
   } else if (semCalculo) {
     variante = 'Sem estimativa automática';
-    corpo = `Recebi os dados ${obra} pelo site, e o seu caso pede uma olhada mais cuidadosa. É isso que o Gabriel faz: entende a obra, aplica as reduções cabíveis e cuida de toda a regularização. Esta é uma hora ruim para eu entender melhor a sua obra?`;
+    corpo = `Recebi os dados ${obra} pelo site, e o seu caso pede uma análise mais cuidadosa do Gabriel. ${pedidoDeConfirmacao(lead)}`;
   } else if (valorAlto) {
     variante = 'Valor alto';
-    corpo = `Recebi os dados ${obra} pelo site, e ela merece uma olhada com cuidado. O Gabriel cuida de todo o processo para reduzir o INSS que a Receita cobraria da obra. Esta é uma hora ruim para eu te fazer umas perguntas rápidas sobre ela?`;
+    corpo = `Recebi os dados da sua obra pelo site e vou preparar a sua simulação. ${pedidoDeConfirmacao(lead)}`;
   } else {
     variante = 'Padrão';
-    corpo = `Recebi os dados ${obra} pelo site. O Gabriel cuida de todo o processo para reduzir o INSS que a Receita cobraria da obra, do começo ao fim. Esta é uma hora ruim para eu te fazer umas perguntas rápidas sobre ela?`;
+    corpo = `Recebi os dados da sua obra pelo site e vou preparar a sua simulação. ${pedidoDeConfirmacao(lead)}`;
   }
 
-  return { variante, texto: `${saudacao} ${comParcelamento(corpo)}` };
+  return { variante, texto: `${saudacao} ${corpo}` };
 }

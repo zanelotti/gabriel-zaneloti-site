@@ -180,3 +180,16 @@ export function criarChamador(anthropic, log = console) {
     return anthropic.messages.create(params);
   };
 }
+
+/**
+ * A obra ainda está em andamento (ou vai começar)? Nesse caso NÃO existe parcelamento: o INSS é pago mês a mês, conforme a obra avança.
+ * O parcelamento só vale para o saldo de meses já em atraso (obra concluída ou competências vencidas).
+ * Usa a situação (em_construcao / iniciar_em_breve / concluida...; a simulação feita pelo bot grava em_construcao) e, na falta dela, só considera em andamento se a data de término for futura.
+ */
+export function obraEmAndamento(lead, hoje = new Date().toISOString().slice(0, 10)) {
+  const situacao = String(lead?.situacao || '');
+  if (/^(em_construcao|iniciar_em_breve)$/.test(situacao)) return true;
+  if (/^(concluida|construida)/.test(situacao)) return false;
+  const fim = String(lead?.data_fim || '').slice(0, 7);
+  return Boolean(fim && fim >= hoje.slice(0, 7));
+}
