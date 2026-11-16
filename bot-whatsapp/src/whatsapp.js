@@ -10,6 +10,7 @@
  */
 import makeWASocket, {
   DisconnectReason,
+  downloadMediaMessage,
   fetchLatestBaileysVersion,
   isLidUser,
   isPnUser,
@@ -18,6 +19,22 @@ import makeWASocket, {
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import { aleatorio, dormir } from './util.js';
+
+const LIMITE_IMAGEM = 3.5 * 1024 * 1024; // a API do Claude aceita até ~5 MB por imagem (em base64)
+const LIMITE_PDF = 15 * 1024 * 1024;
+const MIMES_IMAGEM = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+/** Foto ou PDF que o Claude consegue ler: devolve { tipo, mime, nome } ou null. */
+export function midiaLegivel(conteudo) {
+  const img = conteudo.imageMessage;
+  const doc = conteudo.documentMessage || conteudo.documentWithCaptionMessage?.message?.documentMessage;
+  const mimeImg = String(img?.mimetype || '').split(';')[0].trim();
+  if (img && MIMES_IMAGEM.includes(mimeImg)) return { tipo: 'imagem', mime: mimeImg, nome: null };
+  const mimeDoc = String(doc?.mimetype || '').split(';')[0].trim();
+  if (doc && mimeDoc === 'application/pdf') return { tipo: 'pdf', mime: mimeDoc, nome: doc.fileName || null };
+  if (doc && MIMES_IMAGEM.includes(mimeDoc)) return { tipo: 'imagem', mime: mimeDoc, nome: doc.fileName || null };
+  return null;
+}
 
 const digitosDoJid = (jid) => String(jid).split('@')[0].split(':')[0];
 const IGNORAR_JID = (jid) =>
@@ -59,13 +76,14 @@ export function criarWhatsApp({ pastaAuth = 'auth', log = console, modoTeste = f
       conteudo.imageMessage?.caption ||
       conteudo.videoMessage?.caption ||
       conteudo.documentMessage?.caption ||
+      conteudo.documentWithCaptionMessage?.message?.documentMessage?.caption ||
       '';
     let tipo = 'texto';
     if (!texto) {
       if (conteudo.audioMessage) tipo = 'áudio';
       else if (conteudo.imageMessage) tipo = 'imagem';
       else if (conteudo.videoMessage) tipo = 'vídeo';
-      else if (conteudo.documentMessage) tipo = 'documento';
+      else if (conteudo.documentMessage || conteudo.documentWithCaptionMessage) tipo = 'documento';
       else if (conteudo.stickerMessage) tipo = 'figurinha';
       else tipo = 'conteúdo não suportado';
     }
@@ -81,8 +99,24 @@ export function criarWhatsApp({ pastaAuth = 'auth', log = console, modoTeste = f
       return;
     }
 
-    if (key.fromMe) await aoHumano({ telefone, texto, waId: key.id });
-    else await aoReceber({ telefone, jid, texto, tipo, waId: key.id, nome: m.pushName || null });
+    if (key.fromMe) {
+      await aoHumano({ telefone, texto, waId: key.id });
+      return;
+    }
+    // Foto ou PDF: baixa para a Lia conseguir ler (se falhar ou for grande demais, segue como antes, sem o arquivo).
+    let anexo = null;
+    const legivel = midiaLegivel(conteudo);
+    if (legivel && sock) {
+      try {
+        const buf = await downloadMediaMessage(m, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+        const limite = legivel.tipo === 'pdf' ? LIMITE_PDF : LIMITE_IMAGEM;
+        if (buf && buf.length > 0 && buf.length <= limite) anexo = { ...legivel, base64: buf.toString('base64') };
+        else log.warn(`[whatsapp] arquivo de ${telefone} grande demais para ler (${Math.round((buf?.length || 0) / 1024)} KB).`);
+      } catch (e) {
+        log.warn(`[whatsapp] não consegui baixar o arquivo de ${telefone}: ${e.message}`);
+      }
+    }
+    await aoReceber({ telefone, jid, texto, tipo, waId: key.id, nome: m.pushName || null, anexo });
   }
 
   async function iniciar() {

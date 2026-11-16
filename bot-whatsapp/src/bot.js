@@ -20,6 +20,7 @@ import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, leadValorA
 
 const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
 const TRINTA_MIN = 30 * 60 * 1000;
+const MAX_ANEXOS = 4; // fotos/PDFs lidos por resposta (os mais recentes)
 const MSG_SO_TEXTO = 'Recebi o seu arquivo, mas por aqui eu consigo ler só texto. Consegue me escrever em poucas palavras?';
 const ehMarcaDeMidia = (t) => /^\[o lead enviou [^\]]+\]$/.test(String(t || '').trim());
 const MARCA_ESPERA = 'ESPERA_GABRIEL: '; // guardada em observacao: a conversa segue 'ativa', mas já foi passada ao Gabriel
@@ -35,6 +36,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   const falhasResposta = new Map();
   const simulacoesFeitas = new Map(); // conversaId -> quantas simulações o bot já mandou (trava contra repetição)
   const avisosEspera = new Map(); // conversaId -> quando avisamos que o lead está esperando
+  const anexosPendentes = new Map(); // conversaId -> fotos/PDFs que o lead mandou e a Lia ainda não leu (só em memória)
   const avisosMidia = new Map(); // conversaId -> último aviso de mídia que o bot não lê (no máximo 1 a cada 30 min)
   const avisosDocumento = new Map(); // conversaId -> quando o lead mandou documento pela última vez (aviso + card)
   const cardsFeitos = new Set(); // 'card:agendamento:status'
@@ -495,7 +497,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     log.info(`[bot] boas-vindas enviadas a ${telefone} (origem: ${det.origem})`);
   }
 
-  async function aoReceber({ telefone, texto, tipo = 'texto', waId = null, jid = null, nome = null }) {
+  async function aoReceber({ telefone, texto, tipo = 'texto', waId = null, jid = null, nome = null, anexo = null }) {
     let conversa = await store.conversaPorTelefone(telefone);
     // Conversa antiga já encerrada (ex.: teste anterior) e a pessoa voltou pelo botão do site: abre uma conversa nova.
     if (conversa && conversa.estado === 'encerrada' && tipo === 'texto' && detectarOrigemSite(texto)) conversa = null;
@@ -513,12 +515,21 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       return;
     }
 
-    const conteudo = texto && texto.trim() ? texto.trim() : `[o lead enviou ${tipo}]`;
+    const rotuloAnexo = anexo ? (anexo.tipo === 'pdf' ? 'PDF' : 'imagem') : null;
+    const conteudo = texto && texto.trim()
+      ? `${texto.trim()}${rotuloAnexo ? ` [com ${rotuloAnexo}]` : ''}`
+      : `[o lead enviou ${rotuloAnexo || tipo}]`;
     await store.addMensagem({ conversa_id: conversa.id, direcao: 'lead', texto: conteudo, wa_id: waId });
-    if (ehDocumentoDoLead(tipo)) await tratarDocumentoDoLead(conversa, tipo);
+    if (ehDocumentoDoLead(tipo) || anexo) await tratarDocumentoDoLead(conversa, rotuloAnexo || tipo);
+    if (anexo && conversa.estado === 'ativa' && !String(conversa.observacao || '').startsWith(MARCA_ESPERA)) {
+      const lista = anexosPendentes.get(conversa.id) || [];
+      lista.push({ ...anexo, texto: conteudo });
+      anexosPendentes.set(conversa.id, lista.slice(-MAX_ANEXOS));
+    }
     // Conversa com o Gabriel (ele assumiu ou o bot passou para ele): o bot fica calado e só avisa o Gabriel.
     if (conversa.estado === 'humano' || String(conversa.observacao || '').startsWith(MARCA_ESPERA)) {
       cancelarTimer(conversa.id);
+      anexosPendentes.delete(conversa.id);
       await avisarLeadEsperando(conversa, conteudo);
       return;
     }
@@ -558,7 +569,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
     await avisarLeadGrande(conversa, lead, 'resposta', historico);
 
-    if (tipo !== 'texto' && !(texto && texto.trim()) && !ehDocumentoDoLead(tipo)) {
+    if (tipo !== 'texto' && !(texto && texto.trim()) && !anexo) {
       const ultimo = avisosMidia.get(conversa.id) || 0;
       if (Date.now() - ultimo >= TRINTA_MIN) {
         avisosMidia.set(conversa.id, Date.now());
@@ -585,7 +596,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
         tipo: 'Lead enviou documento',
         lead,
         telefone: conversa.telefone,
-        motivo: `O lead enviou ${tipo} pelo WhatsApp (o bot não lê arquivos). O card foi para "Decidindo". Vale olhar no seu WhatsApp.`,
+        motivo: `O lead enviou ${tipo} pelo WhatsApp. O card foi para "Decidindo". A Lia lê fotos e PDFs, mas vale conferir no seu WhatsApp.`,
         historico: await store.historico(conversa.id),
       });
     } catch (e) {
@@ -781,7 +792,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       // Desde a última fala do bot, o lead só mandou arquivos (sem texto): o bot pede texto UMA vez na conversa e depois fica calado.
       const novas = [];
       for (let i = historico.length - 1; i >= 0 && historico[i].direcao === 'lead'; i--) novas.push(historico[i]);
-      if (novas.length && novas.every((m) => ehMarcaDeMidia(m.texto))) {
+      const anexos = anexosPendentes.get(conversaId) || [];
+      if (novas.length && novas.every((m) => ehMarcaDeMidia(m.texto)) && anexos.length === 0) {
         if (!historico.some((m) => m.direcao === 'bot' && m.texto === MSG_SO_TEXTO)) await enviar(conversa, MSG_SO_TEXTO);
         return;
       }
@@ -792,8 +804,9 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
       let resultado;
       try {
-        resultado = await cerebro.gerarResposta({ lead, historico, ferramentas: montarFerramentas(conversa, lead), log, espera: emEspera ? motivoEspera : null, nomeContato: conversa.nome_contato || '' });
+        resultado = await cerebro.gerarResposta({ lead, historico, ferramentas: montarFerramentas(conversa, lead), log, espera: emEspera ? motivoEspera : null, nomeContato: conversa.nome_contato || '', anexos });
         falhasResposta.delete(conversaId);
+        anexosPendentes.delete(conversaId);
         if (resultado.uso && (resultado.uso.entrada || resultado.uso.saida)) {
           try {
             await store.registrarUso({ conversa_id: conversaId, entrada: resultado.uso.entrada, saida: resultado.uso.saida });

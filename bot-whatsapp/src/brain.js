@@ -158,6 +158,29 @@ export function montarHistorico(historico) {
   return base;
 }
 
+/**
+ * Fotos e PDFs que o lead mandou desde a última resposta: entram na última mensagem dele, para o Claude ler.
+ * @param {Array<{tipo:'imagem'|'pdf', mime:string, base64:string, nome?:string|null}>} anexos
+ */
+export function anexarArquivos(messages, anexos = []) {
+  if (!anexos || anexos.length === 0) return messages;
+  const ultima = messages[messages.length - 1];
+  if (!ultima || ultima.role !== 'user') return messages;
+  const blocos = anexos.map((a) =>
+    a.tipo === 'pdf'
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: a.base64 }, ...(a.nome ? { title: String(a.nome).slice(0, 200) } : {}) }
+      : { type: 'image', source: { type: 'base64', media_type: a.mime, data: a.base64 } },
+  );
+  const textoOriginal = typeof ultima.content === 'string' ? ultima.content : '';
+  const nota =
+    `[Nota do sistema: acima estão ${anexos.length === 1 ? 'o arquivo' : `os ${anexos.length} arquivos`} (foto/PDF) que a pessoa acabou de mandar. ` +
+    'LEIA o conteúdo. NUNCA diga que só consegue ler texto. Use o que estiver legível para confirmar os dados da obra (área em m², datas de início e término, se é pessoa física ou empresa, habite-se, alvará, CNO): ' +
+    'diga em poucas palavras o que você identificou e peça para a pessoa confirmar antes de usar esses números na simulação. Se não der para ler ou não tiver relação com a obra, diga isso em uma frase e peça a informação por escrito. ' +
+    'NÃO repita CPF, RG, endereço completo ou outros dados pessoais do documento.]';
+  ultima.content = [...blocos, { type: 'text', text: textoOriginal ? `${textoOriginal}\n\n${nota}` : nota }];
+  return messages;
+}
+
 export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { texto: '', valores: [] }, documentos = null, aprendizado = null }) {
   const anthropic = client || new Anthropic({ apiKey });
   const chamar = criarChamador(anthropic);
@@ -165,7 +188,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
   /**
    * @returns {Promise<{mensagens: string[], acao: null | {tipo: 'passar'|'encerrar', motivo: string, resumo?: string}}>}
    */
-  async function gerarResposta({ lead, historico, ferramentas, log = console, espera = null, nomeContato = '' }) {
+  async function gerarResposta({ lead, historico, ferramentas, log = console, espera = null, nomeContato = '', anexos = [] }) {
     // Busca nos documentos grandes (normativa, manual) os trechos ligados ao que o lead disse por último.
     let trechos = { texto: '', valores: [] };
     if (documentos && documentos.total > 0) {
@@ -212,7 +235,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     const ferramentasApi = temBusca ? [...base, FERRAMENTA_DOCUMENTOS] : base;
     let consultas = 0;
     const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato, aprendidos, parcelamentoCitado);
-    const messages = montarHistorico(historico);
+    const messages = anexarArquivos(montarHistorico(historico), anexos);
     let acao = null;
     const consumo = { entrada: 0, saida: 0 };
     let bloqueios = 0;

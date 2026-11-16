@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { criarBot } from '../src/bot.js';
-import { criarCerebro, montarHistorico } from '../src/brain.js';
+import { criarCerebro, montarHistorico, anexarArquivos } from '../src/brain.js';
 import { dividirMensagens, extrairValoresReais, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, pediuParar, repeticaoExcessiva, validarSaida } from '../src/guards.js';
 import { montarAbertura } from '../src/opening.js';
 import { montarSistema } from '../src/prompt.js';
@@ -14,6 +14,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { criarSite } from '../src/site.js';
+import { midiaLegivel } from '../src/whatsapp.js';
 import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel, dentroDoHorario, montarConhecimentoDeLinhas } from '../src/painel.js';
 import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAprendizado } from '../src/aprendizado.js';
 import { citouHonorarios, MOTIVOS_PERDA, podeMover } from '../src/funil.js';
@@ -668,6 +669,43 @@ await teste('quem não foi abordado pelo bot é ignorado', async () => {
   await ctx.bot.aoReceber({ telefone: '5511988887777', texto: 'oi, tudo bem?' });
   assert.equal(ctx.wa.enviados.length, 0);
   assert.equal(ctx.store.mensagens.length, 0);
+});
+
+await teste('fotos e PDFs: a Lia recebe o arquivo para ler, não manda "só leio texto" e o Gabriel é avisado 1x', async () => {
+  const ctx = montar({ roteiro: [texto('Pela foto do projeto, a área total é de 2.759 m². Confere?')] });
+  const c = await abrir(ctx, lead());
+  const antes = ctx.wa.enviados.length;
+  const foto = { tipo: 'imagem', mime: 'image/jpeg', base64: 'QUJD', nome: null };
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: '', tipo: 'imagem', anexo: foto });
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'segue o projeto', tipo: 'texto', anexo: { tipo: 'pdf', mime: 'application/pdf', base64: 'JVBERi0=', nome: 'projeto.pdf' } });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.wa.enviados.length, antes + 1);
+  assert.doesNotMatch(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /só texto/);
+  const ultima = ctx.client.chamadas[0].messages[ctx.client.chamadas[0].messages.length - 1];
+  assert.ok(Array.isArray(ultima.content));
+  assert.equal(ultima.content.filter((b) => b.type === 'image').length, 1);
+  assert.equal(ultima.content.filter((b) => b.type === 'document').length, 1);
+  assert.match(ultima.content[ultima.content.length - 1].text, /LEIA o conteúdo/);
+  assert.equal(ctx.avisos.filter((a) => a.tipo === 'Lead enviou mídia').length, 0, 'arquivo legível não gera aviso de "o bot não lê"');
+  // Depois de lidos, os arquivos não voltam na próxima resposta
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'confere sim' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  const seg = ctx.client.chamadas[ctx.client.chamadas.length - 1].messages;
+  assert.ok(!seg.some((m) => Array.isArray(m.content) && m.content.some((b) => b.type === 'image')));
+});
+
+await teste('midiaLegivel: lê foto (jpeg/png/webp) e PDF; áudio, vídeo e Word não', () => {
+  assert.equal(midiaLegivel({ imageMessage: { mimetype: 'image/jpeg' } }).tipo, 'imagem');
+  assert.equal(midiaLegivel({ documentMessage: { mimetype: 'application/pdf', fileName: 'a.pdf' } }).tipo, 'pdf');
+  assert.equal(midiaLegivel({ documentWithCaptionMessage: { message: { documentMessage: { mimetype: 'application/pdf' } } } }).tipo, 'pdf');
+  assert.equal(midiaLegivel({ audioMessage: {} }), null);
+  assert.equal(midiaLegivel({ videoMessage: { mimetype: 'video/mp4' } }), null);
+  assert.equal(midiaLegivel({ documentMessage: { mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' } }), null);
+  const msgs = anexarArquivos([{ role: 'user', content: 'oi' }], [{ tipo: 'imagem', mime: 'image/png', base64: 'x' }]);
+  assert.equal(msgs[0].content[0].type, 'image');
+  assert.match(msgs[0].content[1].text, /^oi/);
 });
 
 await teste('arquivos do lead: um álbum de fotos gera UM pedido de texto (nunca um por foto), só uma vez na conversa, e avisa o Gabriel 1x', async () => {
