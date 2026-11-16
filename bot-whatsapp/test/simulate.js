@@ -507,8 +507,8 @@ await teste('3 respostas bloqueadas seguidas: passa para o Gabriel em vez de arr
   await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'quanto eu economizo?' });
   await ctx.bot.responder(c.id);
   ctx.bot.pararTimers();
-  assert.equal(ctx.store.conversas[0].estado, 'ativa');
-  assert.match(ctx.store.conversas[0].observacao, /^ESPERA_GABRIEL: /);
+  assert.equal(ctx.store.conversas[0].estado, 'humano');
+  assert.match(ctx.store.conversas[0].observacao, /^Passou para o Gabriel: /);
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /Gabriel continuar/);
   assert.ok(ctx.avisos.find((a) => a.tipo === 'Passou para você'));
 });
@@ -596,58 +596,45 @@ await teste('parcelamento: obra em andamento não parcela (trava barra a frase, 
 
 
 
-await teste('passar_para_gabriel: manda a mensagem, avisa, e o bot segue disponível em modo espera', async () => {
+await teste('passar_para_gabriel: manda a mensagem UMA vez, avisa, e o bot fica calado (só avisa o Gabriel se o lead escrever)', async () => {
   const ctx = montar({
     roteiro: [
       [...texto('Vou pedir para o Gabriel continuar essa conversa com você pessoalmente, ele te responde por aqui.'), uso('passar_para_gabriel', { motivo: 'pediu desconto', resumo: 'Quer fechar com 8%.' })],
-      texto('Os documentos principais costumam ser o alvará e o projeto aprovado. A lista final se confirma no seu caso.'),
+      texto('Pode deixar, se surgir dúvida é só me escrever.'),
     ],
   });
   const c = await abrir(ctx, lead());
   await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'faz por 8%?' });
   await ctx.bot.responder(c.id);
-  assert.equal(ctx.store.conversas[0].estado, 'ativa');
-  assert.match(ctx.store.conversas[0].observacao, /^ESPERA_GABRIEL: pediu desconto/);
+  assert.equal(ctx.store.conversas[0].estado, 'humano');
+  assert.match(ctx.store.conversas[0].observacao, /^Passou para o Gabriel: pediu desconto/);
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /Gabriel/);
   const aviso = ctx.avisos.find((a) => a.tipo === 'Passou para você');
   assert.match(aviso.motivo, /pediu desconto/);
-
-  // Pergunta simples depois da passagem: o bot responde, com o aviso de modo espera no prompt
-  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'quais documentos vou precisar?' });
+  const antes = ctx.wa.enviados.length;
+  // Depois da passagem: "ok", "fico no aguardo", fotos... o bot NÃO responde nada.
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'Fico no aguardo, obrigado' });
+  await ctx.bot.responder(c.id);
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: '', tipo: 'imagem' });
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: '', tipo: 'imagem' });
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'Ok' });
   await ctx.bot.responder(c.id);
   ctx.bot.pararTimers();
-  assert.match(ctx.client.chamadas[1].system, /MODO ESPERA/);
-  assert.match(ctx.client.chamadas[1].system, /pediu desconto/);
-  assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /alvará/);
-  assert.equal(ctx.avisos.length, 1, 'sem e-mail extra quando o bot resolve sozinho');
-
-  // Quando o Gabriel responde à mão, o bot se cala de vez
-  await ctx.bot.aoHumano({ telefone: telefoneDe(c), texto: 'Oi, aqui é o Gabriel' });
-  assert.equal(ctx.store.conversas[0].estado, 'humano');
-  const antes = ctx.wa.enviados.length;
-  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'obrigado' });
-  await ctx.bot.responder(c.id);
-  assert.equal(ctx.wa.enviados.length, antes);
+  assert.equal(ctx.wa.enviados.length, antes, 'nenhuma mensagem depois de passar para o Gabriel');
+  assert.equal(ctx.client.chamadas.length, 1, 'o Claude nem é chamado de novo');
+  assert.equal(ctx.avisos.filter((a) => a.tipo === 'Lead esperando resposta').length, 0, 'o Gabriel acabou de ser avisado: nada de e-mail repetido em 30 min');
 });
 
-await teste('modo espera: nova passagem só avisa o Gabriel (1x/30 min) e não cala o bot', async () => {
-  const ctx = montar({
-    roteiro: [
-      [...texto('Vou pedir para o Gabriel continuar com você.'), uso('passar_para_gabriel', { motivo: 'pediu desconto', resumo: 'x' })],
-      [...texto('Essa o Gabriel responde pessoalmente.'), uso('passar_para_gabriel', { motivo: 'quer proposta formal', resumo: 'y' })],
-      [...texto('Essa o Gabriel também responde.'), uso('passar_para_gabriel', { motivo: 'outra dúvida', resumo: 'z' })],
-    ],
-  });
+await teste('conversa antiga em modo espera (ESPERA_GABRIEL) também fica calada', async () => {
+  const ctx = montar({ roteiro: [texto('Não deveria responder.')] });
   const c = await abrir(ctx, lead());
-  for (const t of ['faz por 8%?', 'manda proposta formal', 'e sobre outra coisa?']) {
-    await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: t });
-    await ctx.bot.responder(c.id);
-  }
+  await ctx.store.setEstado(c.id, 'ativa', 'ESPERA_GABRIEL: pediu desconto');
+  const antes = ctx.wa.enviados.length;
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'ok, obrigado' });
+  await ctx.bot.responder(c.id);
   ctx.bot.pararTimers();
-  assert.equal(ctx.store.conversas[0].estado, 'ativa');
-  assert.equal(ctx.store.conversas[0].observacao, 'ESPERA_GABRIEL: pediu desconto', 'motivo original preservado');
-  assert.equal(ctx.avisos.length, 1, 'só o aviso da primeira passagem (os seguintes caem no intervalo de 30 min)');
-  assert.equal(ctx.wa.enviados.length, 4, 'abertura + 3 respostas');
+  assert.equal(ctx.wa.enviados.length, antes, JSON.stringify(ctx.wa.enviados.map((e) => e.texto)));
+  assert.equal(ctx.client.chamadas.length, 0);
 });
 
 await teste('"pare": confirma, encerra e não responde mais', async () => {
@@ -683,13 +670,22 @@ await teste('quem não foi abordado pelo bot é ignorado', async () => {
   assert.equal(ctx.store.mensagens.length, 0);
 });
 
-await teste('áudio do lead: pede texto e avisa o Gabriel', async () => {
+await teste('arquivos do lead: um álbum de fotos gera UM pedido de texto (nunca um por foto), só uma vez na conversa, e avisa o Gabriel 1x', async () => {
   const ctx = montar();
   const c = await abrir(ctx, lead());
-  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: '', tipo: 'áudio' });
-  ctx.bot.pararTimers();
+  const antes = ctx.wa.enviados.length;
+  for (let i = 0; i < 3; i++) await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: '', tipo: 'áudio' });
+  assert.equal(ctx.wa.enviados.length, antes, 'nada sai na hora: espera o lead terminar');
+  await ctx.bot.responder(c.id);
+  assert.equal(ctx.wa.enviados.length, antes + 1);
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /só texto/);
-  assert.ok(ctx.avisos.find((a) => a.tipo === 'Lead enviou mídia'));
+  assert.equal(ctx.avisos.filter((a) => a.tipo === 'Lead enviou mídia').length, 1);
+  // Mais arquivos depois: não repete o pedido
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: '', tipo: 'áudio' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.wa.enviados.length, antes + 1, 'o pedido de texto sai no máximo uma vez');
+  assert.equal(ctx.client.chamadas.length, 0);
 });
 
 await teste('falha do Claude: tenta de novo e, na 2ª vez, devolve a conversa ao Gabriel', async () => {

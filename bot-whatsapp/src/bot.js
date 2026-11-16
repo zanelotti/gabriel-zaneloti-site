@@ -20,6 +20,8 @@ import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, leadValorA
 
 const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
 const TRINTA_MIN = 30 * 60 * 1000;
+const MSG_SO_TEXTO = 'Recebi o seu arquivo, mas por aqui eu consigo ler só texto. Consegue me escrever em poucas palavras?';
+const ehMarcaDeMidia = (t) => /^\[o lead enviou [^\]]+\]$/.test(String(t || '').trim());
 const MARCA_ESPERA = 'ESPERA_GABRIEL: '; // guardada em observacao: a conversa segue 'ativa', mas já foi passada ao Gabriel
 
 export function criarBot({ store, wa, cerebro, site, notificar, config, log = console, dormirFn = dormir, parado = () => false }) {
@@ -33,6 +35,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   const falhasResposta = new Map();
   const simulacoesFeitas = new Map(); // conversaId -> quantas simulações o bot já mandou (trava contra repetição)
   const avisosEspera = new Map(); // conversaId -> quando avisamos que o lead está esperando
+  const avisosMidia = new Map(); // conversaId -> último aviso de mídia que o bot não lê (no máximo 1 a cada 30 min)
   const avisosDocumento = new Map(); // conversaId -> quando o lead mandou documento pela última vez (aviso + card)
   const cardsFeitos = new Set(); // 'card:agendamento:status'
   const followupsFeitos = new Set(); // 'conversa:nível:última mensagem' já enviados nesta execução (trava extra contra repetição)
@@ -513,7 +516,9 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     const conteudo = texto && texto.trim() ? texto.trim() : `[o lead enviou ${tipo}]`;
     await store.addMensagem({ conversa_id: conversa.id, direcao: 'lead', texto: conteudo, wa_id: waId });
     if (ehDocumentoDoLead(tipo)) await tratarDocumentoDoLead(conversa, tipo);
-    if (conversa.estado === 'humano') {
+    // Conversa com o Gabriel (ele assumiu ou o bot passou para ele): o bot fica calado e só avisa o Gabriel.
+    if (conversa.estado === 'humano' || String(conversa.observacao || '').startsWith(MARCA_ESPERA)) {
+      cancelarTimer(conversa.id);
       await avisarLeadEsperando(conversa, conteudo);
       return;
     }
@@ -553,11 +558,14 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
     await avisarLeadGrande(conversa, lead, 'resposta', historico);
 
-    if (tipo !== 'texto' && !(texto && texto.trim())) {
-      await enviar(conversa, 'Recebi o seu arquivo, mas por aqui eu consigo ler só texto. Consegue me escrever em poucas palavras?');
-      if (!ehDocumentoDoLead(tipo)) await notificar.avisar({ tipo: 'Lead enviou mídia', lead, telefone: conversa.telefone, motivo: `O lead enviou ${tipo}, que o bot não lê. Vale olhar no seu WhatsApp.`, historico });
-      return;
+    if (tipo !== 'texto' && !(texto && texto.trim()) && !ehDocumentoDoLead(tipo)) {
+      const ultimo = avisosMidia.get(conversa.id) || 0;
+      if (Date.now() - ultimo >= TRINTA_MIN) {
+        avisosMidia.set(conversa.id, Date.now());
+        await notificar.avisar({ tipo: 'Lead enviou mídia', lead, telefone: conversa.telefone, motivo: `O lead enviou ${tipo}, que o bot não lê. Vale olhar no seu WhatsApp.`, historico });
+      }
     }
+    // Arquivos também esperam o lead terminar (um álbum de fotos vira UMA resposta só, nunca uma por foto).
 
     agendarResposta(conversa.id, config.debounceMs);
   }
@@ -769,7 +777,17 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       const ultima = historico[historico.length - 1];
       if (!ultima || ultima.direcao !== 'lead') return; // nada novo para responder
 
+      if (String(conversa.observacao || '').startsWith(MARCA_ESPERA)) return; // já passou para o Gabriel: o bot não fala mais nessa conversa
+      // Desde a última fala do bot, o lead só mandou arquivos (sem texto): o bot pede texto UMA vez na conversa e depois fica calado.
+      const novas = [];
+      for (let i = historico.length - 1; i >= 0 && historico[i].direcao === 'lead'; i--) novas.push(historico[i]);
+      if (novas.length && novas.every((m) => ehMarcaDeMidia(m.texto))) {
+        if (!historico.some((m) => m.direcao === 'bot' && m.texto === MSG_SO_TEXTO)) await enviar(conversa, MSG_SO_TEXTO);
+        return;
+      }
+
       const emEspera = String(conversa.observacao || '').startsWith(MARCA_ESPERA);
+      if (emEspera) return; // já passou para o Gabriel: o bot não fala mais nessa conversa
       const motivoEspera = emEspera ? conversa.observacao.slice(MARCA_ESPERA.length) : '';
 
       let resultado;
@@ -822,7 +840,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
         const ligacao = /^\s*liga[cç][aã]o hoje/i.test(acao.motivo || '');
         if (ligacao) {
           avisosEspera.set(conversaId, Date.now());
-          if (!emEspera) await store.setEstado(conversaId, 'ativa', `${MARCA_ESPERA}${acao.motivo}`);
+          cancelarTimer(conversaId);
+          await store.setEstado(conversaId, 'humano', `Passou para o Gabriel: ${acao.motivo}`);
           try {
             await store.atualizarLead(lead.id, { nota: `LIGAR HOJE: ${acao.resumo || acao.motivo}`.trim() });
           } catch (e) {
@@ -837,8 +856,9 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
             await notificar.avisar({ tipo: 'Lead com nova dúvida para você', lead, telefone: conversa.telefone, motivo: detalhe, historico: hist });
           }
         } else {
-          // A conversa segue ativa (o bot ainda responde dúvidas simples); só para de vez quando o Gabriel responder.
-          await store.setEstado(conversaId, 'ativa', `${MARCA_ESPERA}${acao.motivo}`);
+          // Passou para o Gabriel: a partir daqui o bot fica calado nessa conversa (se o lead escrever, o Gabriel recebe aviso).
+          cancelarTimer(conversaId);
+          await store.setEstado(conversaId, 'humano', `Passou para o Gabriel: ${acao.motivo}`);
           await store.atualizarLead(lead.id, { nota: `Passou para o Gabriel: ${acao.motivo}. ${acao.resumo || ''}`.trim() });
           avisosEspera.set(conversaId, Date.now());
           await notificar.avisar({ tipo: 'Passou para você', lead, telefone: conversa.telefone, motivo: detalhe, historico: hist });
