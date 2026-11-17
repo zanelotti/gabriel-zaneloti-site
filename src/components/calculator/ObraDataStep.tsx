@@ -58,7 +58,7 @@ const RESPONSAVEL_OPTIONS: { value: Responsavel; label: string; hint: string }[]
 /** Etapa 1 da calculadora — dados da obra. */
 export function ObraDataStep({ data, errors, onChange }: ObraDataStepProps) {
   return (
-    <CalculatorStep title="Conte sobre a sua obra" description="Sem cadastro: começamos pela obra. Leva cerca de 1 minuto.">
+    <CalculatorStep title="Conte sobre a sua obra" description="Sem cadastro. Leva 1 minuto.">
       <div className="grid gap-5 sm:grid-cols-2">
         <MonthField
           id="dataInicio"

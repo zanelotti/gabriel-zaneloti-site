@@ -79,7 +79,7 @@ export function Calculator({ embedded = false, onResultChange }: CalculatorProps
           {step === 1 && (
             <>
               <p className="mt-2 text-sm text-navy-500">
-                Responda sobre a obra em 1 minuto. Em até 24 horas você recebe no WhatsApp:
+                Em até 24 horas você recebe no WhatsApp:
               </p>
               <ListaDaAnalise />
             </>
