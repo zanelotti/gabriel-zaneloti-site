@@ -49,7 +49,8 @@ export type AnalyticsEventName =
   | 'click_ebook'
   | 'click_agendar'
   | 'agenda_horario_escolhido'
-  | 'consultoria_agendada';
+  | 'consultoria_agendada'
+  | 'click_avaliacoes_google';
 
 export interface AnalyticsEventPayload {
   [key: string]: string | number | boolean | undefined;

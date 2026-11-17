@@ -116,6 +116,29 @@ export function validateStep3(
   return errors;
 }
 
+/** Etapa 2 (nova ordem) — só as áreas. */
+export function validateAreas(data: Pick<CalculatorData, 'areaPrincipal' | 'areaPiscina'>): FormErrors<CalculatorData> {
+  const errors: FormErrors<CalculatorData> = {};
+  if (data.areaPrincipal === null || Number.isNaN(data.areaPrincipal)) {
+    errors.areaPrincipal = 'Informe a área da construção principal.';
+  } else if (data.areaPrincipal <= 0) {
+    errors.areaPrincipal = 'A área principal deve ser maior que zero.';
+  }
+  if (data.areaPiscina !== null && !Number.isNaN(data.areaPiscina) && data.areaPiscina < 0) {
+    errors.areaPiscina = 'A área da piscina não pode ser negativa.';
+  }
+  return errors;
+}
+
+/** Etapa 3 (nova ordem, a última) — contato e aceite da Política de Privacidade. */
+export function validateContato(data: Pick<CalculatorData, 'nome' | 'whatsapp' | 'aceitaTermos'>): FormErrors<CalculatorData> {
+  const errors: FormErrors<CalculatorData> = { ...validateStep1(data) };
+  if (!data.aceitaTermos) {
+    errors.aceitaTermos = 'É necessário concordar com a Política de Privacidade para continuar.';
+  }
+  return errors;
+}
+
 /** Validação completa dos dados de um lead/simulação — usada antes de calcular e/ou persistir. */
 export function validateLead(data: CalculatorData): {
   isValid: boolean;

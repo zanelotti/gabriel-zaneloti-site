@@ -3,6 +3,7 @@ import { Container } from '@/components/ui/Container';
 import { Calculator } from '@/components/calculator/Calculator';
 import { trackEvent } from '@/services/analytics';
 import { BotaoWhatsApp } from '@/components/ui/BotaoWhatsApp';
+import { Provas } from '@/components/Provas';
 
 /** Topo do site: título + a calculadora logo de cara (a primeira coisa que o visitante vê). */
 export function Hero() {
@@ -21,9 +22,17 @@ export function Hero() {
       />
 
       <Container
-        className={`relative grid gap-8 lg:gap-12 ${temResultado ? '' : 'lg:grid-cols-2 lg:items-start'}`}
+        className={`relative grid gap-8 ${
+          temResultado ? 'lg:gap-12' : 'lg:grid-cols-2 lg:grid-rows-[auto_auto_1fr] lg:items-start lg:gap-x-12 lg:gap-y-6'
+        }`}
       >
-        <div className={`animate-fade-in-up ${temResultado ? 'mx-auto max-w-3xl text-center' : 'lg:pr-6 lg:pt-4'}`}>
+        {/* No computador: coluna da esquerda = texto, avaliações, botões; direita = calculadora.
+            No celular: texto, botões, avaliações e, logo abaixo, a calculadora. */}
+        <div
+          className={`animate-fade-in-up ${
+            temResultado ? 'mx-auto max-w-3xl text-center' : 'lg:col-start-1 lg:row-start-1 lg:pr-6 lg:pt-4'
+          }`}
+        >
           <span className="inline-flex items-center rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-accent-300">
             Especialista em INSS de Obras
           </span>
@@ -40,7 +49,14 @@ export function Hero() {
             *A economia varia conforme as características, documentação e situação de cada obra.
           </p>
 
-          <div className={`mt-8 sm:mt-10 ${temResultado ? 'flex flex-col items-center' : ''}`}>
+        </div>
+
+        <div
+          className={`animate-fade-in-up ${
+            temResultado ? 'mx-auto flex max-w-3xl flex-col items-center text-center' : 'lg:col-start-1 lg:row-start-3 lg:pr-6'
+          }`}
+        >
+          <div className={temResultado ? 'flex flex-col items-center' : ''}>
             <a
               href="#agendar"
               className="btn-primary w-full gap-3 px-8 py-4 text-base shadow-card ring-4 ring-amber-500/25 sm:w-auto"
@@ -67,7 +83,15 @@ export function Hero() {
           </div>
         </div>
 
-        <Calculator embedded onResultChange={setTemResultado} />
+        {!temResultado && (
+          <div className="lg:col-start-1 lg:row-start-2 lg:pr-6">
+            <Provas />
+          </div>
+        )}
+
+        <div className={temResultado ? '' : 'lg:col-start-2 lg:row-span-3 lg:row-start-1'}>
+          <Calculator embedded onResultChange={setTemResultado} />
+        </div>
       </Container>
     </section>
   );

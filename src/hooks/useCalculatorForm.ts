@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { INITIAL_CALCULATOR_DATA } from '@/types/calculator';
 import type { CalculatorData, CalculatorStepIndex, FormErrors, INSSResult } from '@/types/calculator';
-import { validateStep1, validateStep2, validateStep3 } from '@/utils/validation';
+import { validateAreas, validateContato, validateStep2 } from '@/utils/validation';
 import { calculateINSS } from '@/services/calculateINSS';
 import { leadService } from '@/services/leadService';
 import { trackEvent } from '@/services/analytics';
@@ -45,8 +45,9 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
   );
 
   const goNext = useCallback(() => {
+    // Ordem: 1) dados da obra, 2) áreas, 3) contato (o contato fica por último, como nos concorrentes que mais convertem).
     if (step === 1) {
-      const stepErrors = validateStep1(data);
+      const stepErrors = validateStep2(data);
       setErrors(stepErrors);
       if (Object.keys(stepErrors).length > 0) return;
       trackEvent('calculator_step_1_completed');
@@ -55,7 +56,7 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
     }
 
     if (step === 2) {
-      const stepErrors = validateStep2(data);
+      const stepErrors = validateAreas(data);
       setErrors(stepErrors);
       if (Object.keys(stepErrors).length > 0) return;
       trackEvent('calculator_step_2_completed');
@@ -69,7 +70,7 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
   }, []);
 
   const submit = useCallback(async () => {
-    const stepErrors = validateStep3(data);
+    const stepErrors = validateContato(data);
     setErrors(stepErrors);
     if (Object.keys(stepErrors).length > 0) return;
 

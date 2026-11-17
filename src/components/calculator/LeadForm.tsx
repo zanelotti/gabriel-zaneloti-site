@@ -3,15 +3,18 @@ import { maskWhatsApp } from '@/utils/formatters';
 import { CalculatorStep } from './CalculatorStep';
 
 interface LeadFormProps {
-  data: Pick<CalculatorData, 'nome' | 'whatsapp'>;
+  data: Pick<CalculatorData, 'nome' | 'whatsapp' | 'aceitaTermos'>;
   errors: FormErrors<CalculatorData>;
   onChange: <K extends keyof CalculatorData>(field: K, value: CalculatorData[K]) => void;
 }
 
-/** Etapa 1 da calculadora — dados básicos de contato do lead. */
+/** Última etapa da calculadora — para onde enviar a análise (contato + aceite da Política de Privacidade). */
 export function LeadForm({ data, errors, onChange }: LeadFormProps) {
   return (
-    <CalculatorStep title="Vamos começar" description="Precisamos apenas do seu nome e WhatsApp para continuar. O retorno é rápido, pelo próprio WhatsApp.">
+    <CalculatorStep
+      title="Para onde enviamos a sua análise?"
+      description="Último passo. A análise da sua obra chega no seu WhatsApp em até 24 horas."
+    >
       <div>
         <label htmlFor="nome" className="field-label">
           Nome
@@ -55,6 +58,41 @@ export function LeadForm({ data, errors, onChange }: LeadFormProps) {
         {errors.whatsapp && (
           <p id="whatsapp-error" className="field-error">
             {errors.whatsapp}
+          </p>
+        )}
+      </div>
+      <p className="text-xs leading-relaxed text-navy-400">
+        Seus dados serão usados só para enviar a sua análise e falar sobre a sua obra. Não enviamos propaganda.
+      </p>
+
+      <div>
+        <label className="flex items-start gap-3 text-sm text-navy-600">
+          <input
+            id="aceitaTermos"
+            name="aceitaTermos"
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-navy-300 text-accent-500 focus:ring-accent-400"
+            checked={data.aceitaTermos}
+            onChange={(event) => onChange('aceitaTermos', event.target.checked)}
+            aria-invalid={Boolean(errors.aceitaTermos)}
+            aria-describedby={errors.aceitaTermos ? 'aceitaTermos-error' : undefined}
+          />
+          <span>
+            Li e concordo com a{' '}
+            <a
+              href="/privacidade.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-navy-700 underline hover:text-accent-600"
+            >
+              Política de Privacidade
+            </a>{' '}
+            e autorizo o contato pelo WhatsApp sobre a minha obra.
+          </span>
+        </label>
+        {errors.aceitaTermos && (
+          <p id="aceitaTermos-error" className="field-error">
+            {errors.aceitaTermos}
           </p>
         )}
       </div>

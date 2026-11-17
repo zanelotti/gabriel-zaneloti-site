@@ -24,8 +24,8 @@ function primeiroNome(nome: string): string {
 
 const PASSOS = [
   { titulo: 'Dados recebidos', texto: 'Já estão com a nossa equipe.', feito: true },
-  { titulo: 'Um analista chama você no WhatsApp', texto: 'Para conversar sobre a sua obra.', feito: false },
-  { titulo: 'Entendemos o seu caso', texto: 'E mostramos como podemos ajudar.', feito: false },
+  { titulo: 'Análise da sua obra no WhatsApp, em até 24 horas', texto: 'INSS que a Receita cobraria, quanto dá para reduzir e o que falta para a CND.', feito: false },
+  { titulo: 'Tire suas dúvidas', texto: 'Direto com o Gabriel, sem compromisso.', feito: false },
 ];
 
 /**
@@ -66,8 +66,8 @@ export function Confirmacao({ data, onReset }: ConfirmacaoProps) {
         {nome ? `${nome}, recebemos os dados da sua obra!` : 'Recebemos os dados da sua obra!'}
       </h3>
       <p className="mt-3 text-base leading-relaxed text-navy-600">
-        Um analista vai entrar em contato com você pelo WhatsApp para conversar sobre a sua obra e explicar como
-        podemos ajudar. Fique de olho no celular.
+        A análise da sua obra chega no seu WhatsApp em até 24 horas, muitas vezes em poucos minutos. Fique de olho no
+        celular.
       </p>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">

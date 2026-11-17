@@ -1,5 +1,6 @@
 import { Container } from '@/components/ui/Container';
 import { WHATSAPP_NUMBER_DISPLAY, generateOrigemWhatsAppLink } from '@/services/whatsapp';
+import { CREDENCIAIS } from '@/data/credenciais';
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -14,6 +15,15 @@ export function Footer() {
               Planejamento Tributário | INSS de Obras
             </p>
             <p className="mt-4 text-sm leading-relaxed">Redução de INSS de obras — consultoria especializada.</p>
+            {CREDENCIAIS.cnpj && <p className="mt-3 text-sm">CNPJ {CREDENCIAIS.cnpj}</p>}
+            {CREDENCIAIS.registro && <p className="mt-1 text-sm">{CREDENCIAIS.registro}</p>}
+            {CREDENCIAIS.googleAvaliacoes && (
+              <p className="mt-3 text-sm">
+                <a href={CREDENCIAIS.googleAvaliacoes} target="_blank" rel="noopener noreferrer" className="hover:text-accent-400">
+                  <span className="text-amber-400" aria-hidden="true">★</span> Avaliações no Google
+                </a>
+              </p>
+            )}
           </div>
 
           <div>

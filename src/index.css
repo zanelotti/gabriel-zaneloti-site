@@ -77,3 +77,12 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Quadro de avaliações do Trustindex no topo do site: mostra só as avaliações, sem o cabeçalho
+   ("Google 5.0 ... com a Melhor Avaliação" e o selo "Certificado"). */
+.provas-trustindex .ti-header,
+.provas-trustindex .ti-widget-header,
+.provas-trustindex .ti-certificate,
+.provas-trustindex .ti-verified-by {
+  display: none !important;
+}

@@ -2,7 +2,7 @@ import type { CalculatorData, FormErrors } from '@/types/calculator';
 import { CalculatorStep } from './CalculatorStep';
 
 interface AreasStepProps {
-  data: Pick<CalculatorData, 'areaPrincipal' | 'areaPiscina' | 'observacoes' | 'aceitaTermos'>;
+  data: Pick<CalculatorData, 'areaPrincipal' | 'areaPiscina' | 'observacoes'>;
   errors: FormErrors<CalculatorData>;
   onChange: <K extends keyof CalculatorData>(field: K, value: CalculatorData[K]) => void;
 }
@@ -14,12 +14,12 @@ function parseAreaInput(value: string): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-/** Etapa 3 da calculadora — áreas da construção e observações finais. */
+/** Etapa 2 da calculadora — áreas da construção e observações. */
 export function AreasStep({ data, errors, onChange }: AreasStepProps) {
   return (
     <CalculatorStep
-      title="Áreas e observações"
-      description="Últimos detalhes para o analista entender a sua obra."
+      title="Tamanho da obra"
+      description="Use a área do projeto aprovado ou do alvará. Se não souber exata, coloque um valor aproximado."
     >
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
@@ -92,41 +92,6 @@ export function AreasStep({ data, errors, onChange }: AreasStepProps) {
         />
       </div>
 
-      <p className="text-xs leading-relaxed text-navy-400">
-        Seus dados serão utilizados exclusivamente para entrar em contato sobre sua simulação e atendimento.
-      </p>
-
-      <div>
-        <label className="flex items-start gap-3 text-sm text-navy-600">
-          <input
-            id="aceitaTermos"
-            name="aceitaTermos"
-            type="checkbox"
-            className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-navy-300 text-accent-500 focus:ring-accent-400"
-            checked={data.aceitaTermos}
-            onChange={(event) => onChange('aceitaTermos', event.target.checked)}
-            aria-invalid={Boolean(errors.aceitaTermos)}
-            aria-describedby={errors.aceitaTermos ? 'aceitaTermos-error' : undefined}
-          />
-          <span>
-            Li e concordo com a{' '}
-            <a
-              href="/privacidade.html"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-navy-700 underline hover:text-accent-600"
-            >
-              Política de Privacidade
-            </a>{' '}
-            e autorizo o uso dos meus dados para ser contatado sobre a minha simulação.
-          </span>
-        </label>
-        {errors.aceitaTermos && (
-          <p id="aceitaTermos-error" className="field-error">
-            {errors.aceitaTermos}
-          </p>
-        )}
-      </div>
     </CalculatorStep>
   );
 }

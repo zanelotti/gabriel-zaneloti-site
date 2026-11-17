@@ -3,6 +3,8 @@ interface ProgressBarProps {
   totalSteps?: number;
 }
 
+const NOMES = ['A obra', 'Tamanho', 'Seu contato'];
+
 export function ProgressBar({ currentStep, totalSteps = 3 }: ProgressBarProps) {
   const percentage = (currentStep / totalSteps) * 100;
 
@@ -11,6 +13,7 @@ export function ProgressBar({ currentStep, totalSteps = 3 }: ProgressBarProps) {
       <div className="mb-2 flex items-center justify-between text-sm font-semibold text-navy-500">
         <span>
           Etapa {currentStep} de {totalSteps}
+          {NOMES[currentStep - 1] ? <span className="font-normal text-navy-400"> · {NOMES[currentStep - 1]}</span> : null}
         </span>
         <span>{Math.round(percentage)}%</span>
       </div>

@@ -55,10 +55,10 @@ const RESPONSAVEL_OPTIONS: { value: Responsavel; label: string; hint: string }[]
   { value: 'PJ', label: 'Pessoa Jurídica', hint: 'A obra está em nome de um CNPJ' },
 ];
 
-/** Etapa 2 da calculadora — dados da obra. */
+/** Etapa 1 da calculadora — dados da obra. */
 export function ObraDataStep({ data, errors, onChange }: ObraDataStepProps) {
   return (
-    <CalculatorStep title="Dados da obra" description="Conte um pouco mais sobre a sua construção.">
+    <CalculatorStep title="Conte sobre a sua obra" description="Sem cadastro: começamos pela obra. Leva cerca de 1 minuto.">
       <div className="grid gap-5 sm:grid-cols-2">
         <MonthField
           id="dataInicio"
