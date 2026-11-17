@@ -1,3 +1,4 @@
+import { ECONOMIA_TOTAL_TEXTO } from '@/data/resultados';
 import { useEffect, type ReactNode } from 'react';
 import type { CalculatorData, INSSResult } from '@/types/calculator';
 import { useCountUp } from '@/hooks/useCountUp';
@@ -124,7 +125,7 @@ function ConfiancaESocial() {
               <path d="M15 7h6v6" />
             </svg>
           }
-          titulo="+R$ 1 milhão já economizado"
+          titulo={`${ECONOMIA_TOTAL_TEXTO} já economizado`}
           texto="Por clientes que regularizaram a obra comigo."
         />
       </ul>

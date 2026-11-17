@@ -1,4 +1,5 @@
 import { Container } from '@/components/ui/Container';
+import { ECONOMIA_TOTAL_TEXTO, REDUCAO_MEDIA_TEXTO } from '@/data/resultados';
 
 interface Numero {
   valor: string;
@@ -7,8 +8,8 @@ interface Numero {
 
 /** Números reais dos contratos do Gabriel (set/2024 a set/2026), do painel de controle dele. */
 const NUMEROS: Numero[] = [
-  { valor: 'R$ 1,09 mi', rotulo: 'de INSS economizados para os clientes' },
-  { valor: '58%', rotulo: 'de redução média sobre o INSS da obra' },
+  { valor: ECONOMIA_TOTAL_TEXTO, rotulo: 'de INSS economizados para os clientes' },
+  { valor: REDUCAO_MEDIA_TEXTO, rotulo: 'de redução média sobre o INSS da obra' },
 ];
 
 /** Faixa de prova social com os resultados reais, logo abaixo dos três destaques. */

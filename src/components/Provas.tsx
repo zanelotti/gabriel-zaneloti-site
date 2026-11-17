@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CREDENCIAIS } from '@/data/credenciais';
 import { trackEvent } from '@/services/analytics';
+import { ECONOMIA_TOTAL_TEXTO } from '@/data/resultados';
 
 /** Aceita o código inteiro do Trustindex (<script ... loader.js?ID>) ou só o ID. */
 export function idDoTrustindex(codigo: string): string {
@@ -117,7 +118,7 @@ export function Provas() {
 
       <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
         <li>
-          <span className="whitespace-nowrap font-bold text-accent-300">R$ 1,09 mi</span>{' '}
+          <span className="whitespace-nowrap font-bold text-accent-300">{ECONOMIA_TOTAL_TEXTO}</span>{' '}
           <span className="text-navy-200">economizados para clientes</span>
         </li>
         {cnpj && (

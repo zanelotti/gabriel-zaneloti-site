@@ -1,3 +1,4 @@
+import { ECONOMIA_TOTAL_TEXTO } from '@/data/resultados';
 import { generateGenericWhatsAppLink } from '@/services/whatsapp';
 
 function H2({ children }: { children: string }) {
@@ -76,7 +77,7 @@ export default function Sobre() {
 
         <div className="mt-12 rounded-xl2 bg-navy-950 p-8 text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-accent-400">Resultados</p>
-          <p className="mt-2 text-3xl font-extrabold text-white sm:text-4xl">+R$ 1 milhão</p>
+          <p className="mt-2 text-3xl font-extrabold text-white sm:text-4xl">{ECONOMIA_TOTAL_TEXTO}</p>
           <p className="mt-1 text-sm text-navy-300">já economizados por clientes em INSS de obras</p>
         </div>
 

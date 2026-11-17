@@ -1,3 +1,4 @@
+import { ECONOMIA_TOTAL_TEXTO } from '@/data/resultados';
 import { Container } from '@/components/ui/Container';
 
 export function About() {
@@ -22,7 +23,7 @@ export function About() {
 
           <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3">
             <div>
-              <p className="text-3xl font-extrabold text-navy-900">+R$ 1 milhão</p>
+              <p className="text-3xl font-extrabold text-navy-900">{ECONOMIA_TOTAL_TEXTO}</p>
               <p className="text-sm font-semibold text-accent-600">já economizados por clientes</p>
             </div>
             <a href="/sobre.html" className="text-sm font-semibold text-navy-600 underline hover:text-accent-600">
