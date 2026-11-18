@@ -129,7 +129,7 @@ export function calcularHonorario(lead) {
  * Pergunta objetiva (sim ou não) que fecha a conversa depois do honorário. Não é pergunta aberta: a resposta
  * esperada é "sim" (e aí o bot envia a lista de dados do contrato) ou uma objeção.
  */
-export const PERGUNTA_FECHAMENTO = 'Posso te passar a lista de dados para o Gabriel já preparar o seu contrato?';
+export const PERGUNTA_FECHAMENTO = 'Posso te passar a lista de dados para já preparar o seu contrato?';
 
 /**
  * Dados que o Gabriel precisa para preparar o contrato. Para mudar a lista, edite só aqui.

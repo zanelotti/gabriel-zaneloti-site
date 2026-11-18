@@ -226,7 +226,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     const perguntouPreco = leadPerguntouPreco(msgsLead.slice(-2).map((m) => m.texto).join(' '));
     const jaFalouHonorario = historico.some((m) => m.direcao !== 'lead' && citouHonorarios(m.texto));
     const numerosExplicados = !precisaExplicarNumeros(lead) || historico.some((m) => m.direcao !== 'lead' && citouNumerosDoCalculo(m.texto, lead));
-    const precoPrematuro = (t) => falaDeHonorario(t) && !perguntouPreco && !jaFalouHonorario && (msgsLead.length < 3 || !numerosExplicados);
+    const precoPrematuro = (t) => falaDeHonorario(t) && !perguntouPreco && !jaFalouHonorario && (msgsLead.length < 2 || !numerosExplicados);
     const MOTIVO_PRECO_CEDO =
       'fala de honorário/preço, mas a pessoa não perguntou o custo e ainda é cedo (o honorário só entra no FINAL da conversa, depois de explicar os números do cálculo). Reescreva SEM citar honorário, percentual do Gabriel nem oferecer "mostrar a conta": se ainda não explicou os números do cálculo, explique-os agora (INSS estimado, redução e valor final) e continue passando valor rumo ao fechamento';
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];

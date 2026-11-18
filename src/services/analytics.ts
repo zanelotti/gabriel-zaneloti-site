@@ -1,3 +1,4 @@
+import { marcarNoClarity } from './clarity';
 /**
  * ============================================================================
  *  CAMADA DE ANALYTICS — EVENTOS PREPARADOS PARA GA4 / GOOGLE ADS / META PIXEL
@@ -176,6 +177,7 @@ export function setEnhancedConversionData(data: { email?: string; whatsappDigits
  * (modo desenvolvimento), sem erros — nada é enviado para lugar nenhum.
  */
 export function trackEvent(name: AnalyticsEventName, payload: AnalyticsEventPayload = {}): void {
+  marcarNoClarity(name);
   if (!isAnalyticsAvailable()) return;
 
   if (GA4_ID && typeof window.gtag === 'function') {

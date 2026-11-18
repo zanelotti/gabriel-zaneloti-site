@@ -10,7 +10,7 @@
  * O site NÃO mostra o resultado do cálculo ao lead, então os lembretes de acompanhamento não citam valores
  * (o lead ainda pode nem ter visto os números: eles aparecem na conversa, na hora certa).
  */
-import { primeiroNomePessoa } from './util.js';
+import { formatarReaisInteiros, primeiroNomePessoa } from './util.js';
 
 const HORA = 3600 * 1000;
 const FUSO = 'America/Sao_Paulo';
@@ -48,15 +48,19 @@ function nomeDe(lead, nomeContato) {
  * @param {1|2|3} p.nivel    qual acompanhamento (1 = 24h, 2 = 3 dias, 3 = 7 dias)
  * @param {boolean} p.respondeuAntes  o lead já tinha respondido alguma vez?
  * @param {string} [p.nomeContato]
+ * @param {boolean} [p.economiaApresentada]  o bot já mostrou a economia estimada na conversa?
  */
-export function montarFollowup({ lead, nivel, respondeuAntes, nomeContato = '' }) {
+export function montarFollowup({ lead, nivel, respondeuAntes, nomeContato = '', economiaApresentada = false }) {
   const oi = saudacao(nomeDe(lead, nomeContato));
+  const economia = Number(lead?.economia_estimada) > 0 && lead?.responsavel !== 'PJ' ? formatarReaisInteiros(lead.economia_estimada) : '';
   if (nivel === 1) {
+    if (economiaApresentada && economia)
+      return `${oi} A estimativa da sua obra mostrou uma economia de ${economia} no INSS. Ficou alguma dúvida que eu possa tirar para você seguir com o Gabriel?`;
     if (respondeuAntes) return `${oi} Ficou alguma dúvida sobre o que conversamos? Se quiser, continuo de onde paramos.`;
     return `${oi} Só passando para ver se você conseguiu ler minha mensagem sobre o INSS da sua obra. Posso te explicar como funciona a redução, sem compromisso?`;
   }
   if (nivel === 2) {
-    return `${oi} Muita gente fica na dúvida se compensa mexer nisso. A análise pode reduzir o que a Receita cobraria da sua obra. Faz sentido a gente conversar uns minutinhos?`;
+    return `${oi} Um ponto que pesa: sem planejamento, a Receita calcula o INSS da obra pelo pior cenário, e sem a CND o imóvel não averba, não vende nem financia. O que falta para você decidir?`;
   }
   return `${oi} Como não tive retorno, devo entender que você desistiu de regularizar o INSS da sua obra? Se for só falta de tempo, sem problema: é só me chamar aqui que eu retomo de onde paramos.`;
 }

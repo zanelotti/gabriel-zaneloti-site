@@ -84,8 +84,9 @@ export default function Privacidade() {
 
       <H2>5. Cookies, analytics e publicidade</H2>
       <p>
-        Este site pode utilizar ferramentas como Google Analytics, Google Ads e/ou Meta Ads para entender
-        como os visitantes usam o site e para medir o resultado de campanhas de anúncios. Essas ferramentas
+        Este site pode utilizar ferramentas como Google Analytics, Google Ads, Meta Ads e/ou Microsoft Clarity
+        para entender como os visitantes usam o site (inclusive mapas de calor e gravações anônimas da navegação,
+        com os campos de formulário ocultados) e para medir o resultado de campanhas de anúncios. Essas ferramentas
         podem usar cookies e identificadores do navegador para fins estatísticos e de mensuração de
         conversão. Você pode gerenciar ou bloquear cookies diretamente nas configurações do seu navegador.
       </p>

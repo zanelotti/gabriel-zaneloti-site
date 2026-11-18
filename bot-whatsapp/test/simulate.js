@@ -1486,7 +1486,7 @@ await teste('prompt e conhecimento trazem a regra: autônomo com recolhimento re
   const sis = montarSistema(lead({ responsavel: 'PF' }), config, carregarConhecimento().texto);
   assert.match(sis, /AUTÔNOMO \(contribuinte individual\)/);
   assert.match(sis, /RETROATIVA/);
-  assert.match(sis, /NÃO faz perguntas sobre os trabalhadores/);
+  assert.match(sis, /NÃO faça perguntas sobre os trabalhadores/);
   const c = carregarConhecimento().texto;
   assert.match(c, /inclusive de forma retroativa/);
   assert.doesNotMatch(c, /quem teve funcionário registrado na obra costuma ter o melhor resultado/);
@@ -1817,6 +1817,41 @@ await teste('modelos de acompanhamento: tempos, textos e sem valor para empresa'
   }
 });
 
+await teste('venda objetiva: depois dos números, na 2ª resposta do lead o honorário já pode sair (sem novas perguntas)', async () => {
+  const l = lead({ economia_estimada: 21013, inss_estimado: 28854, valor_apos_reducao: 7841 });
+  const resposta = 'O honorário é de R$ 2.522, que são 12% sobre a economia estimada de R$ 21.013, e cobre tudo até a CND. Posso te passar a lista de dados para já preparar o seu contrato?';
+  const mk = () => {
+    const chamadas = [];
+    return { chamadas, messages: { async create(p) { chamadas.push(p); return { content: [{ type: 'text', text: resposta }], stop_reason: 'end_turn' }; } } };
+  };
+  const c1 = mk();
+  const r1 = await criarCerebro({ modelo: 't', config, client: c1 }).gerarResposta({
+    lead: l,
+    historico: [
+      { direcao: 'bot', texto: 'Oi, Maria. Só para confirmar: a obra tem 231 m². Está certo?' },
+      { direcao: 'lead', texto: 'Isso' },
+      { direcao: 'bot', texto: 'Sem planejamento, a Receita cobraria cerca de R$ 28.854. A economia estimada é de R$ 21.013 e o valor ficaria em torno de R$ 7.841. A obra já tem CNO aberto?' },
+      { direcao: 'lead', texto: 'Ainda não' },
+    ],
+    ferramentas: {},
+    log: silencioso,
+  });
+  assert.equal(c1.chamadas.length, 1, 'não foi bloqueado como preço cedo demais');
+  assert.match(r1.mensagens.join(' '), /R\$\s2\.522/);
+});
+
+await teste('acompanhamento de venda: depois de ver a economia, o 1º lembrete cita a economia estimada (número do cadastro) e passa nas travas', () => {
+  const l = lead({ economia_estimada: 21013 });
+  const t1 = montarFollowup({ lead: l, nivel: 1, respondeuAntes: true, economiaApresentada: true });
+  assert.match(t1, /economia de R\$\s21\.013/);
+  assert.equal(validarSaida(t1, l).ok, true);
+  const t1b = montarFollowup({ lead: l, nivel: 1, respondeuAntes: true, economiaApresentada: false });
+  assert.doesNotMatch(t1b, /R\$/);
+  const pj = montarFollowup({ lead: lead({ responsavel: 'PJ', economia_estimada: 5000 }), nivel: 1, respondeuAntes: true, economiaApresentada: true });
+  assert.doesNotMatch(pj, /R\$/);
+  for (const n of [2, 3]) assert.equal(validarSaida(montarFollowup({ lead: l, nivel: n, respondeuAntes: true }), l).ok, true);
+});
+
 await teste('acompanhamento: 1 dia, 3 dias e 7 dias de silêncio; depois para', async () => {
   const ctx = montar();
   const l = lead({ economia_estimada: 42000 });
@@ -1832,7 +1867,7 @@ await teste('acompanhamento: 1 dia, 3 dias e 7 dias de silêncio; depois para', 
   assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0, 'não repete');
   envelhecer(ctx, 49);
   assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
-  assert.match(ctx.wa.enviados[enviados() - 1].texto, /compensa mexer nisso/);
+  assert.match(ctx.wa.enviados[enviados() - 1].texto, /pior cenário[^]*O que falta para você decidir/);
   envelhecer(ctx, 97);
   assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
   assert.match(ctx.wa.enviados[enviados() - 1].texto, /desistiu/);
@@ -2034,30 +2069,40 @@ await teste('motivo da perda: o bot grava o motivo e não sobrescreve o que o Ga
   assert.equal(ctx.store.leads.get(l.id).motivo_perda, 'desconfianca');
 });
 
-await teste('prompt: papel de assistente de simulação (escopo, respostas curtas, sem vender, agendamento não é na hora)', () => {
+await teste('prompt: Lia é a vendedora (estratégia de venda, fechamento sim/não, dados do contrato, objeções), sem oferecer reunião', () => {
   const s = montarSistema(lead(), config);
-  assert.match(s, /14\. SEU ESCOPO/);
+  assert.match(s, /14\. SEU PAPEL/);
+  assert.match(s, /VENDEDORA do Gabriel/);
+  assert.match(s, /# ESTRATÉGIA DE VENDA/);
+  assert.match(s, /NÚMEROS \+ UMA PERGUNTA DA OBRA/);
+  assert.match(s, /ÚNICA pergunta de diagnóstico/);
+  assert.match(s, /PROIBIDO: perguntar a motivação/);
+  assert.match(s, /VALOR \+ HONORÁRIO \+ FECHAMENTO \(na resposta seguinte/);
+  assert.match(s, new RegExp(PERGUNTA_FECHAMENTO.replace(/[?]/g, '\\?')));
+  assert.match(s, /MENSAGEM DOS DADOS DO CONTRATO/);
+  assert.match(s, /CPF/);
+  assert.match(s, /"Vou pensar"/);
+  assert.match(s, /"Está caro"/);
   assert.match(s, /15\. RESPOSTAS CURTAS/);
-  assert.match(s, /SEU FLUXO: SIMULAÇÃO/);
   assert.match(s, /NÃO é na hora/);
   assert.match(s, /próximo horário livre do Gabriel/);
-  assert.match(s, /passar_para_gabriel/);
-  assert.doesNotMatch(s, /AINDA NÃO CITOU/);
-  assert.doesNotMatch(s, /Razão social/);
-  assert.doesNotMatch(s, /estratégia de conversa|ESTRATEGIA_CONSULTORIA/i);
+  assert.match(s, /Não ofereça reunião, consultoria nem ligação por conta própria/);
+  assert.match(s, /TERMINE a mensagem com UMA pergunta objetiva sobre a obra/);
+  assert.doesNotMatch(s, /SEU FLUXO: SIMULAÇÃO/);
+  assert.doesNotMatch(s, /Você NÃO vende/);
 });
 
-await teste('config.estrategia é ignorada: o prompt é o mesmo de simulação', () => {
+await teste('config.estrategia é ignorada: o prompt é sempre o de venda', () => {
   const a = montarSistema(lead(), { ...config, estrategia: 'consultoria' });
   const b = montarSistema(lead(), { ...config, estrategia: 'conversa' });
   assert.equal(a, b);
-  assert.match(a, /SEU FLUXO: SIMULAÇÃO/);
+  assert.match(a, /# ESTRATÉGIA DE VENDA/);
 });
 
-await teste('valor antes do preço: o prompt traz economia e honorário só se ela perguntar o custo, SEM a conta líquida, e o guard barra o valor que sobra', () => {
+await teste('valor antes do preço: o prompt traz o honorário junto da economia, SEM a conta líquida, e o guard barra o valor que sobra', () => {
   const l = lead({ economia_estimada: 42000 });
   const sistema = montarSistema(l, config);
-  assert.match(sistema, /SE ELA PERGUNTAR O CUSTO/);
+  assert.match(sistema, /COMO APRESENTAR O HONORÁRIO[^\n]*R\$\s5\.040[^\n]*R\$\s42\.000/);
   assert.doesNotMatch(sistema, /sobra para a pessoa/);
   assert.equal(validarSaida('Os honorários são de R$ 5.040, sobre a economia estimada de R$ 42.000.', l).ok, true);
   assert.equal(validarSaida('Você economizaria R$ 42.000, pagaria R$ 5.040 e ficariam R$ 36.960 com você.', l).ok, false);

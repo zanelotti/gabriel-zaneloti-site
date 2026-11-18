@@ -3,11 +3,13 @@ import { createRoot } from 'react-dom/client';
 import { Analytics } from '@vercel/analytics/react';
 import App from './App';
 import { initAnalytics } from './services/analytics';
+import { initClarity } from './services/clarity';
 import { captureAttribution } from './services/attribution';
 import { trackPageView } from './services/pageViewTracker';
 import './index.css';
 
 initAnalytics();
+initClarity();
 captureAttribution();
 trackPageView();
 
