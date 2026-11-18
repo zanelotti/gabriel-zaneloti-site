@@ -3,11 +3,30 @@
  * Para ligar: crie o projeto em clarity.microsoft.com e cole aqui o "Project ID" (Settings > Overview).
  * Vazio = o Clarity não carrega.
  */
-export const CLARITY_ID = '';
+export const CLARITY_ID = 'zfsbk2oeyv';
 
 declare global {
   interface Window {
     clarity?: ((...args: unknown[]) => void) & { q?: unknown[] };
+  }
+}
+
+import { getAttribution } from './attribution';
+
+/** De onde veio a visita, para filtrar as gravações no Clarity (filtro "Etiquetas personalizadas" > origem). */
+function origemDaVisita(): { origem: string; campanha?: string } {
+  try {
+    const a = getAttribution() as Record<string, string | undefined>;
+    const campanha = a.utmCampaign || undefined;
+    if (a.gclid || a.gbraid || a.wbraid) return { origem: 'google_ads', campanha };
+    if (a.utmSource) return { origem: `${a.utmSource}${a.utmMedium ? `_${a.utmMedium}` : ''}`, campanha };
+    const ref = document.referrer || '';
+    if (/google\./i.test(ref)) return { origem: 'google_organico' };
+    if (/facebook|instagram/i.test(ref)) return { origem: 'redes_sociais' };
+    if (ref && !ref.includes(location.hostname)) return { origem: 'outro_site' };
+    return { origem: 'direto' };
+  } catch {
+    return { origem: 'desconhecida' };
   }
 }
 
@@ -22,6 +41,9 @@ export function initClarity(): void {
   s.async = true;
   s.src = `https://www.clarity.ms/tag/${CLARITY_ID}`;
   document.head.appendChild(s);
+  const { origem, campanha } = origemDaVisita();
+  window.clarity('set', 'origem', origem);
+  if (campanha) window.clarity('set', 'campanha', campanha);
 }
 
 /** Marca um passo do funil na gravação (ex.: "calculator_step_1_completed"), para filtrar no Clarity. */

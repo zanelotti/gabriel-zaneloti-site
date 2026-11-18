@@ -9,8 +9,8 @@ import { trackPageView } from './services/pageViewTracker';
 import './index.css';
 
 initAnalytics();
-initClarity();
 captureAttribution();
+initClarity();
 trackPageView();
 
 createRoot(document.getElementById('root')!).render(
