@@ -3,7 +3,7 @@
  * Para ligar: crie o projeto em clarity.microsoft.com e cole aqui o "Project ID" (Settings > Overview).
  * Vazio = o Clarity não carrega.
  */
-export const CLARITY_ID = '';
+export const CLARITY_ID = 'zfsbk2oeyv';
 
 declare global {
   interface Window {
