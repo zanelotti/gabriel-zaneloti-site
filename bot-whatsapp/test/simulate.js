@@ -1482,11 +1482,11 @@ await teste('pessoa física: bloqueia falar em funcionário registrado/CLT; empr
   assert.equal(validarSaida('Durante a obra, teve pedreiro ou algum prestador autônomo? Mesmo sem recolhimento, dá para regularizar recolhendo depois.', pf).ok, true);
 });
 
-await teste('prompt e conhecimento trazem a regra: autônomo com recolhimento retroativo para pessoa física, sem perguntas sobre trabalhadores', () => {
+await teste('prompt e conhecimento trazem a regra: autônomo com recolhimento retroativo para pessoa física, no máximo uma pergunta sobre trabalhadores', () => {
   const sis = montarSistema(lead({ responsavel: 'PF' }), config, carregarConhecimento().texto);
   assert.match(sis, /AUTÔNOMO \(contribuinte individual\)/);
   assert.match(sis, /RETROATIVA/);
-  assert.match(sis, /NÃO faça perguntas sobre os trabalhadores/);
+  assert.match(sis, /NO MÁXIMO UMA pergunta na conversa inteira/);
   const c = carregarConhecimento().texto;
   assert.match(c, /inclusive de forma retroativa/);
   assert.doesNotMatch(c, /quem teve funcionário registrado na obra costuma ter o melhor resultado/);
@@ -1817,29 +1817,6 @@ await teste('modelos de acompanhamento: tempos, textos e sem valor para empresa'
   }
 });
 
-await teste('venda objetiva: depois dos números, na 2ª resposta do lead o honorário já pode sair (sem novas perguntas)', async () => {
-  const l = lead({ economia_estimada: 21013, inss_estimado: 28854, valor_apos_reducao: 7841 });
-  const resposta = 'O honorário é de R$ 2.522, que são 12% sobre a economia estimada de R$ 21.013, e cobre tudo até a CND. Posso te passar a lista de dados para já preparar o seu contrato?';
-  const mk = () => {
-    const chamadas = [];
-    return { chamadas, messages: { async create(p) { chamadas.push(p); return { content: [{ type: 'text', text: resposta }], stop_reason: 'end_turn' }; } } };
-  };
-  const c1 = mk();
-  const r1 = await criarCerebro({ modelo: 't', config, client: c1 }).gerarResposta({
-    lead: l,
-    historico: [
-      { direcao: 'bot', texto: 'Oi, Maria. Só para confirmar: a obra tem 231 m². Está certo?' },
-      { direcao: 'lead', texto: 'Isso' },
-      { direcao: 'bot', texto: 'Sem planejamento, a Receita cobraria cerca de R$ 28.854. A economia estimada é de R$ 21.013 e o valor ficaria em torno de R$ 7.841. A obra já tem CNO aberto?' },
-      { direcao: 'lead', texto: 'Ainda não' },
-    ],
-    ferramentas: {},
-    log: silencioso,
-  });
-  assert.equal(c1.chamadas.length, 1, 'não foi bloqueado como preço cedo demais');
-  assert.match(r1.mensagens.join(' '), /R\$\s2\.522/);
-});
-
 await teste('acompanhamento de venda: depois de ver a economia, o 1º lembrete cita a economia estimada (número do cadastro) e passa nas travas', () => {
   const l = lead({ economia_estimada: 21013 });
   const t1 = montarFollowup({ lead: l, nivel: 1, respondeuAntes: true, economiaApresentada: true });
@@ -2074,10 +2051,7 @@ await teste('prompt: Lia é a vendedora (estratégia de venda, fechamento sim/n�
   assert.match(s, /14\. SEU PAPEL/);
   assert.match(s, /VENDEDORA do Gabriel/);
   assert.match(s, /# ESTRATÉGIA DE VENDA/);
-  assert.match(s, /NÚMEROS \+ UMA PERGUNTA DA OBRA/);
-  assert.match(s, /ÚNICA pergunta de diagnóstico/);
-  assert.match(s, /PROIBIDO: perguntar a motivação/);
-  assert.match(s, /VALOR \+ HONORÁRIO \+ FECHAMENTO \(na resposta seguinte/);
+  assert.match(s, /NÚMEROS \+ GANCHO/);
   assert.match(s, new RegExp(PERGUNTA_FECHAMENTO.replace(/[?]/g, '\\?')));
   assert.match(s, /MENSAGEM DOS DADOS DO CONTRATO/);
   assert.match(s, /CPF/);
@@ -2087,7 +2061,7 @@ await teste('prompt: Lia é a vendedora (estratégia de venda, fechamento sim/n�
   assert.match(s, /NÃO é na hora/);
   assert.match(s, /próximo horário livre do Gabriel/);
   assert.match(s, /Não ofereça reunião, consultoria nem ligação por conta própria/);
-  assert.match(s, /TERMINE a mensagem com UMA pergunta objetiva sobre a obra/);
+  assert.match(s, /TERMINE a mensagem com UMA pergunta-gancho/);
   assert.doesNotMatch(s, /SEU FLUXO: SIMULAÇÃO/);
   assert.doesNotMatch(s, /Você NÃO vende/);
 });

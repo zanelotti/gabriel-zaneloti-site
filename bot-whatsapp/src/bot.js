@@ -730,7 +730,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
             ok: true,
             simulacao: false,
             orientacao:
-              'É empresa: o Fator de Ajuste não se aplica e não existe simulação com valores. O tipo já foi registrado no cadastro. Explique em 2 frases as frentes que valem para empresa (use o CONHECIMENTO, "formas de reduzir"), sem citar valores em reais, e faça UMA pergunta objetiva (por exemplo, se na época da obra havia funcionários registrados). Na resposta seguinte: valor + honorário pela linha HONORÁRIO + pergunta de fechamento.',
+              'É empresa: o Fator de Ajuste não se aplica e não existe simulação com valores. O tipo já foi registrado no cadastro. Explique em 2 frases as frentes que valem para empresa (use o CONHECIMENTO, "formas de reduzir"), sem citar valores em reais, e faça UMA pergunta de diagnóstico (por exemplo, se na época da obra havia funcionários registrados ou se a obra tem contabilidade própria). Depois siga a ESTRATÉGIA DE VENDA (valor, honorário pela linha HONORÁRIO, fechamento).',
           };
         }
 
@@ -763,8 +763,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
           enviada: true,
           tem_estimativa_de_economia: temEconomia,
           orientacao: temEconomia
-            ? 'A simulação JÁ foi enviada à pessoa na conversa e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais e sem repetir os números: diga em meia frase que é uma estimativa confirmada com os documentos e termine com UMA pergunta objetiva sobre a obra que ajude a fechar (por exemplo, se ela vai precisar da CND para averbar, vender ou financiar). Na resposta seguinte: valor + honorário + pergunta de fechamento.'
-            : 'A simulação JÁ foi enviada à pessoa (só o INSS estimado, sem economia: o caso depende de análise) e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais, dizendo que o Gabriel analisa o caso (obras antigas costumam ter boas frentes de redução, como a decadência, com prova da época da obra) e termine com UMA pergunta objetiva (por exemplo, se ela tem habite-se, alvará ou IPTU da época). Na resposta seguinte: valor + honorário + pergunta de fechamento.',
+            ? 'A simulação JÁ foi enviada à pessoa na conversa e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais e sem repetir os números: diga em meia frase que é uma estimativa confirmada com os documentos e termine com UMA pergunta-gancho que leve à venda (por exemplo, se ela vai precisar da CND para averbar, vender ou financiar). Depois siga a ESTRATÉGIA DE VENDA.'
+            : 'A simulação JÁ foi enviada à pessoa (só o INSS estimado, sem economia: o caso depende de análise) e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais, dizendo que o Gabriel analisa o caso (obras antigas costumam ter boas frentes de redução, como a decadência, com prova da época da obra) e termine com UMA pergunta-gancho (por exemplo, se ela tem habite-se, alvará ou IPTU da época). Depois siga a ESTRATÉGIA DE VENDA.',
         };
       },
     };
