@@ -84,7 +84,8 @@ export function Provas() {
             className={
               aberto
                 ? 'fixed inset-x-3 top-1/2 z-[61] mx-auto max-h-[90vh] max-w-5xl -translate-y-1/2 overflow-auto rounded-xl2 bg-white p-4 shadow-card sm:inset-x-6 sm:p-6'
-                : 'relative mt-3 max-h-[17rem] overflow-hidden rounded-lg bg-white p-2'
+                : // Altura FIXA (não só máxima): o quadro do Trustindex carrega depois da página e, sem isso, empurrava a calculadora para baixo.
+                  'relative mt-3 h-[17rem] overflow-hidden rounded-lg bg-white p-2'
             }
           >
             {aberto && (
@@ -99,7 +100,12 @@ export function Provas() {
                 </button>
               </div>
             )}
-            <div ref={caixa} className="provas-trustindex" />
+            {!aberto && (
+              <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm text-navy-300" aria-hidden="true">
+                Carregando avaliações…
+              </p>
+            )}
+            <div ref={caixa} className="provas-trustindex relative bg-white" />
             {!aberto && (
               <button
                 type="button"
