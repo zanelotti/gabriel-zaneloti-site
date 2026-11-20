@@ -131,12 +131,10 @@ export function validateAreas(data: Pick<CalculatorData, 'areaPrincipal' | 'area
 }
 
 /** Etapa 3 (nova ordem, a última) — contato e aceite da Política de Privacidade. */
-export function validateContato(data: Pick<CalculatorData, 'nome' | 'whatsapp' | 'aceitaTermos'>): FormErrors<CalculatorData> {
-  const errors: FormErrors<CalculatorData> = { ...validateStep1(data) };
-  if (!data.aceitaTermos) {
-    errors.aceitaTermos = 'É necessário concordar com a Política de Privacidade para continuar.';
-  }
-  return errors;
+export function validateContato(data: Pick<CalculatorData, 'nome' | 'whatsapp'>): FormErrors<CalculatorData> {
+  // Sem caixinha obrigatória: o aviso da Política de Privacidade fica no texto ao lado do botão (o Clarity mostrou gente
+  // apertando "enviar" várias vezes e desistindo nesta etapa).
+  return { ...validateStep1(data) };
 }
 
 /** Validação completa dos dados de um lead/simulação — usada antes de calcular e/ou persistir. */

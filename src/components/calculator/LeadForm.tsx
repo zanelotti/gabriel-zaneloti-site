@@ -3,7 +3,7 @@ import { maskWhatsApp } from '@/utils/formatters';
 import { CalculatorStep } from './CalculatorStep';
 
 interface LeadFormProps {
-  data: Pick<CalculatorData, 'nome' | 'whatsapp' | 'aceitaTermos'>;
+  data: Pick<CalculatorData, 'nome' | 'whatsapp'>;
   errors: FormErrors<CalculatorData>;
   onChange: <K extends keyof CalculatorData>(field: K, value: CalculatorData[K]) => void;
 }
@@ -62,40 +62,12 @@ export function LeadForm({ data, errors, onChange }: LeadFormProps) {
         )}
       </div>
       <p className="text-xs leading-relaxed text-navy-400">
-        Seus dados serão usados só para enviar a sua análise e falar sobre a sua obra. Não enviamos propaganda.
+        Seus dados são usados só para enviar a sua análise e falar sobre a sua obra. Ao enviar, você concorda com a{' '}
+        <a href="/privacidade.html" target="_blank" rel="noopener noreferrer" className="font-semibold text-navy-600 underline">
+          Política de Privacidade
+        </a>
+        .
       </p>
-
-      <div>
-        <label className="flex items-start gap-3 text-sm text-navy-600">
-          <input
-            id="aceitaTermos"
-            name="aceitaTermos"
-            type="checkbox"
-            className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-navy-300 text-accent-500 focus:ring-accent-400"
-            checked={data.aceitaTermos}
-            onChange={(event) => onChange('aceitaTermos', event.target.checked)}
-            aria-invalid={Boolean(errors.aceitaTermos)}
-            aria-describedby={errors.aceitaTermos ? 'aceitaTermos-error' : undefined}
-          />
-          <span>
-            Li e concordo com a{' '}
-            <a
-              href="/privacidade.html"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-navy-700 underline hover:text-accent-600"
-            >
-              Política de Privacidade
-            </a>{' '}
-            e autorizo o contato pelo WhatsApp sobre a minha obra.
-          </span>
-        </label>
-        {errors.aceitaTermos && (
-          <p id="aceitaTermos-error" className="field-error">
-            {errors.aceitaTermos}
-          </p>
-        )}
-      </div>
     </CalculatorStep>
   );
 }

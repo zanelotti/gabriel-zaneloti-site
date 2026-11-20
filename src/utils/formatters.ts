@@ -20,7 +20,10 @@ export function formatPercentPrecise(value: number): string {
 
 /** Aplica a máscara brasileira de WhatsApp: (XX) XXXXX-XXXX enquanto o usuário digita. */
 export function maskWhatsApp(rawValue: string): string {
-  const digits = rawValue.replace(/\D/g, '').slice(0, 11);
+  let digits = rawValue.replace(/\D/g, '');
+  // O preenchimento automático do celular costuma colocar +55 (ou 0) na frente: remove para não estragar o número.
+  if (digits.length >= 12 && digits.startsWith('55')) digits = digits.slice(2);
+  digits = digits.replace(/^0+/, '').slice(0, 11);
 
   if (digits.length === 0) return '';
   if (digits.length <= 2) return `(${digits}`;

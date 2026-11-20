@@ -20,6 +20,19 @@ interface UseCalculatorFormReturn {
   reset: () => void;
 }
 
+/** Leva a tela até o primeiro campo com erro (no celular a mensagem de erro podia ficar fora da tela). */
+function mostrarPrimeiroErro(erros: Record<string, unknown>): void {
+  const campo = Object.keys(erros)[0];
+  if (!campo) return;
+  window.setTimeout(() => {
+    const el = document.getElementById(campo) || document.querySelector(`[name="${campo}"]`);
+    if (el instanceof HTMLElement) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus({ preventScroll: true });
+    }
+  }, 50);
+}
+
 /**
  * Hook central que concentra todo o estado da calculadora em um único objeto
  * (CalculatorData), evitando espalhar os dados entre múltiplos states soltos.
@@ -49,7 +62,10 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
     if (step === 1) {
       const stepErrors = validateStep2(data);
       setErrors(stepErrors);
-      if (Object.keys(stepErrors).length > 0) return;
+      if (Object.keys(stepErrors).length > 0) {
+        mostrarPrimeiroErro(stepErrors);
+        return;
+      }
       trackEvent('calculator_step_1_completed');
       setStep(2);
       return;
@@ -58,7 +74,10 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
     if (step === 2) {
       const stepErrors = validateAreas(data);
       setErrors(stepErrors);
-      if (Object.keys(stepErrors).length > 0) return;
+      if (Object.keys(stepErrors).length > 0) {
+        mostrarPrimeiroErro(stepErrors);
+        return;
+      }
       trackEvent('calculator_step_2_completed');
       setStep(3);
     }
@@ -72,7 +91,10 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
   const submit = useCallback(async () => {
     const stepErrors = validateContato(data);
     setErrors(stepErrors);
-    if (Object.keys(stepErrors).length > 0) return;
+    if (Object.keys(stepErrors).length > 0) {
+      mostrarPrimeiroErro(stepErrors);
+      return;
+    }
 
     setIsSubmitting(true);
     // Cede o controle ao navegador por um instante antes do cálculo (síncrono e,
@@ -93,7 +115,8 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
       }
 
       await leadService.createLead({
-        ...data,
+        // o envio vale como aceite (aviso da Política de Privacidade ao lado do botão)
+        ...{ ...data, aceitaTermos: true },
         inssEstimado: calcResult?.inssEstimado ?? null,
         economiaEstimada: calcResult?.economiaEstimada ?? null,
         percentualReducao: calcResult?.percentualReducao ?? null,

@@ -33,3 +33,21 @@ Cada análise compara o **período total** com o **período desde a análise ant
 - Corrigir o "pulo" da página no carregamento (provável: quadro de avaliações).
 - Conferir no CRM se as 12 simulações da semana de 16/11 são leads reais.
 - Com o gestor: orçamento limitado e conversão recuperada; avaliar aumento de orçamento e a alta do CPC.
+
+## Análise 2: 20/11/2026 (11h), período desde a análise 1
+
+A partir desta análise, só o período desde a análise anterior (pedido do Gabriel).
+
+**Google Ads, [Leads-22/09], 19/11 a 20/11 (até 11h)**
+- Cerca de 17 cliques, 1 simulação, cerca de R$ 66 de custo. Continua limitada pelo orçamento.
+- Parcela de impressões da campanha (desde 22/09): 23,7%. Concorrentes: insscerto.com 63%, grupotoda.com.br 48%, engeajuda.com.br 28%, solidusinssdeobra.com.br 27%. Topo absoluto da página: nós 6,8%, eles de 17% a 54%.
+- Alerta na campanha: "Conflito de palavras-chave negativas".
+
+**Clarity, 18 a 20/11**
+- 18 sessões reais (11 robôs), quase todas do Google e no celular. Rolagem média 18%.
+- Funil: 8 começaram, 7 terminaram a obra, 6 terminaram o tamanho, só 2 enviaram. Maior queda: etapa do contato (4 de 6 desistiram).
+- Gravações: gente apertando "enviar" duas vezes e saindo (provável bloqueio pela caixinha obrigatória da Política de Privacidade ou pelo WhatsApp com +55 do preenchimento automático); cliques mortos na tabela de exemplos e no campo de área.
+
+**Feito**
+- v17: contato sem caixinha obrigatória (aviso em texto), WhatsApp aceita +55/0, tela leva até o erro.
+- Análise de palavras-chave entregue ao Gabriel (para repassar ao gestor).
