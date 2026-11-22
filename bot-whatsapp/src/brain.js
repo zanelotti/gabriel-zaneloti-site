@@ -4,7 +4,7 @@
  * passou nas travas de conteúdo (guards.js).
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { citouNumerosDoCalculo, dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, precisaExplicarNumeros, repeticaoExcessiva, validarSaida } from './guards.js';
+import { aceitouVerInvestimento, citouNumerosDoCalculo, dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, precisaExplicarNumeros, repeticaoExcessiva, validarSaida } from './guards.js';
 import { citouHonorarios } from './funil.js';
 import { formatarTrechos } from './documentos.js';
 import { formatarAprendidos } from './aprendizado.js';
@@ -226,9 +226,13 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     const perguntouPreco = leadPerguntouPreco(msgsLead.slice(-2).map((m) => m.texto).join(' '));
     const jaFalouHonorario = historico.some((m) => m.direcao !== 'lead' && citouHonorarios(m.texto));
     const numerosExplicados = !precisaExplicarNumeros(lead) || historico.some((m) => m.direcao !== 'lead' && citouNumerosDoCalculo(m.texto, lead));
-    const precoPrematuro = (t) => falaDeHonorario(t) && !perguntouPreco && !jaFalouHonorario && (msgsLead.length < 2 || !numerosExplicados);
+    // O honorário só sai quando: o lead perguntou o preço, OU aceitou o convite "posso te mostrar o investimento?",
+    // OU a conversa já vai longe (5+ mensagens do lead, com os números explicados). Nunca logo depois dos números.
+    const aceitou = aceitouVerInvestimento(historico);
+    const precoPrematuro = (t) =>
+      falaDeHonorario(t) && !perguntouPreco && !jaFalouHonorario && !aceitou && (msgsLead.length < 5 || !numerosExplicados);
     const MOTIVO_PRECO_CEDO =
-      'fala de honorário/preço, mas a pessoa não perguntou o custo e ainda é cedo (o honorário só entra no FINAL da conversa, depois de explicar os números do cálculo). Reescreva SEM citar honorário, percentual do Gabriel nem oferecer "mostrar a conta": se ainda não explicou os números do cálculo, explique-os agora (INSS estimado, redução e valor final) e continue passando valor rumo ao fechamento';
+      'fala de honorário/preço, mas a pessoa não perguntou o custo e ainda não aceitou ver o investimento. Reescreva SEM citar honorário, percentual ou valor do serviço: passe VALOR (como a redução funciona no caso dela, o que o Gabriel faz do começo ao fim, prova real) e termine convidando: "Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?"';
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
     const temBusca = (documentos && documentos.total > 0) || (aprendizado && aprendizado.total > 0);
     const base = ehLeadExterno(lead) ? [...FERRAMENTAS, FERRAMENTA_SIMULACAO] : FERRAMENTAS;

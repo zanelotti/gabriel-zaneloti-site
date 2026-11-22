@@ -164,6 +164,26 @@ export function leadPerguntouPreco(texto) {
   return /(honorari|quanto (voce|vc|ele|o gabriel|vcs|voces)?\s*(cobra|cobram|custa|fica|e que|sai)|quanto (e|eh|custa|fica|sai|seria)|\bcusto\b|\bcustos\b|\bcustar\b|\bpreco|valor do (servico|trabalho|honorario)|qual (e )?o valor|cobranca|\bcobra|\bcobram|\bpagar (pra|para) (voce|vc|ele|o gabriel)|percentual|\bporcentagem|comissao|\btaxa\b|mensalidade|\bcaro\b|\bbarato\b|desconto)/.test(t);
 }
 
+/**
+ * O bot ofereceu mostrar o investimento ("posso te mostrar o investimento?") e o lead aceitou na mensagem seguinte?
+ * Só então o honorário pode sair sem o lead ter perguntado o preço.
+ */
+export function aceitouVerInvestimento(historico) {
+  const h = Array.isArray(historico) ? historico : [];
+  let i = h.length - 1;
+  const respostas = [];
+  while (i >= 0 && h[i].direcao === 'lead') respostas.unshift(h[i--].texto || '');
+  const oferta = i >= 0 ? String(h[i].texto || '') : '';
+  if (!respostas.length || !/investimento/i.test(oferta)) return false;
+  const r = respostas
+    .join(' ')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (/\b(nao|agora nao|depois)\b/.test(r)) return false;
+  return /\b(sim|pode|podes|quero|manda|mande|claro|ok|okay|bora|vamos|beleza|blz|show|isso|por favor|pfv|pode ser|mostra|mostre|gostaria)\b/.test(r);
+}
+
 /** Pessoa física com economia estimada: tem números (INSS, redução, valor final) para o bot explicar antes de falar do honorário. */
 export function precisaExplicarNumeros(lead) {
   const h = calcularHonorario(lead);

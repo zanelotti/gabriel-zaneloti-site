@@ -15,6 +15,17 @@ import { criarStore } from './store.js';
 import { dormir } from './util.js';
 import { criarWhatsApp } from './whatsapp.js';
 
+// A biblioteca de criptografia do WhatsApp imprime blocos enormes ("Removing old closed session...", com chaves)
+// que enchiam o registro e escondiam as mensagens do bot. Esses avisos internos são descartados aqui.
+const RUIDO_SIGNAL = /^(Removing old closed session|Closing session|Closing open session|Opening session|Migrating session)/;
+for (const nivel of ['log', 'info']) {
+  const original = console[nivel].bind(console);
+  console[nivel] = (...args) => {
+    if (typeof args[0] === 'string' && RUIDO_SIGNAL.test(args[0])) return;
+    original(...args);
+  };
+}
+
 const log = {
   info: (...a) => console.log(new Date().toLocaleTimeString('pt-BR'), ...a),
   warn: (...a) => console.warn(new Date().toLocaleTimeString('pt-BR'), ...a),

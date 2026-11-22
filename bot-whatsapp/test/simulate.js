@@ -4,6 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { criarBot } from '../src/bot.js';
+import { aceitouVerInvestimento } from '../src/guards.js';
 import { criarCerebro, montarHistorico, anexarArquivos } from '../src/brain.js';
 import { dividirMensagens, extrairValoresReais, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, pediuParar, repeticaoExcessiva, validarSaida } from '../src/guards.js';
 import { montarAbertura } from '../src/opening.js';
@@ -1817,27 +1818,44 @@ await teste('modelos de acompanhamento: tempos, textos e sem valor para empresa'
   }
 });
 
-await teste('venda objetiva: depois dos números, na 2ª resposta do lead o honorário já pode sair (sem novas perguntas)', async () => {
-  const l = lead({ economia_estimada: 21013, inss_estimado: 28854, valor_apos_reducao: 7841 });
-  const resposta = 'O honorário é de R$ 2.522, que são 12% sobre a economia estimada de R$ 21.013, e cobre tudo até a CND. Posso te passar a lista de dados para já preparar o seu contrato?';
-  const mk = () => {
+await teste('aceitouVerInvestimento: só vale resposta positiva logo depois do convite', () => {
+  const conv = { direcao: 'bot', texto: 'Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?' };
+  assert.equal(aceitouVerInvestimento([conv, { direcao: 'lead', texto: 'pode sim' }]), true);
+  assert.equal(aceitouVerInvestimento([conv, { direcao: 'lead', texto: 'Quero ver' }]), true);
+  assert.equal(aceitouVerInvestimento([conv, { direcao: 'lead', texto: 'agora não' }]), false);
+  assert.equal(aceitouVerInvestimento([conv, { direcao: 'lead', texto: 'tenho uma dúvida sobre o prazo' }]), false);
+  assert.equal(aceitouVerInvestimento([{ direcao: 'bot', texto: 'A obra tem CNO?' }, { direcao: 'lead', texto: 'sim' }]), false);
+});
+
+await teste('venda com valor: logo depois dos números o honorário é BARRADO (caso Jaime); só sai quando ela aceita ver o investimento', async () => {
+  const l = lead({ economia_estimada: 16241, inss_estimado: 26339, valor_apos_reducao: 10098 });
+  const honor = 'O honorário é de R$ 1.949, que são 12% sobre a economia estimada de R$ 16.241, e cobre tudo até a CND. Posso te passar a lista de dados para já preparar o seu contrato?';
+  const valor = 'Para financiar, a CND é o que libera o processo. A redução vem do enquadramento correto da obra e dos prestadores autônomos, e nós cuidamos de tudo até a certidão. Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?';
+  const mk = (respostas) => {
     const chamadas = [];
-    return { chamadas, messages: { async create(p) { chamadas.push(p); return { content: [{ type: 'text', text: resposta }], stop_reason: 'end_turn' }; } } };
+    let k = 0;
+    return { chamadas, messages: { async create(p) { chamadas.push(p); const r = respostas[Math.min(k++, respostas.length - 1)]; return { content: [{ type: 'text', text: r }], stop_reason: 'end_turn' }; } } };
   };
-  const c1 = mk();
-  const r1 = await criarCerebro({ modelo: 't', config, client: c1 }).gerarResposta({
+  const base = [
+    { direcao: 'bot', texto: 'Oi, Jaime. Só para confirmar: a obra tem 209 m². Está certo?' },
+    { direcao: 'lead', texto: 'Sim' },
+    { direcao: 'bot', texto: 'Sem planejamento, a Receita cobraria cerca de R$ 26.339. A economia estimada é de R$ 16.241 e o valor cairia para cerca de R$ 10.098. Você vai precisar da CND para averbar, vender ou financiar?' },
+    { direcao: 'lead', texto: 'Financiado' },
+  ];
+  const c1 = mk([honor, valor]);
+  const r1 = await criarCerebro({ modelo: 't', config, client: c1 }).gerarResposta({ lead: l, historico: base, ferramentas: {}, log: silencioso });
+  assert.equal(c1.chamadas.length, 2, 'o honorário foi barrado e o Claude reescreveu');
+  assert.doesNotMatch(r1.mensagens.join(' '), /honor[aá]rio|12%/i);
+  assert.match(r1.mensagens.join(' '), /posso te mostrar o investimento/);
+  const c2 = mk([honor]);
+  const r2 = await criarCerebro({ modelo: 't', config, client: c2 }).gerarResposta({
     lead: l,
-    historico: [
-      { direcao: 'bot', texto: 'Oi, Maria. Só para confirmar: a obra tem 231 m². Está certo?' },
-      { direcao: 'lead', texto: 'Isso' },
-      { direcao: 'bot', texto: 'Sem planejamento, a Receita cobraria cerca de R$ 28.854. A economia estimada é de R$ 21.013 e o valor ficaria em torno de R$ 7.841. A obra já tem CNO aberto?' },
-      { direcao: 'lead', texto: 'Ainda não' },
-    ],
+    historico: [...base, { direcao: 'bot', texto: valor }, { direcao: 'lead', texto: 'Pode mostrar' }],
     ferramentas: {},
     log: silencioso,
   });
-  assert.equal(c1.chamadas.length, 1, 'não foi bloqueado como preço cedo demais');
-  assert.match(r1.mensagens.join(' '), /R\$\s2\.522/);
+  assert.equal(c2.chamadas.length, 1, 'aceitou ver o investimento: o honorário sai');
+  assert.match(r2.mensagens.join(' '), /R\$\s1\.949/);
 });
 
 await teste('acompanhamento de venda: depois de ver a economia, o 1º lembrete cita a economia estimada (número do cadastro) e passa nas travas', () => {
@@ -2077,7 +2095,9 @@ await teste('prompt: Lia é a vendedora (estratégia de venda, fechamento sim/n�
   assert.match(s, /NÚMEROS \+ UMA PERGUNTA DA OBRA/);
   assert.match(s, /ÚNICA pergunta de diagnóstico/);
   assert.match(s, /PROIBIDO: perguntar a motivação/);
-  assert.match(s, /VALOR \+ HONORÁRIO \+ FECHAMENTO \(na resposta seguinte/);
+  assert.match(s, /3\. VALOR \(na resposta seguinte, ANTES de qualquer preço\)/);
+  assert.match(s, /posso te mostrar o investimento\?/);
+  assert.match(s, /PROIBIDO falar de honorário, percentual ou formas de pagamento nesta etapa/);
   assert.match(s, new RegExp(PERGUNTA_FECHAMENTO.replace(/[?]/g, '\\?')));
   assert.match(s, /MENSAGEM DOS DADOS DO CONTRATO/);
   assert.match(s, /CPF/);
@@ -2199,14 +2219,14 @@ await teste('lead comum: o honorário (mesmo depois de várias trocas) só sai s
   const a = cerebroRoteiro([texto(comHonorario), texto(textoNumeros)]);
   const r = await a.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', 'b', 'c', 'd', 'e'), ferramentas: {}, log: silencioso });
   assert.deepEqual(r.mensagens, [textoNumeros], 'o texto dos números pode sair (sem falar de honorário)');
-  assert.match(JSON.stringify(a.chamadas[1].messages.at(-1).content), /explique-os agora/);
+  assert.match(JSON.stringify(a.chamadas[1].messages.at(-1).content), /aceitou ver o investimento/);
   // Se a pessoa pergunta o custo, o honorário sai direto.
   const b = cerebroRoteiro([texto(comHonorario)]);
   const r2 = await b.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', 'b', 'Quanto custa o serviço?'), ferramentas: {}, log: silencioso });
   assert.deepEqual(r2.mensagens, [comHonorario]);
 });
 
-await teste('lead comum: honorário sem ser perguntado só depois de 3 mensagens da pessoa; se ela perguntar, sai na hora', async () => {
+await teste('lead comum: honorário sem ser perguntado só depois que ela aceita ver o investimento; se ela perguntar, sai na hora', async () => {
   const com = 'Os honorários são de R$ 960 (12% da economia estimada de R$ 8.000). Posso te passar a lista de dados para o Gabriel já preparar o seu contrato?';
   const ok = 'Pela estimativa da calculadora a economia é boa. Como foi a obra, teve prestadores autônomos?';
   const a = cerebroRoteiro([texto(com), texto(ok)]);
@@ -2214,7 +2234,7 @@ await teste('lead comum: honorário sem ser perguntado só depois de 3 mensagens
   assert.deepEqual(r.mensagens, [ok]);
   const b = cerebroRoteiro([texto(com)]);
   const explicou = 'Pela estimativa da calculadora, a Receita cobraria R$ 20.000 e com a redução ficaria em R$ 12.000, uma economia de R$ 8.000. O saldo ainda pode ser parcelado em até 60 vezes.';
-  const r2 = await b.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', explicou, 'c', 'd', 'e'), ferramentas: {}, log: silencioso });
+  const r2 = await b.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', explicou + ' Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?', 'pode sim'), ferramentas: {}, log: silencioso });
   assert.deepEqual(r2.mensagens, [com]);
   const c = cerebroRoteiro([texto(com)]);
   const r3 = await c.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('Qual o valor do serviço?'), ferramentas: {}, log: silencioso });
