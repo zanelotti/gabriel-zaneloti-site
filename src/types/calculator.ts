@@ -57,7 +57,7 @@ export const INITIAL_CALCULATOR_DATA: CalculatorData = {
   whatsapp: '',
   dataInicio: '',
   dataFim: '',
-  responsavel: '',
+  responsavel: 'PF', // a maioria é pessoa física: já vem marcado (evita erro no 1º "Continuar")
   tipoObra: '',
   situacao: '',
   categoria: '',

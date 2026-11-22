@@ -1,4 +1,4 @@
-import { useEffect, type FormEvent } from 'react';
+import { useEffect, useRef, type FormEvent } from 'react';
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { useCalculatorForm } from '@/hooks/useCalculatorForm';
@@ -44,12 +44,14 @@ interface CalculatorProps {
  * contato pelo WhatsApp". Quem apresenta o valor do serviço é a conversa.
  */
 export function Calculator({ embedded = false, onResultChange }: CalculatorProps = {}) {
-  const { data, step, errors, enviado, isSubmitting, updateField, goNext, goBack, submit, reset } =
+  const { data, step, errors, enviado, isSubmitting, inssSemPlanejamento, updateField, goNext, goBack, submit, reset } =
     useCalculatorForm();
 
   useEffect(() => {
     onResultChange?.(enviado);
   }, [enviado, onResultChange]);
+
+  const cartaoRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -63,6 +65,7 @@ export function Calculator({ embedded = false, onResultChange }: CalculatorProps
 
   const cartao = (
     <div
+      ref={cartaoRef}
       id={embedded ? 'calculadora' : undefined}
       className={
         embedded
@@ -126,14 +129,14 @@ export function Calculator({ embedded = false, onResultChange }: CalculatorProps
               Voltar
             </button>
             <button type="submit" className="btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Enviando...' : 'Receber minha análise grátis'}
+              {isSubmitting ? 'Enviando...' : 'Ver o resultado da minha obra'}
             </button>
           </div>
           <p className="mt-3 text-center text-xs text-navy-400 sm:text-right">Sem custo e sem compromisso.</p>
         </form>
       )}
 
-      {enviado && <Confirmacao data={data} onReset={reset} />}
+      {enviado && <Confirmacao data={data} inssSemPlanejamento={inssSemPlanejamento} onReset={reset} />}
     </div>
   );
 

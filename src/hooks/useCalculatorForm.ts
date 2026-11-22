@@ -13,6 +13,8 @@ interface UseCalculatorFormReturn {
   /** true depois que os dados foram enviados (o visitante vê só a confirmação — o valor calculado NÃO é mostrado). */
   enviado: boolean;
   isSubmitting: boolean;
+  /** INSS sem planejamento, mostrado na confirmação depois do envio (null = não mostrar número). */
+  inssSemPlanejamento: number | null;
   updateField: <K extends keyof CalculatorData>(field: K, value: CalculatorData[K]) => void;
   goNext: () => void;
   goBack: () => void;
@@ -34,6 +36,16 @@ function mostrarPrimeiroErro(erros: Record<string, unknown>): void {
 }
 
 /**
+ * Valor que a Receita cobraria sem planejamento, mostrado DEPOIS do envio (na confirmação).
+ * Não mostra número para obra terminada antes de 2021 (pode haver decadência: a conta muda muito)
+ * nem quando o cálculo não fecha.
+ */
+function previaDoINSS(data: CalculatorData, r: INSSResult | null): number | null {
+  if (data.dataFim && data.dataFim < '2021-01-01') return null;
+  return r && r.inssEstimado > 0 ? Math.round(r.inssEstimado) : null;
+}
+
+/**
  * Hook central que concentra todo o estado da calculadora em um único objeto
  * (CalculatorData), evitando espalhar os dados entre múltiplos states soltos.
  */
@@ -44,6 +56,7 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
   const [enviado, setEnviado] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [started, setStarted] = useState(false);
+  const [inssSemPlanejamento, setInssSemPlanejamento] = useState<number | null>(null);
 
   const updateField = useCallback(
     <K extends keyof CalculatorData>(field: K, value: CalculatorData[K]) => {
@@ -124,6 +137,7 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
         detalheInterno: calcResult?.detalheInterno ?? null,
       });
 
+      setInssSemPlanejamento(previaDoINSS(data, calcResult));
       trackEvent('calculator_completed', {
         estado: data.estado,
         tipoObra: data.tipoObra,
@@ -140,7 +154,8 @@ export function useCalculatorForm(): UseCalculatorFormReturn {
     setErrors({});
     setEnviado(false);
     setStarted(false);
+    setInssSemPlanejamento(null);
   }, []);
 
-  return { data, step, errors, enviado, isSubmitting, updateField, goNext, goBack, submit, reset };
+  return { data, step, errors, enviado, isSubmitting, inssSemPlanejamento, updateField, goNext, goBack, submit, reset };
 }

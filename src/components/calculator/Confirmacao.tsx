@@ -13,6 +13,8 @@ const AgendarNoResultado = lazy(() =>
 
 interface ConfirmacaoProps {
   data: CalculatorData;
+  /** INSS que a Receita cobraria sem planejamento (null = não mostrar número, ex.: obra antiga com possível decadência). */
+  inssSemPlanejamento: number | null;
   onReset: () => void;
 }
 
@@ -22,19 +24,16 @@ function primeiroNome(nome: string): string {
   return parte.charAt(0).toLocaleUpperCase('pt-BR') + parte.slice(1).toLocaleLowerCase('pt-BR');
 }
 
-const PASSOS = [
-  { titulo: 'Dados recebidos', texto: 'Já estão com a nossa equipe.', feito: true },
-  { titulo: 'Análise da sua obra no WhatsApp, em até 24 horas', texto: 'INSS que a Receita cobraria, quanto dá para reduzir e o que falta para a CND.', feito: false },
-  { titulo: 'Tire suas dúvidas', texto: 'Direto com o Gabriel, sem compromisso.', feito: false },
-];
+function reaisInteiros(valor: number): string {
+  return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+}
 
 /**
- * Tela exibida depois que o visitante envia a simulação. NÃO mostra nenhum
- * valor (INSS, economia, honorário): o cálculo fica guardado para o CRM e para
- * o bot, e quem apresenta o serviço é a conversa no WhatsApp. Aqui só tem:
- * confirmação + botão do WhatsApp + botão para agendar a consultoria.
+ * Tela depois do envio (o contato vem ANTES do resultado). Mostra só o INSS que a
+ * Receita cobraria sem planejamento; a redução fica para o WhatsApp, para o lead
+ * ter motivo de chamar ou responder a Lia. Texto curto de propósito.
  */
-export function Confirmacao({ data, onReset }: ConfirmacaoProps) {
+export function Confirmacao({ data, inssSemPlanejamento, onReset }: ConfirmacaoProps) {
   const [agendaAberta, setAgendaAberta] = useState(false);
   const raiz = useRef<HTMLDivElement>(null);
   const nome = primeiroNome(data.nome);
@@ -53,24 +52,31 @@ export function Confirmacao({ data, onReset }: ConfirmacaoProps) {
     .join(' · ');
 
   const whatsappUrl = generateConfirmacaoWhatsAppLink(data);
+  const temNumero = inssSemPlanejamento !== null && inssSemPlanejamento > 0;
 
   return (
     <div ref={raiz} id="resultado-simulacao" className="animate-fade-in-up scroll-mt-24" role="status">
-      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-100 text-accent-700">
-        <svg viewBox="0 0 16 16" fill="none" className="h-6 w-6" aria-hidden="true">
-          <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-
-      <h3 className="mt-4 text-2xl font-extrabold leading-tight text-navy-900 sm:text-3xl">
-        {nome ? `${nome}, recebemos os dados da sua obra!` : 'Recebemos os dados da sua obra!'}
+      <h3 className="text-2xl font-extrabold leading-tight text-navy-900">
+        {nome ? `${nome}, aqui está o resultado` : 'Aqui está o resultado'}
       </h3>
-      <p className="mt-3 text-base leading-relaxed text-navy-600">
-        A análise da sua obra chega no seu WhatsApp em até 24 horas, muitas vezes em poucos minutos. Fique de olho no
-        celular.
+
+      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-5">
+        {temNumero ? (
+          <>
+            <p className="text-sm font-semibold text-amber-800">Sem planejamento, a Receita cobraria cerca de</p>
+            <p className="mt-1 text-4xl font-extrabold tracking-tight text-navy-900">{reaisInteiros(inssSemPlanejamento)}</p>
+          </>
+        ) : (
+          <p className="text-base font-bold text-navy-900">Sem planejamento, a Receita cobra o INSS da sua obra pelo valor cheio.</p>
+        )}
+      </div>
+
+      <p className="mt-4 text-base leading-relaxed text-navy-700">
+        <strong className="text-navy-900">Com um especialista, dá para pagar bem menos, dentro da lei.</strong> A Lia,
+        assistente do Gabriel, vai te mostrar no WhatsApp quanto você economiza.
       </p>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <a
           href={whatsappUrl}
           target="_blank"
@@ -78,7 +84,7 @@ export function Confirmacao({ data, onReset }: ConfirmacaoProps) {
           className="btn-primary w-full sm:w-auto"
           onClick={() => trackEvent('whatsapp_clicked', { origem: 'confirmacao' })}
         >
-          Falar agora no WhatsApp
+          Ver quanto economizo no WhatsApp
         </a>
         {!agendaAberta && (
           <button
@@ -112,30 +118,6 @@ export function Confirmacao({ data, onReset }: ConfirmacaoProps) {
           />
         </Suspense>
       )}
-
-      <ol className="mt-8 space-y-4 border-t border-navy-100 pt-6">
-        {PASSOS.map((passo, indice) => (
-          <li key={passo.titulo} className="flex gap-3.5">
-            <span
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${
-                passo.feito ? 'bg-accent-500' : 'bg-navy-900'
-              }`}
-            >
-              {passo.feito ? (
-                <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" aria-hidden="true">
-                  <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              ) : (
-                indice + 1
-              )}
-            </span>
-            <div className="pt-0.5">
-              <p className="text-sm font-bold text-navy-900">{passo.titulo}</p>
-              <p className="text-sm text-navy-500">{passo.texto}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
 
       <div className="mt-6 text-center sm:text-left">
         <button type="button" onClick={onReset} className="text-sm font-semibold text-navy-500 underline">

@@ -12,8 +12,8 @@ interface LeadFormProps {
 export function LeadForm({ data, errors, onChange }: LeadFormProps) {
   return (
     <CalculatorStep
-      title="Para onde enviamos a sua análise?"
-      description="Último passo. A análise da sua obra chega no seu WhatsApp em até 24 horas."
+      title="Último passo"
+      description="Informe seu contato para ver o resultado da sua obra."
     >
       <div>
         <label htmlFor="nome" className="field-label">

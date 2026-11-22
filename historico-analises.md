@@ -51,3 +51,34 @@ A partir desta análise, só o período desde a análise anterior (pedido do Gab
 **Feito**
 - v17: contato sem caixinha obrigatória (aviso em texto), WhatsApp aceita +55/0, tela leva até o erro.
 - Análise de palavras-chave entregue ao Gabriel (para repassar ao gestor).
+
+## Análise 3: 22/11/2026 (tarde), período desde a análise 2 (20 a 22/11)
+
+**Google Ads, [Leads-22/09], 20 a 22/11 (domingo parcial)**
+
+| Dia | Impressões | Cliques | Simulações | Custo |
+|---|---|---|---|---|
+| sex 20/11 | 156 | 10 | 1 | R$ 37,82 |
+| sáb 21/11 | 215 | 16 | 1 | R$ 62,91 |
+| dom 22/11 (parcial) | 135 | 9 | 0 | R$ 37,07 |
+| **Total** | 506 | 35 | 2 | R$ 137,80 |
+
+- CTR 6,9%, taxa de conversão 5,7%, custo por simulação R$ 68,90 (antes ~R$ 23-25). Impressões caíram 468 em relação aos 3 dias anteriores.
+- Continua "Limitada pelo orçamento" (R$ 58,21/dia).
+- **Saldo da conta: R$ 224,85 ("Os fundos estão acabando")**. Último Pix: R$ 300 em 21/11. Dá para uns 4 a 5 dias.
+- Termos: "inss de obra", "inss da obra", "como tirar cnd de obra antiga" (os poucos com clique).
+
+**Clarity, últimos 3 dias**
+- 30 sessões reais (8 robôs), 26 vindas do Google, 2/3 no celular. Rolagem média 14%, 39 s ativos.
+- Funil: 6 começaram, 6 terminaram a obra, 5 terminaram o tamanho, 2 enviaram. Maior queda: de novo a etapa do contato (3 de 5).
+- Gravações (2 reais; a 3ª, de 20/11 17h no Firefox sem origem, parece teste):
+  - 22/11 11h37, celular: travou ~1 min na etapa 1 (1º "Continuar" deu erro: faltava escolher Pessoa Física/Jurídica e preencher campos), passou o tamanho, chegou no contato e saiu em 8 segundos sem digitar nada.
+  - 22/11 10h05, PC: 1º "Continuar" deu erro (faltava PF/PJ), passou, chegou no contato e saiu em 4 segundos sem digitar.
+- Desempenho: CLS 0,75 (ruim) e LCP 3,5 s, mas só 3 medições.
+
+**Conclusão:** a v17 tirou a caixinha, mas as pessoas desistem ao ver o pedido de nome e WhatsApp sem ter recebido nada em troca.
+
+**Sugestões**
+- Mostrar um resultado parcial antes do contato (ex.: "Sem planejamento, a Receita cobraria cerca de R$ X da sua obra") e pedir o WhatsApp para enviar quanto dá para reduzir.
+- Deixar "Pessoa Física" já marcado (a maioria é PF): evita o erro no 1º "Continuar".
+- Gestor: recarregar saldo; com a conversão baixa nos 3 dias, não aumentar orçamento ainda.
