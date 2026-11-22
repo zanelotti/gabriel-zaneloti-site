@@ -532,6 +532,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     if (conversa.estado === 'humano' || String(conversa.observacao || '').startsWith(MARCA_ESPERA)) {
       cancelarTimer(conversa.id);
       anexosPendentes.delete(conversa.id);
+      log.info(`[bot] mensagem de ${telefone} não respondida: a conversa está com o Gabriel (${conversa.observacao || conversa.estado}).`);
       await avisarLeadEsperando(conversa, conteudo);
       return;
     }
@@ -631,7 +632,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     await store.addMensagem({ conversa_id: conversa.id, direcao: 'humano', texto: texto || '[mensagem sem texto]', wa_id: waId });
     if (conversa.estado === 'ativa') {
       await store.setEstado(conversa.id, 'humano', 'Gabriel respondeu pelo WhatsApp');
-      log.info(`[bot] Gabriel assumiu a conversa ${conversa.id}; o bot se calou.`);
+      log.info(`[bot] Gabriel respondeu pelo WhatsApp a ${telefone}; o bot se calou nessa conversa.`);
     }
     // O quadro também acompanha o que o Gabriel fala: se ele apresentou os honorários, o card vai para "Proposta enviada".
     if (citouHonorarios(texto)) {
@@ -819,7 +820,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       } catch (e) {
         const n = (falhasResposta.get(conversaId) || 0) + 1;
         falhasResposta.set(conversaId, n);
-        log.error(`[bot] falha ao gerar resposta (tentativa ${n}):`, e.message);
+        log.error(`[bot] falha ao gerar resposta para ${conversa?.telefone || conversaId} (tentativa ${n}):`, e.message);
         if (n < 2) {
           agendarResposta(conversaId, 30000);
         } else {
@@ -837,6 +838,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
         if (i > 0) await dormirFn(aleatorio(800, 1800));
         await enviar(conversa, msg);
       }
+      log.info(`[bot] respondeu ${conversa.telefone} (${resultado.mensagens.length} mensagem(ns)).`);
 
       // Falou dos honorários? Então a proposta foi apresentada: card vai para "Proposta enviada".
       if (resultado.mensagens.some(citouHonorarios)) {
@@ -874,12 +876,14 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
           // Passou para o Gabriel: a partir daqui o bot fica calado nessa conversa (se o lead escrever, o Gabriel recebe aviso).
           cancelarTimer(conversaId);
           await store.setEstado(conversaId, 'humano', `Passou para o Gabriel: ${acao.motivo}`);
+          log.info(`[bot] conversa com ${conversa.telefone} passada para o Gabriel: ${acao.motivo}`);
           await store.atualizarLead(lead.id, { nota: `Passou para o Gabriel: ${acao.motivo}. ${acao.resumo || ''}`.trim() });
           avisosEspera.set(conversaId, Date.now());
           await notificar.avisar({ tipo: 'Passou para você', lead, telefone: conversa.telefone, motivo: detalhe, historico: hist });
         }
       } else if (acao?.tipo === 'encerrar') {
         await store.setEstado(conversaId, 'encerrada', acao.motivo);
+        log.info(`[bot] conversa com ${conversa.telefone} encerrada: ${acao.motivo}`);
         await store.atualizarLead(lead.id, { status: 'perdido', nota: `Conversa encerrada pelo bot: ${acao.motivo}`, motivoPerda: acao.motivo_perda || 'outro' });
       }
     } finally {
