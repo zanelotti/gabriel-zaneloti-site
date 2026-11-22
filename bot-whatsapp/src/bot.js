@@ -25,6 +25,17 @@ const MSG_SO_TEXTO = 'Recebi o seu arquivo, mas por aqui eu consigo ler só text
 const ehMarcaDeMidia = (t) => /^\[o lead enviou [^\]]+\]$/.test(String(t || '').trim());
 const MARCA_ESPERA = 'ESPERA_GABRIEL: '; // guardada em observacao: a conversa segue 'ativa', mas já foi passada ao Gabriel
 
+// Mensagens automáticas do WhatsApp Business (saudação e ausência) saem do mesmo número do Gabriel,
+// mas não são ele digitando. Dá para acrescentar outras no .env: MENSAGENS_AUTOMATICAS=trecho1|trecho2
+const AUTOMATICAS_PADRAO = [/obrigad[oa] pelo (seu )?contato/i, /responderei assim que poss[ií]vel/i, /no momento n[aã]o (estou|estamos) dispon[ií]ve/i];
+export function ehMensagemAutomaticaDoWhatsApp(texto, config = {}) {
+  const t = String(texto || '');
+  if (!t.trim()) return false;
+  const extras = String(config.mensagensAutomaticas || process.env.MENSAGENS_AUTOMATICAS || '')
+    .split('|').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  return AUTOMATICAS_PADRAO.some((r) => r.test(t)) || extras.some((x) => t.toLowerCase().includes(x));
+}
+
 export function criarBot({ store, wa, cerebro, site, notificar, config, log = console, dormirFn = dormir, parado = () => false }) {
   const timers = new Map(); // conversaId -> timeout do "espera o lead terminar de escrever"
   const emAndamento = new Set(); // conversas sendo respondidas agora
@@ -628,6 +639,11 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   async function aoHumano({ telefone, texto, waId = null }) {
     const conversa = await store.conversaPorTelefone(telefone);
     if (!conversa) return;
+    // Mensagem automática do WhatsApp Business (saudação/ausência): não foi o Gabriel digitando, o bot continua.
+    if (ehMensagemAutomaticaDoWhatsApp(texto, config)) {
+      log.info(`[bot] mensagem automática do WhatsApp Business para ${telefone} ignorada (o bot continua atendendo).`);
+      return;
+    }
     cancelarTimer(conversa.id);
     await store.addMensagem({ conversa_id: conversa.id, direcao: 'humano', texto: texto || '[mensagem sem texto]', wa_id: waId });
     if (conversa.estado === 'ativa') {

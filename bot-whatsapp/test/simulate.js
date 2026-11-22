@@ -665,6 +665,18 @@ await teste('Gabriel responde à mão: o bot se cala e não atropela', async () 
   assert.equal(ctx.client.chamadas.length, 0);
 });
 
+await teste('saudação automática do WhatsApp Business não cala o bot (caso Andreza)', async () => {
+  const ctx = montar({ roteiro: [texto('Perfeito, já calculo a sua simulação.')] });
+  const c = await abrir(ctx, lead());
+  await ctx.bot.aoHumano({ telefone: telefoneDe(c), texto: 'Obrigado pelo seu contato. Responderei assim que possível. \nComo posso te ajudar?' });
+  assert.equal(ctx.store.conversas[0].estado, 'ativa');
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'Casa de 136 m² em SP, 2020 a 2021' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.client.chamadas.length, 1);
+  assert.ok(ctx.wa.enviados.some((e) => /simulação/.test(e.texto || e)));
+});
+
 await teste('quem não foi abordado pelo bot é ignorado', async () => {
   const ctx = montar();
   await ctx.bot.aoReceber({ telefone: '5511988887777', texto: 'oi, tudo bem?' });
