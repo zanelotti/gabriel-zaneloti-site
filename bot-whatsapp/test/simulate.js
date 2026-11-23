@@ -665,6 +665,17 @@ await teste('Gabriel responde à mão: o bot se cala e não atropela', async () 
   assert.equal(ctx.client.chamadas.length, 0);
 });
 
+await teste('números da calculadora: valor cheio e com planejamento, depois economia em mensagem separada (com 60x só se não está em andamento)', async () => {
+  const { textosDosNumeros } = await import('../src/prompt.js');
+  const base = { inss_estimado: 16190, valor_apos_reducao: 5756, economia_estimada: 10434, percentual_reducao: 64.45, situacao: 'concluida_com_habite_se' };
+  const n = (o) => ({ valores: o.valores.replace(/\u00a0/g, ' '), economia: o.economia.replace(/\u00a0/g, ' ') });
+  const t = n(textosDosNumeros(base));
+  assert.equal(t.valores, 'Sem nenhum planejamento, a Receita cobraria cerca de R$ 16.190 de INSS da sua obra. Com o planejamento, você pagaria cerca de R$ 5.756.');
+  assert.equal(t.economia, 'Isso representa uma economia de R$ 10.434 (64%), e esse valor a ser pago ainda pode ser parcelado em até 60x.');
+  const andamento = n(textosDosNumeros({ ...base, situacao: 'em_construcao' }));
+  assert.equal(andamento.economia, 'Isso representa uma economia de R$ 10.434 (64%).');
+});
+
 await teste('saudação automática do WhatsApp Business não cala o bot (caso Andreza)', async () => {
   const ctx = montar({ roteiro: [texto('Perfeito, já calculo a sua simulação.')] });
   const c = await abrir(ctx, lead());
@@ -2119,7 +2130,7 @@ await teste('prompt: Lia é a vendedora (estratégia de venda, fechamento sim/n�
   assert.match(s, /NÃO é na hora/);
   assert.match(s, /próximo horário livre do Gabriel/);
   assert.match(s, /Não ofereça reunião, consultoria nem ligação por conta própria/);
-  assert.match(s, /TERMINE a mensagem com UMA pergunta objetiva sobre a obra/);
+  assert.match(s, /UMA pergunta objetiva sobre a obra/);
   assert.doesNotMatch(s, /SEU FLUXO: SIMULAÇÃO/);
   assert.doesNotMatch(s, /Você NÃO vende/);
 });

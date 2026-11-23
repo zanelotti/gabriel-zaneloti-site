@@ -6,7 +6,7 @@
  *
  * Para mudar o jeito do bot falar, é aqui que você mexe.
  */
-import { calcularHonorario, formatarArea, formatarReaisInteiros, HONORARIO_MINIMO_PF, mensagemDadosContrato, nomeParecePessoa, PERGUNTA_FECHAMENTO, primeiroNome, regimeApuracao } from './util.js';
+import { calcularHonorario, formatarArea, formatarReaisInteiros, HONORARIO_MINIMO_PF, mensagemDadosContrato, nomeParecePessoa, obraEmAndamento, PERGUNTA_FECHAMENTO, primeiroNome, regimeApuracao } from './util.js';
 import { ehLeadExterno, origemDoLead, rotuloDaOrigem, roteiroDaOrigem, ROTEIRO_POS_SIMULACAO, semSimulacao } from './origem.js';
 
 const montarBase = (nome, trabalho) => `Você é ${nome}, assistente do Gabriel Zaneloti, consultor em regularização e redução de INSS de obra (construção civil). Você conversa por WhatsApp com pessoas que pediram uma simulação da regularização do INSS da obra. Escreva sempre em português do Brasil.
@@ -159,7 +159,9 @@ function descreverLead(lead, config, nomeContato = '') {
   const parcelaTxt = ', e, SÓ se a obra já tiver meses em atraso, que o saldo deles pode ser parcelado em até 60 vezes (obra em andamento não parcela: o INSS é pago mês a mês)';
   const numerosCalculadora = posSim
     ? '- (2) Os números JÁ FORAM enviados na simulação (mensagem acima, na conversa): NÃO repita o texto dos números; só comente se ela perguntar, com os valores EXATOS dos DADOS e sempre como estimativa.'
-    : `- (2) Quando ela CONFIRMAR, envie o TEXTO DOS NÚMEROS em UMA mensagem (até 4 frases curtas, uns 70 palavras), usando EXATAMENTE os valores dos DADOS: o que a Receita cobraria sem o planejamento (INSS estimado), a economia estimada e o valor que ficaria depois da redução${parcelaTxt}. Diga que é uma ESTIMATIVA confirmada na análise. A pessoa ainda não viu esses números: apresente com calma, sem dizer "como o site mostrou". NÃO fale de honorário ainda. TERMINE a mensagem com UMA pergunta objetiva sobre a obra (passo 2 da ESTRATÉGIA DE VENDA): nunca mande os números sem pergunta no final.`;
+    : temNumeros
+      ? `- (2) Quando ela CONFIRMAR, envie os NÚMEROS em TRÊS mensagens separadas (uma linha em branco entre elas), com ênfase na ECONOMIA. Siga o MODELO abaixo: pode adaptar as palavras ao jeito e ao caso da pessoa, mas mantenha a ORDEM (1º quanto pagaria sem planejamento e quanto pagaria com o planejamento; só DEPOIS, em mensagem separada, a economia em reais e em %), os VALORES EXATOS e o parcelamento só se estiver no modelo:\n  Mensagem 1 (modelo): ${JSON.stringify(textosDosNumeros(lead).valores)}\n  Mensagem 2 (modelo): ${JSON.stringify(textosDosNumeros(lead).economia)}\n  Mensagem 3: diga em meia frase que é uma estimativa com os dados que ela informou, confirmada na análise do Gabriel, e faça UMA pergunta objetiva sobre a obra (passo 2 da ESTRATÉGIA DE VENDA). A pessoa ainda não viu esses números: nunca diga "como o site mostrou". NÃO fale de honorário ainda.`
+      : `- (2) Quando ela CONFIRMAR, envie o TEXTO DOS NÚMEROS em UMA mensagem (até 4 frases curtas, uns 70 palavras), usando EXATAMENTE os valores dos DADOS: o que a Receita cobraria sem o planejamento (INSS estimado), a economia estimada e o valor que ficaria depois da redução${parcelaTxt}. Diga que é uma ESTIMATIVA confirmada na análise. A pessoa ainda não viu esses números: apresente com calma, sem dizer "como o site mostrou". NÃO fale de honorário ainda. TERMINE a mensagem com UMA pergunta objetiva sobre a obra (passo 2 da ESTRATÉGIA DE VENDA): nunca mande os números sem pergunta no final.`;
 
   const roteiroCalculadora = `\n\nROTEIRO DESTE LEAD (SIMULAÇÃO JÁ FEITA NA CALCULADORA DO SITE): confirme metragem e prazo, apresente os números com um gancho e conduza até o contrato (ESTRATÉGIA DE VENDA).\n- (1) Na 1ª resposta dela (a abertura já pediu a confirmação), se ela confirmou, siga para o passo 2. Se ela ainda não confirmou, confirme em UMA mensagem curta a METRAGEM e o PRAZO da obra com os dados (ex.: "Só para confirmar: a obra tem X m², início em MM/AAAA e [término em MM/AAAA / ainda em andamento]. Está certo?"). Não pergunte mais nada.\n${numerosCalculadora}\n- (3) Se ela CORRIGIR a metragem ou o prazo: agradeça, NÃO envie os números antigos e use passar_para_gabriel (motivo começando por "CORREÇÃO DE DADOS:" com o que mudou) dizendo que o Gabriel refaz a simulação com os dados corretos.\n- (4) Depois dos números: siga a ESTRATÉGIA DE VENDA a partir do passo 3: na resposta seguinte, VALOR (como a redução funciona no caso dela, o que o Gabriel faz, prova) terminando com o convite "Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?"; honorário SÓ quando ela perguntar ou aceitar o convite; depois a pergunta de fechamento e, quando aceitar, os dados do contrato.`;
 
@@ -167,6 +169,18 @@ function descreverLead(lead, config, nomeContato = '') {
 
   const cautela = externo ? roteiroDaOrigem(origem, { siteUrl: config?.siteUrl }) : temNumeros ? roteiroCalculadora : roteiroSemNumeros;
   return `# DADOS DO LEAD (única fonte de números que você pode citar)\n${linhas.map((l) => `- ${l}`).join('\n')}\n\n${politica}${cautela}`;
+}
+
+/**
+ * Textos fixos dos números da calculadora (pedido do Gabriel, 23/11): primeiro o valor sem planejamento e o valor com
+ * planejamento; depois, em mensagem separada, a economia em reais e em % (e o parcelamento só se a obra já tem meses em atraso).
+ */
+export function textosDosNumeros(lead) {
+  const pct = Math.round(Number(lead.percentual_reducao) || 0);
+  const valores = `Sem nenhum planejamento, a Receita cobraria cerca de ${formatarReaisInteiros(lead.inss_estimado)} de INSS da sua obra. Com o planejamento, você pagaria cerca de ${formatarReaisInteiros(lead.valor_apos_reducao)}.`;
+  const parcela = obraEmAndamento(lead) ? '' : ', e esse valor a ser pago ainda pode ser parcelado em até 60x';
+  const economia = `Isso representa uma economia de ${formatarReaisInteiros(lead.economia_estimada)}${pct > 0 ? ` (${pct}%)` : ''}${parcela}.`;
+  return { valores, economia };
 }
 
 export function montarSistema(lead, config, conhecimento = '', trechos = '', espera = null, nomeContato = '', aprendidos = '', parcelamentoCitado = true) {

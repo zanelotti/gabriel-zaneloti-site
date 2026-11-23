@@ -72,8 +72,8 @@ export function Confirmacao({ data, inssSemPlanejamento, onReset }: ConfirmacaoP
       </div>
 
       <p className="mt-4 text-base leading-relaxed text-navy-700">
-        <strong className="text-navy-900">Com um especialista, dá para pagar bem menos, dentro da lei.</strong> A Lia,
-        assistente do Gabriel, vai te mostrar no WhatsApp quanto você economiza.
+        <strong className="text-navy-900">Com um especialista, dá para pagar bem menos, dentro da lei.</strong> Eu mesmo
+        vou te chamar no WhatsApp para mostrar quanto você economiza.
       </p>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
