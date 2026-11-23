@@ -49,15 +49,15 @@ export function LeadCard({ lead, onClick, onDragStart, onDragEnd, isDragging }: 
       </p>
 
       {lead.economiaEstimada !== null && (
-        // Uma linha para cada valor: nas colunas estreitas do quadro os dois lado a lado se sobrepunham.
-        <dl className="mt-2 space-y-0.5 text-xs">
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="text-navy-400">Economia</dt>
-            <dd className="font-bold text-accent-600">{formatCurrency(lead.economiaEstimada)}</dd>
+        // Nome em cima e valor embaixo: nas colunas estreitas do quadro, lado a lado o valor era cortado.
+        <dl className="mt-2 grid grid-cols-1 gap-1">
+          <div className="min-w-0">
+            <dt className="text-[10px] uppercase tracking-wide text-navy-400">Economia</dt>
+            <dd className="whitespace-nowrap text-xs font-bold tabular-nums text-accent-600">{formatCurrency(lead.economiaEstimada)}</dd>
           </div>
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="text-navy-400">Honorário</dt>
-            <dd className="font-bold text-navy-700">{formatCurrency(lead.economiaEstimada * 0.12)}</dd>
+          <div className="min-w-0">
+            <dt className="text-[10px] uppercase tracking-wide text-navy-400">Honorário</dt>
+            <dd className="whitespace-nowrap text-xs font-bold tabular-nums text-navy-700">{formatCurrency(lead.economiaEstimada * 0.12)}</dd>
           </div>
         </dl>
       )}
