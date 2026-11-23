@@ -82,3 +82,29 @@ A partir desta análise, só o período desde a análise anterior (pedido do Gab
 - Mostrar um resultado parcial antes do contato (ex.: "Sem planejamento, a Receita cobraria cerca de R$ X da sua obra") e pedir o WhatsApp para enviar quanto dá para reduzir.
 - Deixar "Pessoa Física" já marcado (a maioria é PF): evita o erro no 1º "Continuar".
 - Gestor: recarregar saldo; com a conversão baixa nos 3 dias, não aumentar orçamento ainda.
+
+## Análise 4: 23/11/2026, período desde a análise 3 (22/11 à tarde até 23/11)
+
+**Google Ads, [Leads-22/09]**
+
+| Período | Cliques | Simulações | Custo |
+|---|---|---|---|
+| 22/11, depois da análise 3 | 8 | 2 | R$ 30,06 |
+| 23/11 (até a hora da análise) | 8 | 2 | R$ 45,59 |
+| **Total** | 16 | 4 | R$ 75,65 |
+
+- Custo por simulação: cerca de R$ 19 (na análise 3 foi R$ 68,90). Taxa de conversão de 25% hoje.
+- 22/11 fechou com 17 cliques, 2 simulações, R$ 67,13.
+- **Saldo: R$ 153,66 ("Os fundos estão acabando")**. Dá para uns 2 a 3 dias.
+
+**Clarity (últimos 2 dias = 22 e 23/11)**
+- 25 sessões reais (10 robôs). Funil: 10 começaram, 10 passaram a etapa 1 (ninguém travou), 10 passaram o tamanho, 6 enviaram.
+- Desistências no contato depois da análise 3: 2, ambas em 22/11 à noite (celular), ainda no site antigo. Gravação das 22h30: chegou no contato e ficou 26 s sem digitar nada.
+- Em 23/11, nenhuma desistência no contato até agora.
+- O site novo (resultado depois do contato, "Pessoa Física" já marcada) está no ar em 23/11. Ainda é cedo para medir.
+- Desempenho: CLS 1,3 (ruim) e LCP 3,2 s, com 7 medições. A página ainda "pula" no celular.
+
+**Próximos passos**
+- Recarregar o saldo do Google Ads hoje ou amanhã.
+- Medir o site novo em 3 a 4 dias.
+- Investigar o "pulo" da página no celular (CLS).

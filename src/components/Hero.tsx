@@ -22,7 +22,7 @@ export function Hero() {
       />
 
       <Container
-        className={`relative grid gap-8 ${
+        className={`relative grid grid-cols-1 gap-8 ${
           temResultado ? 'lg:gap-12' : 'lg:grid-cols-2 lg:grid-rows-[auto_auto_1fr] lg:items-start lg:gap-x-12 lg:gap-y-6'
         }`}
       >
@@ -118,12 +118,14 @@ export function Hero() {
         </div>
 
         {!temResultado && (
-          <div className="lg:col-start-1 lg:row-start-2 lg:pr-6">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:pr-6">
+            {/* min-w-0: o quadro do Trustindex nasce largo antes de carregar o próprio estilo; sem isso ele alargava a coluna
+                e o título "pulava" de linha no celular (CLS). */}
             <Provas />
           </div>
         )}
 
-        <div className={temResultado ? '' : 'lg:col-start-2 lg:row-span-3 lg:row-start-1'}>
+        <div className={temResultado ? 'min-w-0' : 'min-w-0 lg:col-start-2 lg:row-span-3 lg:row-start-1'}>
           <Calculator embedded onResultChange={setTemResultado} />
         </div>
       </Container>

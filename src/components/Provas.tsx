@@ -54,7 +54,7 @@ export function Provas() {
     : 'Avaliações de clientes no Google';
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-5">
+    <div className="min-w-0 max-w-full rounded-xl border border-white/10 bg-white/5 p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-navy-300">O que os clientes dizem</p>
         {googleAvaliacoes && (
@@ -85,7 +85,7 @@ export function Provas() {
               aberto
                 ? 'fixed inset-x-3 top-1/2 z-[61] mx-auto max-h-[90vh] max-w-5xl -translate-y-1/2 overflow-auto rounded-xl2 bg-white p-4 shadow-card sm:inset-x-6 sm:p-6'
                 : // Altura FIXA (não só máxima): o quadro do Trustindex carrega depois da página e, sem isso, empurrava a calculadora para baixo.
-                  'relative mt-3 h-[17rem] overflow-hidden rounded-lg bg-white p-2'
+                  'relative mt-3 h-[17rem] w-full max-w-full overflow-hidden rounded-lg bg-white p-2 [contain:inline-size_layout_paint]'
             }
           >
             {aberto && (
@@ -105,7 +105,7 @@ export function Provas() {
                 Carregando avaliações…
               </p>
             )}
-            <div ref={caixa} className="provas-trustindex relative bg-white" />
+            <div ref={caixa} className="provas-trustindex relative max-w-full bg-white" />
             {!aberto && (
               <button
                 type="button"
