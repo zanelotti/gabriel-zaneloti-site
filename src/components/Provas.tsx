@@ -1,126 +1,81 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { CREDENCIAIS } from '@/data/credenciais';
+import { AVALIACOES, type Avaliacao } from '@/data/avaliacoes';
 import { trackEvent } from '@/services/analytics';
 import { ECONOMIA_TOTAL_TEXTO } from '@/data/resultados';
 
-/** Aceita o código inteiro do Trustindex (<script ... loader.js?ID>) ou só o ID. */
-export function idDoTrustindex(codigo: string): string {
-  const t = codigo.trim();
-  const m = t.match(/loader\.js\?([A-Za-z0-9_-]+)/);
-  if (m) return m[1];
-  return /^[A-Za-z0-9_-]+$/.test(t) ? t : '';
+function LogoGoogle() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.7v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z" />
+      <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z" />
+      <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8l4-3.1z" />
+      <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z" />
+    </svg>
+  );
+}
+
+function Cartao({ a }: { a: Avaliacao }) {
+  const [inteiro, setInteiro] = useState(false);
+  const longo = a.texto.length > 150;
+  return (
+    <li className="flex w-[85%] shrink-0 snap-start flex-col rounded-lg bg-white p-4 sm:w-[70%]">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-sm font-bold text-navy-900">{a.nome}</p>
+        <LogoGoogle />
+      </div>
+      <p className="mt-0.5 flex items-center gap-2 text-xs text-navy-400">
+        <span className="tracking-tight text-amber-500" aria-label="5 estrelas">★★★★★</span>
+        {a.quando}
+      </p>
+      <p className={`mt-2 text-sm leading-relaxed text-navy-700 ${inteiro ? '' : 'line-clamp-4'}`}>{a.texto}</p>
+      {longo && (
+        <button type="button" onClick={() => setInteiro((v) => !v)} className="mt-1 self-start text-xs font-semibold text-navy-500 underline">
+          {inteiro ? 'Ler menos' : 'Ler mais'}
+        </button>
+      )}
+    </li>
+  );
 }
 
 /**
- * Topo do site, ao lado da calculadora: as avaliações reais do Google (quadro do Trustindex, que atualiza sozinho),
- * pequeno, com o botão "Ver maior" que abre em tela cheia. Embaixo, os números e o CNPJ.
- * Há UM quadro só na página (o mesmo elemento muda de tamanho), para o Trustindex não carregar duas vezes.
+ * Topo do site, ao lado da calculadora: as avaliações reais do Google (copiadas em data/avaliacoes.ts),
+ * em cartões que deslizam para o lado, e o link para ver todas no Google. Embaixo, os números e o CNPJ.
+ * Tudo vem junto com a página: não depende de serviço de fora e não faz a página "pular".
  */
 export function Provas() {
-  const { googleAvaliacoes, googleNota, googleQuantidade, cnpj, registro } = CREDENCIAIS;
-  const id = idDoTrustindex(CREDENCIAIS.trustindex);
-  const caixa = useRef<HTMLDivElement>(null);
-  const [aberto, setAberto] = useState(false);
-
-  // Coloca o script do Trustindex uma vez: ele desenha o quadro no lugar do script.
-  useEffect(() => {
-    const alvo = caixa.current;
-    if (!id || !alvo || alvo.childElementCount > 0) return;
-    const script = document.createElement('script');
-    script.src = `https://cdn.trustindex.io/loader.js?${id}`;
-    script.async = true;
-    script.defer = true;
-    alvo.appendChild(script);
-  }, [id]);
-
-  // Abriu/fechou: trava a rolagem da página, fecha com Esc e avisa o quadro para se reajustar ao novo tamanho.
-  useEffect(() => {
-    window.dispatchEvent(new Event('resize'));
-    const t = window.setTimeout(() => window.dispatchEvent(new Event('resize')), 250);
-    if (!aberto) return () => window.clearTimeout(t);
-    const antes = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const tecla = (e: KeyboardEvent) => e.key === 'Escape' && setAberto(false);
-    window.addEventListener('keydown', tecla);
-    return () => {
-      window.clearTimeout(t);
-      document.body.style.overflow = antes;
-      window.removeEventListener('keydown', tecla);
-    };
-  }, [aberto]);
-
-  const textoGoogle = googleNota
-    ? `${googleNota} no Google${googleQuantidade ? ` · ${googleQuantidade} avaliações` : ''}`
-    : 'Avaliações de clientes no Google';
+  const { googleAvaliacoes, googleNota, cnpj, registro } = CREDENCIAIS;
 
   return (
     <div className="min-w-0 max-w-full rounded-xl border border-white/10 bg-white/5 p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-navy-300">O que os clientes dizem</p>
+        <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-white">
+          <span className="text-amber-400" aria-hidden="true">★</span>
+          {googleNota || '5,0'} no Google
+        </p>
+      </div>
+
+      <ul className="-mx-1 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]" aria-label="Avaliações de clientes no Google">
+        {AVALIACOES.map((a) => (
+          <Cartao key={a.nome} a={a} />
+        ))}
+      </ul>
+
+      <div className="mt-1 flex items-center justify-between gap-3 text-xs">
+        <span className="text-navy-300">Deslize para ver mais →</span>
         {googleAvaliacoes && (
           <a
             href={googleAvaliacoes}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-white underline-offset-4 hover:underline"
+            className="font-semibold text-accent-300 underline-offset-4 hover:underline"
             onClick={() => trackEvent('click_avaliacoes_google', { origem: 'hero' })}
           >
-            <span className="text-amber-400" aria-hidden="true">★</span>
-            {textoGoogle}
+            Ver todas no Google
           </a>
         )}
       </div>
-
-      {id && (
-        <>
-          {/* Fundo escuro do modo "ver maior" (clicar fora fecha) */}
-          {aberto && (
-            <div className="fixed inset-0 z-[60] bg-navy-950/80" onClick={() => setAberto(false)} aria-hidden="true" />
-          )}
-          <div
-            role={aberto ? 'dialog' : undefined}
-            aria-modal={aberto ? true : undefined}
-            aria-label={aberto ? 'Avaliações no Google' : undefined}
-            className={
-              aberto
-                ? 'fixed inset-x-3 top-1/2 z-[61] mx-auto max-h-[90vh] max-w-5xl -translate-y-1/2 overflow-auto rounded-xl2 bg-white p-4 shadow-card sm:inset-x-6 sm:p-6'
-                : // Altura FIXA (não só máxima): o quadro do Trustindex carrega depois da página e, sem isso, empurrava a calculadora para baixo.
-                  'relative mt-3 h-[17rem] w-full max-w-full overflow-hidden rounded-lg bg-white p-2 [contain:inline-size_layout_paint]'
-            }
-          >
-            {aberto && (
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-base font-bold text-navy-900">Avaliações no Google</p>
-                <button
-                  type="button"
-                  onClick={() => setAberto(false)}
-                  className="rounded-full px-3 py-1 text-sm font-semibold text-navy-600 hover:bg-navy-50"
-                >
-                  Fechar ✕
-                </button>
-              </div>
-            )}
-            {!aberto && (
-              <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm text-navy-300" aria-hidden="true">
-                Carregando avaliações…
-              </p>
-            )}
-            <div ref={caixa} className="provas-trustindex relative max-w-full bg-white" />
-            {!aberto && (
-              <button
-                type="button"
-                onClick={() => {
-                  setAberto(true);
-                  trackEvent('click_avaliacoes_google', { origem: 'hero_ver_maior' });
-                }}
-                className="absolute inset-x-0 bottom-0 flex h-16 items-end justify-center bg-gradient-to-t from-white via-white/90 to-transparent pb-2 text-sm font-semibold text-navy-800"
-              >
-                Ver maior ⤢
-              </button>
-            )}
-          </div>
-        </>
-      )}
 
       <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
         <li>
