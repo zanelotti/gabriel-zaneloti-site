@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CREDENCIAIS } from '@/data/credenciais';
 import { AVALIACOES, type Avaliacao } from '@/data/avaliacoes';
 import { trackEvent } from '@/services/analytics';
@@ -45,6 +45,41 @@ function Cartao({ a }: { a: Avaliacao }) {
  */
 export function Provas() {
   const { googleAvaliacoes, googleNota, cnpj, registro } = CREDENCIAIS;
+  const trilho = useRef<HTMLUListElement>(null);
+  const parado = useRef(false);
+  const ate = useRef(0);
+
+  // Vai para o próximo cartão (ou volta); no fim, recomeça do primeiro.
+  const andar = (direcao: 1 | -1) => {
+    const el = trilho.current;
+    if (!el) return;
+    const passo = (el.firstElementChild as HTMLElement | null)?.offsetWidth ?? el.clientWidth;
+    const fim = el.scrollWidth - el.clientWidth - 4;
+    if (direcao === 1 && el.scrollLeft >= fim) el.scrollTo({ left: 0 });
+    else if (direcao === -1 && el.scrollLeft <= 4) el.scrollTo({ left: el.scrollWidth });
+    else el.scrollBy({ left: direcao * (passo + 12) });
+  };
+
+  // Quem mexe nas avaliações ganha 10 s de pausa antes de voltarem a andar sozinhas.
+  const pausar = () => {
+    ate.current = Date.now() + 10000;
+  };
+
+  // Passa sozinho a cada 5 s (só quando o quadro está na tela e a aba está aberta).
+  useEffect(() => {
+    let visivel = false;
+    const el = trilho.current;
+    const obs = el && 'IntersectionObserver' in window ? new IntersectionObserver(([e]) => (visivel = e.isIntersecting)) : null;
+    if (el && obs) obs.observe(el);
+    else visivel = true;
+    const t = window.setInterval(() => {
+      if (visivel && !parado.current && Date.now() > ate.current && !document.hidden) andar(1);
+    }, 5000);
+    return () => {
+      window.clearInterval(t);
+      obs?.disconnect();
+    };
+  }, []);
 
   return (
     <div className="min-w-0 max-w-full rounded-xl border border-white/10 bg-white/5 p-4 sm:p-5">
@@ -56,15 +91,39 @@ export function Provas() {
         </p>
       </div>
 
-      <ul className="-mx-1 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]" aria-label="Avaliações de clientes no Google">
-        {AVALIACOES.map((a) => (
-          <Cartao key={a.nome} a={a} />
-        ))}
-      </ul>
+      <div className="relative mt-3">
+        <ul
+          ref={trilho}
+          className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-label="Avaliações de clientes no Google"
+          onPointerDown={pausar}
+          onMouseEnter={() => (parado.current = true)}
+          onMouseLeave={() => (parado.current = false)}
+        >
+          {AVALIACOES.map((a) => (
+            <Cartao key={a.nome} a={a} />
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={() => { pausar(); andar(-1); }}
+          aria-label="Avaliação anterior"
+          className="absolute -left-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white text-lg font-bold text-navy-800 shadow-card"
+        >
+          ‹
+        </button>
+        <button
+          type="button"
+          onClick={() => { pausar(); andar(1); }}
+          aria-label="Próxima avaliação"
+          className="absolute -right-4 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white text-lg font-bold text-navy-800 shadow-card"
+        >
+          ›
+        </button>
+      </div>
 
-      <div className="mt-1 flex items-center justify-between gap-3 text-xs">
-        <span className="text-navy-300">Deslize para ver mais →</span>
-        {googleAvaliacoes && (
+      {googleAvaliacoes && (
+        <div className="mt-2 text-right text-xs">
           <a
             href={googleAvaliacoes}
             target="_blank"
@@ -74,8 +133,8 @@ export function Provas() {
           >
             Ver todas no Google
           </a>
-        )}
-      </div>
+        </div>
+      )}
 
       <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
         <li>
