@@ -12,6 +12,7 @@ declare global {
 }
 
 import { getAttribution } from './attribution';
+import { depoisDeCarregar } from './depoisDeCarregar';
 
 /** De onde veio a visita, para filtrar as gravações no Clarity (filtro "Etiquetas personalizadas" > origem). */
 function origemDaVisita(): { origem: string; campanha?: string } {
@@ -40,7 +41,7 @@ export function initClarity(): void {
   const s = document.createElement('script');
   s.async = true;
   s.src = `https://www.clarity.ms/tag/${CLARITY_ID}`;
-  document.head.appendChild(s);
+  depoisDeCarregar(() => document.head.appendChild(s), 300);
   const { origem, campanha } = origemDaVisita();
   window.clarity('set', 'origem', origem);
   if (campanha) window.clarity('set', 'campanha', campanha);

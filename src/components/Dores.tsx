@@ -23,17 +23,24 @@ export function Dores() {
 
         <ul className="mx-auto mt-10 grid max-w-3xl gap-3">
           {DORES.map((dor) => (
-            <li
-              key={dor}
-              className="flex items-start gap-3 rounded-xl border border-navy-100 bg-white p-4 shadow-soft sm:p-5"
-            >
-              <span
-                className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-sm font-extrabold text-amber-600"
-                aria-hidden="true"
+            // Cada situação é clicável (as pessoas clicavam nelas e nada acontecia): leva para a simulação.
+            <li key={dor}>
+              <a
+                href="#calculadora"
+                onClick={() => trackEvent('click_simular', { origem: 'dores_item' })}
+                className="group flex items-start gap-3 rounded-xl border border-navy-100 bg-white p-4 shadow-soft transition-colors hover:border-accent-300 hover:bg-accent-50/40 sm:p-5"
               >
-                ?
-              </span>
-              <span className="text-base font-semibold leading-snug text-navy-800">{dor}</span>
+                <span
+                  className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-sm font-extrabold text-amber-600"
+                  aria-hidden="true"
+                >
+                  ?
+                </span>
+                <span className="flex-1 text-base font-semibold leading-snug text-navy-800">{dor}</span>
+                <span className="mt-0.5 shrink-0 text-sm font-semibold text-accent-600 opacity-70 transition-opacity group-hover:opacity-100" aria-hidden="true">
+                  Simular →
+                </span>
+              </a>
             </li>
           ))}
         </ul>

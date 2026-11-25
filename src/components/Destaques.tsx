@@ -1,4 +1,5 @@
 import { Container } from '@/components/ui/Container';
+import { trackEvent } from '@/services/analytics';
 
 interface Destaque {
   id: string;
@@ -61,17 +62,22 @@ export function Destaques() {
       <Container>
         <ul className="grid gap-4 md:grid-cols-3">
           {DESTAQUES.map((d) => (
-            <li
-              key={d.id}
-              className="flex items-start gap-4 rounded-xl border border-navy-100 bg-white p-5 shadow-card"
-            >
-              <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-600">
-                <Icone tipo={d.icone} />
-              </span>
-              <div>
-                <h3 className="text-base font-bold text-navy-900">{d.titulo}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-navy-600">{d.texto}</p>
-              </div>
+            <li key={d.id}>
+              {/* O cartão inteiro é clicável (antes era só texto e as pessoas clicavam nele): leva para a simulação. */}
+              <a
+                href="#calculadora"
+                onClick={() => trackEvent('click_simular', { origem: `destaque_${d.id}` })}
+                className="group flex h-full items-start gap-4 rounded-xl border border-navy-100 bg-white p-5 shadow-card transition-colors hover:border-accent-300"
+              >
+                <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-600">
+                  <Icone tipo={d.icone} />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-navy-900">{d.titulo}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-navy-600">{d.texto}</p>
+                  <p className="mt-2 text-sm font-semibold text-accent-600 group-hover:underline">Simular agora →</p>
+                </div>
+              </a>
             </li>
           ))}
         </ul>

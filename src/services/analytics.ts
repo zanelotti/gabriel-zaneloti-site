@@ -1,3 +1,4 @@
+import { depoisDeCarregar } from './depoisDeCarregar';
 import { marcarNoClarity } from './clarity';
 /**
  * ============================================================================
@@ -102,7 +103,8 @@ export function initAnalytics(): void {
     const script = document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${loaderId}`;
-    document.head.appendChild(script);
+    // Os comandos ficam na fila (dataLayer) e são enviados quando o script chega: nada se perde.
+    depoisDeCarregar(() => document.head.appendChild(script));
 
     window.dataLayer = window.dataLayer ?? [];
     // IMPORTANTE: o gtag.js só reconhece comandos empurrados como o objeto
@@ -149,7 +151,7 @@ export function initAnalytics(): void {
       const script = document.createElement('script');
       script.async = true;
       script.src = 'https://connect.facebook.net/en_US/fbevents.js';
-      document.head.appendChild(script);
+      depoisDeCarregar(() => document.head.appendChild(script));
     }
 
     window.fbq?.('init', META_PIXEL_ID);

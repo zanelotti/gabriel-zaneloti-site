@@ -108,3 +108,28 @@ A partir desta análise, só o período desde a análise anterior (pedido do Gab
 - Recarregar o saldo do Google Ads hoje ou amanhã.
 - Medir o site novo em 3 a 4 dias.
 - Investigar o "pulo" da página no celular (CLS).
+
+## Análise 5: 25/11/2026, período desde a análise 4 (23/11 à tarde até 25/11)
+
+**Google Ads, [Leads-22/09]** (dados pelo Adspirer)
+
+| Período | Cliques | Simulações | Custo |
+|---|---|---|---|
+| 23/11, depois da análise 4 | 4 | 5 | R$ 14,55 |
+| 24/11 | 15 | 4 | R$ 60,54 |
+| 25/11 (parcial) | 10 | 1 | R$ 36,40 |
+| **Total** | 29 | 10 | R$ 111,49 |
+
+- Custo por simulação: cerca de R$ 11 (análise 4: R$ 19; análise 3: R$ 68,90). CTR 8%.
+- 23/11 fechou com 12 cliques e 7 simulações. O Clarity bate com o Ads (13 envios em 3 dias contra 12 conversões), então a contagem parece certa; parte pode ter sido teste do Gabriel.
+- Saldo: na análise 4 estava em R$ 153,66. Se não houve recarga, sobra pouco.
+
+**Clarity, últimos 3 dias (23 a 25/11)**
+- 47 sessões reais (22 robôs). Rolagem média 16%, 1,2 min ativos.
+- Funil: 18 começaram, 18 passaram a etapa 1, 17 passaram o tamanho, 13 enviaram (76% de quem chega no contato; antes era 40% a 60%).
+- Estabilidade da página (CLS): 0, bom (antes 1,3 a 1,5). A correção do "pulo" funcionou.
+- LCP 2,6 s e INP 410 ms: "precisa de melhorias".
+- Cliques mortos em 10 sessões (21%): investigar onde.
+- Muitas sessões em Chrome de computador (72%): parte deve ser teste interno.
+
+**Conclusão:** o site novo (resultado depois do contato, Pessoa Física marcada, sem pulo) melhorou bastante a conversão.

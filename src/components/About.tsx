@@ -33,7 +33,7 @@ export function About() {
         </div>
 
         <div className="rounded-xl2 bg-navy-900 p-8 text-center shadow-card animate-fade-in">
-          <div className="mx-auto h-40 w-40 overflow-hidden rounded-full border-4 border-accent-400/40 bg-navy-800">
+          <a href="/sobre.html" aria-label="Conheça mais sobre o Gabriel" className="mx-auto block h-40 w-40 overflow-hidden rounded-full border-4 border-accent-400/40 bg-navy-800 transition-opacity hover:opacity-90">
             <img
               src="/gabriel-zaneloti.jpg"
               alt="Gabriel Zaneloti, planejador tributário"
@@ -42,7 +42,7 @@ export function About() {
               className="h-full w-full object-cover"
               loading="lazy"
             />
-          </div>
+          </a>
 
           <h3 className="mt-5 text-xl font-bold text-white">Gabriel Zaneloti</h3>
           <p className="text-sm font-semibold text-accent-400">Planejador tributário</p>

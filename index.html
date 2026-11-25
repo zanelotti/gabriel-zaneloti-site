@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
-    <!-- Google Tag Manager -->
+    <!-- Google Tag Manager: a fila (dataLayer) começa agora; o script só carrega depois da página (ou no 1º toque), para não atrasar o topo do site. -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    new Date().getTime(),event:'gtm.js'});var feito=false;function carregar(){if(feito)return;feito=true;
+    var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);}
+    ['pointerdown','keydown','scroll','touchstart'].forEach(function(e){w.addEventListener(e,carregar,{once:true,passive:true});});
+    w.addEventListener('load',function(){setTimeout(carregar,1500);});
     })(window,document,'script','dataLayer','GTM-NFSNQBZL');</script>
     <!-- End Google Tag Manager -->
     <meta charset="UTF-8" />
@@ -52,10 +54,14 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Fonte sem bloquear o desenho da página (display=optional: se demorar, usa a fonte do sistema e a página não pula). -->
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=optional"
-      rel="stylesheet"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=optional" /></noscript>
 
     <!-- Schema.org: ProfessionalService -->
     <script type="application/ld+json">
