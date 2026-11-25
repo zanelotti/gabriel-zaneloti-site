@@ -1296,11 +1296,14 @@ await teste('PF com 12% acima de R$ 800: pode citar o honorário; não pode fala
   assert.match(sistema, /NÃO fale em valor mínimo/);
 });
 
-await teste('PF com economia pequena: honorário fica em R$ 800 e a Lia pode explicar o piso', () => {
+await teste('PF com economia pequena: honorário de R$ 800 apresentado só pelo valor (sem 12%, sem economia, sem "mínimo")', () => {
   const l = lead({ economia_estimada: 3000, inss_estimado: 9000, valor_apos_reducao: 6000 });
-  assert.equal(validarSaida('12% da estimativa daria R$ 360, então o honorário fica em R$ 800, que é o valor mínimo.', l).ok, true);
+  assert.equal(validarSaida('O honorário é de R$ 800 e cobre o processo inteiro, do CNO até a certidão.', l).ok, true);
   assert.equal(validarSaida('O honorário fica em R$ 700.', l).ok, false);
-  assert.match(montarSistema(l, config), /fica em R\$\s800/);
+  const sistema = montarSistema(l, config);
+  assert.match(sistema, /HONORÁRIO: R\$\s800\. Apresente SÓ esse valor/);
+  assert.match(sistema, /COMO APRESENTAR O HONORÁRIO: "o honorário é de R\$\s800 e cobre o processo inteiro/);
+  assert.doesNotMatch(sistema, /que são 12% sobre a economia estimada de R\$\s3\.000/);
 });
 
 await teste('PF sem economia estimada: pode explicar a regra dos R$ 800 sem inventar outros valores', () => {
