@@ -464,23 +464,23 @@ function descreverObra(d) {
 export function montarMensagemSimulacao(d, r, { nome = '' } = {}) {
   const oi = nome ? `Pronto, ${primeiroNome(nome)}!` : 'Pronto!';
   const periodo = d.dataFim ? `${mesAno(d.dataInicio)} a ${mesAno(d.dataFim)}` : `${mesAno(d.dataInicio)} até hoje (obra em andamento)`;
-  const topo = `${oi} Esta é a simulação da sua obra (estimativa inicial, feita com as tabelas oficiais):\n• Obra: ${descreverObra(d)}\n• Período: ${periodo}`;
+  const topo = `${oi} Esta é a simulação da sua obra, feita com as tabelas oficiais:\n• Obra: ${descreverObra(d)}\n• Período: ${periodo}`;
 
   if (r.regime === 'gfip_anterior_2021' && r.inssEstimado <= 0) {
-    return `${topo}\n\nPelo prazo de 5 anos que a Receita tem para cobrar, essa obra pode já estar fora da cobrança. Isso se comprova com documentos da época da obra (habite-se, alvará, IPTU, contas de consumo), e o Gabriel confirma no seu caso.`;
+    return `${topo}\n\nPelo prazo de 5 anos que a Receita tem para cobrar, essa obra pode já estar fora da cobrança. Isso se comprova com documentos da época da obra (habite-se, alvará, IPTU, contas de consumo).`;
   }
   if (r.regime === 'gfip_anterior_2021') {
-    return `${topo}\n• INSS estimado sem planejamento: ${reais(r.inssEstimado)}\n\nComo a obra começou antes de 2021, a redução depende de uma análise do período (a Receita só cobra os últimos 5 anos) e dos documentos da época. O Gabriel faz essa análise e confirma o valor.`;
+    return `${topo}\n• INSS sem planejamento: ${reais(r.inssEstimado)}\n\nComo a obra começou antes de 2021, a redução vem do período (a Receita só cobra os últimos 5 anos) e dos documentos da época.`;
   }
   if (!(r.economiaEstimada > 0)) {
-    return `${topo}\n• INSS estimado sem planejamento: ${reais(r.inssEstimado)}\n\nCom esses dados, o Fator de Ajuste sozinho não mostra economia, mas há outras frentes (notas fiscais, mão de obra comprovada, tempo da obra). O Gabriel analisa o seu caso e confirma o que vale.`;
+    return `${topo}\n• INSS sem planejamento: ${reais(r.inssEstimado)}\n\nCom esses dados, o Fator de Ajuste sozinho não mostra economia, mas há outras frentes (notas fiscais, mão de obra comprovada, tempo da obra).`;
   }
   const parcela = r.parcelamento?.aplicavel
     ? `\nO saldo dos meses em atraso ainda pode ser parcelado em até ${r.parcelamento.numeroParcelas} vezes (parcelas de cerca de ${reais(r.parcelamento.valorParcela)}).`
     : r.emAndamento
       ? '\nComo a obra está em andamento, o INSS dela é pago mês a mês, conforme a obra avança.'
       : '';
-  return `${topo}\n• INSS estimado sem planejamento: ${reais(r.inssEstimado)}\n• Com o Fator de Ajuste (${r.detalhe.percentualFator}%): ${reais(r.valorAposReducao)}\n• Economia estimada: ${reais(r.economiaEstimada)} (${Number(r.percentualReducao).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%)${parcela}\n\nÉ uma estimativa: o Gabriel confirma o valor final na análise dos documentos da obra.`;
+  return `${topo}\n• INSS sem planejamento: ${reais(r.inssEstimado)}\n• Com o Fator de Ajuste (${r.detalhe.percentualFator}%): ${reais(r.valorAposReducao)}\n• Economia: ${reais(r.economiaEstimada)} (${Number(r.percentualReducao).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%)${parcela}`;
 }
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

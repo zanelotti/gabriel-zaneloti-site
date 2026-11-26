@@ -207,15 +207,15 @@ export async function gerarPdfSimulacao({ nome = '', dados, r, hoje = new Date()
     const antigaSemCobranca = r.regime === 'gfip_anterior_2021' && !(r.inssEstimado > 0);
     if (!antigaSemCobranca) {
       pg.drawRectangle({ x: M, y: y - 70, width: CW, height: 70, color: WHITE, borderColor: NAVY_100, borderWidth: 1 });
-      txt('INSS ESTIMADO SEM PLANEJAMENTO', M + 14, y - 24, 7.5, f, NAVY_300);
+      txt('INSS SEM PLANEJAMENTO', M + 14, y - 24, 7.5, f, NAVY_300);
       txt(reais(r.inssEstimado), M + 14, y - 42, 18, fb, NAVY_900);
       y -= 84;
     }
     const expl = antigaSemCobranca
-      ? 'Pelo prazo de 5 anos que a Receita tem para cobrar, essa obra pode já estar fora da cobrança. Isso se comprova com documentos da época da obra (habite-se, alvará, IPTU, contas de consumo), e o Gabriel confirma no seu caso.'
+      ? 'Pelo prazo de 5 anos que a Receita tem para cobrar, essa obra pode já estar fora da cobrança. Isso se comprova com documentos da época da obra (habite-se, alvará, IPTU, contas de consumo).'
       : r.regime === 'gfip_anterior_2021'
-        ? 'Como a obra começou antes de 2021, a redução depende de uma análise do período (a Receita só cobra os últimos 5 anos) e dos documentos da época. O Gabriel faz essa análise e confirma o valor.'
-        : 'Com esses dados, o Fator de Ajuste sozinho não mostra economia, mas há outras frentes (notas fiscais, mão de obra comprovada, tempo da obra). O Gabriel analisa o seu caso e confirma o que vale.';
+        ? 'Como a obra começou antes de 2021, a redução vem do período (a Receita só cobra os últimos 5 anos) e dos documentos da época.'
+        : 'Com esses dados, o Fator de Ajuste sozinho não mostra economia, mas há outras frentes (notas fiscais, mão de obra comprovada, tempo da obra).';
     const ls = quebrar(expl, f, 9, CW - 28);
     const ah = 22 + ls.length * 13;
     pg.drawRectangle({ x: M, y: y - ah, width: CW, height: ah, color: AMBER_50, borderColor: AMBER_500, borderWidth: 1 });
@@ -285,7 +285,7 @@ export async function gerarPdfSimulacao({ nome = '', dados, r, hoje = new Date()
   pg.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 1, color: NAVY_100 });
   y -= 14;
   const aviso =
-    'Esta é uma estimativa inicial, feita com as tabelas oficiais e os dados que você informou. O Gabriel confirma o valor final na análise dos documentos da obra.';
+    'Simulação feita com as tabelas oficiais da Receita Federal e os dados que você informou.';
   for (const l of quebrar(aviso, f, 8, CW)) {
     txt(l, M, y - 8, 8, f, NAVY_300);
     y -= 11;
@@ -295,7 +295,7 @@ export async function gerarPdfSimulacao({ nome = '', dados, r, hoje = new Date()
   // ---- Chamada
   const ctah = 36;
   pg.drawRectangle({ x: M, y: y - ctah, width: CW, height: ctah, color: AMBER_500 });
-  const cta = temEconomia ? 'Responda no WhatsApp para confirmar essa economia com o Gabriel' : 'Responda no WhatsApp para o Gabriel analisar o seu caso';
+  const cta = temEconomia ? 'Responda no WhatsApp para garantir essa economia' : 'Responda no WhatsApp para reduzir o INSS da sua obra';
   const cs = 11;
   txt(cta, M + (CW - fb.widthOfTextAtSize(limpo(cta), cs)) / 2, y - ctah / 2 - cs / 2 + 2, cs, fb, NAVY_950);
 

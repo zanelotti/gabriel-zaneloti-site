@@ -6,7 +6,7 @@
 - As parcelas são debitadas automaticamente em conta corrente.
 - Só entra no parcelamento o saldo das competências que já venceram (em atraso). A parte que ainda está em dia não entra.
 - OBRA EM ANDAMENTO NÃO PARCELA: enquanto a obra está em andamento, o INSS é pago mês a mês, conforme a obra avança. O parcelamento só existe para o saldo de meses que já ficaram em atraso (por exemplo, obra concluída ou meses vencidos).
-- A quantidade de parcelas e o valor de cada uma dependem do tamanho do saldo; o Gabriel confirma esses números na análise da obra.
+- A quantidade de parcelas e o valor de cada uma dependem do tamanho do saldo.
 - O Gabriel faz o parcelamento do INSS da obra para o cliente, quando solicitado, no final da obra. Isso já está incluído no serviço.
 
 ## Pagamento dos honorários do Gabriel

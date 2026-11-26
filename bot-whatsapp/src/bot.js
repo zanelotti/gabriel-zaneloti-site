@@ -759,7 +759,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
           ok: true,
           enviado: true,
           orientacao:
-            'O PDF com a simulação JÁ foi enviado. Agora escreva UMA mensagem curta, SEM nenhum valor em reais e sem percentuais: diga que mandou a simulação da obra em PDF, em meia frase que é uma estimativa confirmada na análise do Gabriel, e termine com UMA pergunta objetiva sobre a obra (passo 2 da ESTRATÉGIA DE VENDA). NÃO fale de honorário ainda.',
+            'O PDF com a simulação JÁ foi enviado. Agora escreva UMA mensagem curta, SEM nenhum valor em reais e sem percentuais: diga que mandou a simulação da obra em PDF, sem dizer que é estimativa nem que o Gabriel vai confirmar ou analisar, e termine com UMA pergunta objetiva sobre a obra (passo 2 da ESTRATÉGIA DE VENDA). NÃO fale de honorário ainda.',
         };
       },
       // Simulação do INSS feita na conversa (quem chegou pelo botão do site): calcula, ENVIA ao cliente, avisa o Gabriel por e-mail e preenche o card.
@@ -816,8 +816,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
           enviada: true,
           tem_estimativa_de_economia: temEconomia,
           orientacao: temEconomia
-            ? 'A simulação JÁ foi enviada à pessoa em PDF na conversa e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais e sem repetir os números: diga que mandou a simulação em PDF com os valores da obra, em meia frase que é uma estimativa confirmada com os documentos e termine com UMA pergunta objetiva sobre a obra que ajude a fechar (por exemplo, se ela vai precisar da CND para averbar, vender ou financiar). Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.'
-            : 'A simulação JÁ foi enviada à pessoa em PDF (só o INSS estimado, sem economia: o caso depende de análise) e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais, dizendo que o Gabriel analisa o caso (obras antigas costumam ter boas frentes de redução, como a decadência, com prova da época da obra) e termine com UMA pergunta objetiva (por exemplo, se ela tem habite-se, alvará ou IPTU da época). Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.',
+            ? 'A simulação JÁ foi enviada à pessoa em PDF na conversa e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais e sem repetir os números: diga que mandou a simulação em PDF com os valores da obra, sem dizer que é estimativa nem que o Gabriel vai confirmar ou analisar, e termine com UMA pergunta objetiva sobre a obra que ajude a fechar (por exemplo, se ela vai precisar da CND para averbar, vender ou financiar). Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.'
+            : 'A simulação JÁ foi enviada à pessoa em PDF (só o INSS sem planejamento, sem economia calculada) e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais, dizendo que obras assim costumam ter boas frentes de redução (como a decadência, com prova da época da obra), sem dizer que o Gabriel vai analisar ou confirmar, e termine com UMA pergunta objetiva (por exemplo, se ela tem habite-se, alvará ou IPTU da época). Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.',
         };
       },
     };

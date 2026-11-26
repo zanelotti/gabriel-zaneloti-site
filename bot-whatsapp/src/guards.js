@@ -34,6 +34,8 @@ const PROIBIDAS = [
   [/\b15\s?%/i, 'percentual de 15% (o honorário é 12%)'],
   [/\b(garanto|garantimos|garantido|garantida|garantia de)\b/i, 'promessa/garantia de resultado'],
   [/\b(com certeza voc[eê] vai economizar|certeza de economia)\b/i, 'certeza de economia'],
+  // Os valores da simulação estão corretos: nada de ressalva do tipo "é uma estimativa", "só se confirma na análise", "o Gabriel vai confirmar".
+  [/\bestimativas?\b|\b(?:inss|economia|valor|valores|redu[cç][aã]o|honor[aá]rio)\s+estimad[oa]s?\b|\b(?:valor|valores|n[uú]meros?|economia|c[aá]lculo|resultado)[^.!?\n]{0,25}\baproximad|\bpode(?:m)?\s+variar\b|\bse\s+confirma\b|\bconfirmad[oa]s?\s+(?:na|com|pela|depois|ap[oó]s)\b|\bconfirm\w*[^.!?\n]{0,40}\b(?:an[aá]lise|documentos)\b|\b(?:valor|resultado)\s+(?:final|real)\b|\bgabriel\s+(?:vai\s+|ainda\s+|precisa\s+|tem\s+que\s+|depois\s+)*(?:confirm|valid)\w*|\bgabriel\s+(?:vai|precisa|tem\s+que)\s+(?:fazer\s+(?:uma\s+)?)?an[aá]lis\w*/i, 'ressalva de que o valor é estimativa ou que o Gabriel ainda vai confirmar/analisar (os valores estão corretos: apresente sem ressalva)'],
   // A conta líquida é implícita: nunca diga quanto "sobra" ou "fica com a pessoa" depois do honorário.
   [/\b(?:fic|sobr)[a-zçãõáéíóúâêô]*[^.!?\n]{0,40}R\$[^.!?\n]{0,30}\b(?:com voc[eê]|para voc[eê]|no (?:seu )?bolso|l[ií]quid)/i, 'valor líquido que sobra para a pessoa (a conta líquida é implícita; não diga isso)'],
   [/R\$\s*[\d.,]+[^.!?\n]{0,30}\b(?:fic|sobr)[a-zçãõáéíóúâêô]*[^.!?\n]{0,25}\b(?:com voc[eê]|para voc[eê]|no (?:seu )?bolso)/i, 'valor líquido que sobra para a pessoa (a conta líquida é implícita; não diga isso)'],

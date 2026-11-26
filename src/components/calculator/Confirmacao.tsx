@@ -63,7 +63,7 @@ export function Confirmacao({ data, inssSemPlanejamento, onReset }: ConfirmacaoP
       <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-5">
         {temNumero ? (
           <>
-            <p className="text-sm font-semibold text-amber-800">Sem planejamento, a Receita cobraria cerca de</p>
+            <p className="text-sm font-semibold text-amber-800">Sem planejamento, a Receita cobraria</p>
             <p className="mt-1 text-4xl font-extrabold tracking-tight text-navy-900">{reaisInteiros(inssSemPlanejamento)}</p>
           </>
         ) : (

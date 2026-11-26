@@ -53,13 +53,13 @@ export function montarAbertura(lead, nomeAssistente = 'Lia', config = {}) {
 
   if (isPJ) {
     variante = 'PJ';
-    corpo = `Recebi os dados da obra da sua empresa pelo site. Para obra em nome de empresa o caminho de redução é outro e o Gabriel analisa o seu caso. ${pedidoDeConfirmacao(lead)}`;
+    corpo = `Recebi os dados da obra da sua empresa pelo site. Para obra em nome de empresa o caminho de redução é outro, e eu te explico como funciona. ${pedidoDeConfirmacao(lead)}`;
   } else if (gfipAnterior) {
     variante = 'Obra antes de 10/2021';
-    corpo = `Recebi os dados ${obra} pelo site. Obra iniciada antes de 2021 tem um cálculo diferente e passa por uma análise do Gabriel. ${pedidoDeConfirmacao(lead)}`;
+    corpo = `Recebi os dados ${obra} pelo site. Obra iniciada antes de 2021 tem um cálculo diferente, com regras próprias de redução. ${pedidoDeConfirmacao(lead)}`;
   } else if (semCalculo) {
     variante = 'Sem estimativa automática';
-    corpo = `Recebi os dados ${obra} pelo site, e o seu caso pede uma análise mais cuidadosa do Gabriel. ${pedidoDeConfirmacao(lead)}`;
+    corpo = `Recebi os dados ${obra} pelo site e vou preparar a sua simulação. ${pedidoDeConfirmacao(lead)}`;
   } else if (valorAlto) {
     variante = 'Valor alto';
     corpo = `Recebi os dados da sua obra pelo site e vou preparar a sua simulação. ${pedidoDeConfirmacao(lead)}`;

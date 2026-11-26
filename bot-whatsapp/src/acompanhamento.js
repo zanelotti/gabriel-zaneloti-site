@@ -55,7 +55,7 @@ export function montarFollowup({ lead, nivel, respondeuAntes, nomeContato = '', 
   const economia = Number(lead?.economia_estimada) > 0 && lead?.responsavel !== 'PJ' ? formatarReaisInteiros(lead.economia_estimada) : '';
   if (nivel === 1) {
     if (economiaApresentada && economia)
-      return `${oi} A estimativa da sua obra mostrou uma economia de ${economia} no INSS. Ficou alguma dúvida que eu possa tirar para você seguir com o Gabriel?`;
+      return `${oi} A simulação da sua obra mostrou uma economia de ${economia} no INSS. Ficou alguma dúvida que eu possa tirar para você seguir com o Gabriel?`;
     if (respondeuAntes) return `${oi} Ficou alguma dúvida sobre o que conversamos? Se quiser, continuo de onde paramos.`;
     return `${oi} Só passando para ver se você conseguiu ler minha mensagem sobre o INSS da sua obra. Posso te explicar como funciona a redução, sem compromisso?`;
   }

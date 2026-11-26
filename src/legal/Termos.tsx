@@ -20,14 +20,13 @@ export default function Termos() {
 
       <H2>1. Sobre a simulação de INSS de obra</H2>
       <p>
-        A calculadora deste site gera uma <strong>estimativa inicial</strong>, calculada a partir das
-        informações fornecidas por você (área, destinação, tipo, categoria e datas da obra) e das mecânicas
-        oficiais previstas na IN RFB nº 2021/2021 (Fator de Ajuste, Selic, CPP, multa, MAED). Essa estimativa:
+        A calculadora deste site calcula o INSS da sua obra a partir das informações fornecidas por você
+        (área, destinação, tipo, categoria e datas da obra) e das regras oficiais previstas na IN RFB
+        nº 2021/2021 (Fator de Ajuste, Selic, CPP, multa, MAED).
       </p>
       <Ul>
-        <li>Não substitui uma análise técnica e tributária da documentação real da obra;</li>
-        <li>Pode divergir do valor final apurado oficialmente, que depende da RMT real da obra;</li>
-        <li>Não constitui garantia de resultado, economia ou percentual de redução específico.</li>
+        <li>O resultado vale para os dados informados: se algum dado da obra for diferente, o valor muda;</li>
+        <li>A economia de cada obra depende das condições dela e não é prometida antes da contratação.</li>
       </Ul>
 
       <H2>2. Uso do site</H2>

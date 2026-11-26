@@ -348,8 +348,19 @@ await teste('validarSaida bloqueia palavras e promessas proibidas', () => {
   assert.equal(validarSaida('O honorário é de 12% sobre a economia que a gente conseguir comprovar.', l).ok, true);
   assert.equal(validarSaida('Para pessoa jurídica o caminho de redução é outro.', l).ok, true, '"pessoa jurídica" é termo correto e pode');
   assert.equal(validarSaida('Isso vale para Pessoas Jurídicas com CNPJ.', l).ok, true);
-  assert.equal(validarSaida('A estimativa do site foi de R$ 42.000 de economia.', l).ok, true);
-  assert.equal(validarSaida('A estimativa ficou em torno de R$ 42.000,00.', l).ok, true);
+  assert.equal(validarSaida('A simulação deu R$ 42.000 de economia.', l).ok, true);
+  // Sem ressalvas: o valor da Lia está correto (pedido do Gabriel, 26/11/2026).
+  for (const ruim of [
+    'A simulação da sua obra está no PDF que enviei. É uma estimativa feita com os dados que você informou e só se confirma na análise.',
+    'O valor final a gente confirma na análise do Gabriel.',
+    'O Gabriel vai fazer uma análise do seu caso.',
+    'O Gabriel precisa confirmar esse valor.',
+    'Os valores são aproximados e podem variar.',
+    'A economia estimada é de R$ 42.000.',
+  ]) assert.equal(validarSaida(ruim, l).ok, false, ruim);
+  assert.equal(validarSaida('A simulação da sua obra está no PDF que enviei. Você vai precisar da CND para averbar, vender ou financiar o imóvel?', l).ok, true);
+  assert.equal(validarSaida('Para empresa, o Gabriel analisa a contabilidade e as notas da obra.', l).ok, true);
+  assert.equal(validarSaida('A economia ficou em R$ 42.000,00.', l).ok, true);
 });
 
 await teste('PJ nunca pode citar valor de economia', () => {
@@ -902,7 +913,7 @@ await teste('pasta inexistente ou vazia não quebra', async () => {
 await teste('trechos vão para o prompt e valores citados neles podem ser repetidos', async () => {
   const d = pastaDeDocs({ 'norma.txt': textoNorma });
   const documentos = await indexarDocumentos({ ...d, log: silencioso });
-  const resposta = 'Em geral dá para parcelar em até 60 parcelas, com parcela mínima de R$ 200 para pessoa física. O Gabriel confirma no seu caso.';
+  const resposta = 'Em geral dá para parcelar em até 60 parcelas, com parcela mínima de R$ 200 para pessoa física.';
   const ctx = montar({ roteiro: [texto(resposta)], documentos });
   const c = await abrir(ctx, lead());
   await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'como funciona o parcelamento do saldo devedor em parcelas?' });
@@ -1296,7 +1307,7 @@ await teste('cálculo do honorário: PF 12% com piso de R$ 800; PJ R$ 1.000 + 12
 
 await teste('PF com 12% acima de R$ 800: pode citar o honorário; não pode falar em mínimo nem em R$ 800', () => {
   const l = lead({ economia_estimada: 42000 });
-  assert.equal(validarSaida('Pelo valor estimado de R$ 42.000, o honorário seria de R$ 5.040 (12%), confirmado na análise.', l).ok, true);
+  assert.equal(validarSaida('Pela economia de R$ 42.000, o honorário seria de R$ 5.040 (12%).', l).ok, true);
   assert.equal(validarSaida('O honorário tem um valor mínimo de R$ 800.', l).ok, false);
   assert.equal(validarSaida('O honorário seria de R$ 5.500.', l).ok, false, 'valor inventado');
   const sistema = montarSistema(l, config);
@@ -1330,7 +1341,7 @@ await teste('empresa: R$ 1.000 mais 12% da economia conseguida; nunca valor de e
 
 await teste('fluxo: lead PF pergunta o custo e a Lia responde com o valor calculado pelo sistema', async () => {
   const ctx = montar({
-    roteiro: [texto('Pela estimativa da calculadora, o honorário seria de R$ 5.040, que é 12% da economia. O valor final a gente confirma na análise do Gabriel. Faz sentido?')],
+    roteiro: [texto('Pela simulação, o honorário seria de R$ 5.040, que é 12% da economia. Posso te passar a lista de dados para o contrato?')],
   });
   const c = await abrir(ctx, lead({ economia_estimada: 42000 }));
   await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'quanto custa o seu serviço?' });
@@ -1618,7 +1629,7 @@ await teste('índice: dúvida parecida encontra o item aprendido e o prompt rece
 await teste('cérebro: usa o aprendizado ao responder e a ferramenta de consulta passa a existir', async () => {
   const ind = criarIndiceAprendizado([{ ...itemBom, ativo: true }]);
   const store = criarStoreMemoria();
-  const client = clienteFalso([texto('Em geral sim: se as notas de pré-moldado somam 40% do custo, reduz 70% da remuneração daquela área. O Gabriel confirma no seu caso. Teve notas?')]);
+  const client = clienteFalso([texto('Em geral sim: se as notas de pré-moldado somam 40% do custo, reduz 70% da remuneração daquela área. Teve notas?')]);
   const cerebro = criarCerebro({ modelo: 'teste', config, client, aprendizado: ind });
   const r = await cerebro.gerarResposta({ lead: lead(), historico: [{ direcao: 'lead', texto: 'nota de pré-moldado reduz o inss?' }], ferramentas: {}, log: silencioso });
   assert.equal(r.acao, null);
@@ -1863,7 +1874,7 @@ await teste('aceitouVerInvestimento: só vale resposta positiva logo depois do c
 
 await teste('venda com valor: logo depois dos números o honorário é BARRADO (caso Jaime); só sai quando ela aceita ver o investimento', async () => {
   const l = lead({ economia_estimada: 16241, inss_estimado: 26339, valor_apos_reducao: 10098 });
-  const honor = 'O honorário é de R$ 1.949, que são 12% sobre a economia estimada de R$ 16.241, e cobre tudo até a CND. Posso te passar a lista de dados para já preparar o seu contrato?';
+  const honor = 'O honorário é de R$ 1.949, que são 12% sobre a economia de R$ 16.241, e cobre tudo até a CND. Posso te passar a lista de dados para já preparar o seu contrato?';
   const valor = 'Para financiar, a CND é o que libera o processo. A redução vem do enquadramento correto da obra e dos prestadores autônomos, e nós cuidamos de tudo até a certidão. Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?';
   const mk = (respostas) => {
     const chamadas = [];
@@ -1873,7 +1884,7 @@ await teste('venda com valor: logo depois dos números o honorário é BARRADO (
   const base = [
     { direcao: 'bot', texto: 'Oi, Jaime. Só para confirmar: a obra tem 209 m². Está certo?' },
     { direcao: 'lead', texto: 'Sim' },
-    { direcao: 'bot', texto: 'Sem planejamento, a Receita cobraria cerca de R$ 26.339. A economia estimada é de R$ 16.241 e o valor cairia para cerca de R$ 10.098. Você vai precisar da CND para averbar, vender ou financiar?' },
+    { direcao: 'bot', texto: 'Sem planejamento, a Receita cobraria cerca de R$ 26.339. A economia é de R$ 16.241 e o valor cairia para cerca de R$ 10.098. Você vai precisar da CND para averbar, vender ou financiar?' },
     { direcao: 'lead', texto: 'Financiado' },
   ];
   const c1 = mk([honor, valor]);
@@ -2158,7 +2169,7 @@ await teste('valor antes do preço: o prompt traz o honorário junto da economia
   const sistema = montarSistema(l, config);
   assert.match(sistema, /COMO APRESENTAR O HONORÁRIO[^\n]*R\$\s5\.040[^\n]*R\$\s42\.000/);
   assert.doesNotMatch(sistema, /sobra para a pessoa/);
-  assert.equal(validarSaida('Os honorários são de R$ 5.040, sobre a economia estimada de R$ 42.000.', l).ok, true);
+  assert.equal(validarSaida('Os honorários são de R$ 5.040, sobre a economia de R$ 42.000.', l).ok, true);
   assert.equal(validarSaida('Você economizaria R$ 42.000, pagaria R$ 5.040 e ficariam R$ 36.960 com você.', l).ok, false);
   assert.equal(validarSaida('Ficariam R$ 36.960 com você.', l).ok, false);
   assert.equal(validarSaida('Sobram R$ 36.960 para você.', l).ok, false);
@@ -2234,23 +2245,23 @@ await teste('passar para o Gabriel continua funcionando cedo quando o motivo é 
 
 await teste('lead de valor alto: honorário que ninguém perguntou é bloqueado e reescrito; se a pessoa pergunta o custo, sai (com a conta e o convite)', async () => {
   const ruim = 'Quer que eu te mostre como fica a conta, com o honorário do Gabriel?';
-  const boa = 'Pela estimativa, o INSS cai bastante. Seria ruim se o Gabriel te explicasse isso numa conversa rápida, sem compromisso?';
+  const boa = 'Pela simulação, o INSS cai bastante. Seria ruim se o Gabriel te explicasse isso numa conversa rápida, sem compromisso?';
   const a = cerebroRoteiro([texto(ruim), texto(boa)]);
   const r = await a.cerebro.gerarResposta({ lead: lead(), historico: hist('Olá', 'Claro', 'Teve dois autônomos', 'Entendi', 'Ok, e agora?'), ferramentas: {}, log: silencioso });
   assert.deepEqual(r.mensagens, [boa]);
   assert.match(JSON.stringify(a.chamadas[1].messages.at(-1).content), /não perguntou o custo/);
   // Agora ela pergunta o preço: pode falar.
-  const resposta = 'Os honorários são de R$ 5.040 (12% da economia estimada de R$ 42.000). Seria ruim se o Gabriel te explicasse como funciona numa conversa rápida?';
+  const resposta = 'Os honorários são de R$ 5.040 (12% da economia de R$ 42.000). Seria ruim se o Gabriel te explicasse como funciona numa conversa rápida?';
   const b = cerebroRoteiro([texto(resposta)]);
   const r2 = await b.cerebro.gerarResposta({ lead: lead(), historico: hist('Olá', 'Claro', 'Quanto vocês cobram?'), ferramentas: {}, log: silencioso });
   assert.deepEqual(r2.mensagens, [resposta]);
 });
 
 await teste('lead comum: o honorário (mesmo depois de várias trocas) só sai sem ser perguntado DEPOIS do texto dos números', async () => {
-  const comHonorario = 'Os honorários são de R$ 960 (12% da economia estimada de R$ 8.000). Posso te passar a lista de dados para o Gabriel já preparar o seu contrato?';
-  const textoNumeros = 'Pela estimativa da calculadora, a Receita cobraria R$ 20.000 e, com a redução, ficaria em R$ 12.000, uma economia de R$ 8.000. O saldo ainda pode ser parcelado em até 60 vezes. Isso faz sentido para a sua obra?';
+  const comHonorario = 'Os honorários são de R$ 960 (12% da economia de R$ 8.000). Posso te passar a lista de dados para o Gabriel já preparar o seu contrato?';
+  const textoNumeros = 'Pela simulação, a Receita cobraria R$ 20.000 e, com a redução, ficaria em R$ 12.000, uma economia de R$ 8.000. O saldo ainda pode ser parcelado em até 60 vezes. Isso faz sentido para a sua obra?';
   // 5 mensagens, mas os números ainda não foram explicados: o honorário é barrado e a conversa pede o texto dos números.
-  const aposPdf = 'Te mandei a simulação da sua obra em PDF. É uma estimativa, confirmada na análise do Gabriel. Você vai precisar da CND para averbar?';
+  const aposPdf = 'Te mandei a simulação da sua obra em PDF. Você vai precisar da CND para averbar?';
   const a = cerebroRoteiro([texto(comHonorario), texto(textoNumeros), [uso('enviar_simulacao_pdf', {})], texto(aposPdf)]);
   const r = await a.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', 'b', 'c', 'd', 'e'), ferramentas: { enviar_simulacao_pdf: async () => ({ ok: true, enviado: true }) }, log: silencioso });
   assert.deepEqual(r.mensagens, [aposPdf], 'os números vão no PDF, não no texto');
@@ -2263,13 +2274,13 @@ await teste('lead comum: o honorário (mesmo depois de várias trocas) só sai s
 });
 
 await teste('lead comum: honorário sem ser perguntado só depois que ela aceita ver o investimento; se ela perguntar, sai na hora', async () => {
-  const com = 'Os honorários são de R$ 960 (12% da economia estimada de R$ 8.000). Posso te passar a lista de dados para o Gabriel já preparar o seu contrato?';
-  const ok = 'Pela estimativa da calculadora a economia é boa. Como foi a obra, teve prestadores autônomos?';
+  const com = 'Os honorários são de R$ 960 (12% da economia de R$ 8.000). Posso te passar a lista de dados para o Gabriel já preparar o seu contrato?';
+  const ok = 'Pela simulação a economia é boa. Como foi a obra, teve prestadores autônomos?';
   const a = cerebroRoteiro([texto(com), texto(ok)]);
   const r = await a.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('Oi'), ferramentas: {}, log: silencioso });
   assert.deepEqual(r.mensagens, [ok]);
   const b = cerebroRoteiro([texto(com)]);
-  const explicou = 'Pela estimativa da calculadora, a Receita cobraria R$ 20.000 e com a redução ficaria em R$ 12.000, uma economia de R$ 8.000. O saldo ainda pode ser parcelado em até 60 vezes.';
+  const explicou = 'Pela simulação, a Receita cobraria R$ 20.000 e com a redução ficaria em R$ 12.000, uma economia de R$ 8.000. O saldo ainda pode ser parcelado em até 60 vezes.';
   const r2 = await b.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', explicou + ' Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?', 'pode sim'), ferramentas: {}, log: silencioso });
   assert.deepEqual(r2.mensagens, [com]);
   const c = cerebroRoteiro([texto(com)]);
@@ -2372,7 +2383,7 @@ await teste('repetição: nome da pessoa, nome do Gabriel, abertura igual e perg
   const bot = (...t) => t.map((texto) => ({ direcao: 'bot', texto }));
   const h = bot(
     'Oi, Jonathan, tudo bem? Aqui é Lia, assistente do Gabriel Zaneloti. Posso te explicar rapidinho?',
-    'Combinado, Jonathan. O Gabriel confirma o que vale no seu caso. Durante a obra, teve pedreiro ou algum prestador autônomo?',
+    'Combinado, Jonathan. A redução vale para o seu caso. Durante a obra, teve pedreiro ou algum prestador autônomo?',
     'Isso ajuda, Jonathan: o Gabriel cadastra cada autônomo. Na época, algum deles teve INSS recolhido?'
   );
   const J = ['Jonathan'];
@@ -2634,7 +2645,7 @@ await teste('depois da boas-vindas, a resposta dela segue o roteiro da origem (s
   assert.match(sistema, /FAZER A SIMULAÇÃO da obra aqui na conversa/);
   assert.match(sistema, /você não tem números|Você NÃO escreve os números|NÃO tem números|AINDA NÃO tem números/i);
   assert.match(sistema, /honorário/i);
-  assert.doesNotMatch(sistema, /INSS estimado pela calculadora/);
+  assert.doesNotMatch(sistema, /INSS que a Receita cobraria sem planejamento/);
   assert.doesNotMatch(sistema, /MÃO DE OBRA \(pessoa física\)/);
   assert.match(ctx.wa.enviados[ctx.wa.enviados.length - 1].texto, /situação 2/);
 });
@@ -2727,7 +2738,7 @@ await teste('o assistente passa a usar os números da calculadora depois que ela
   await ctx.bot.aoReceber({ telefone: c.telefone, texto: 'fiz a simulação agora' });
   await ctx.bot.responder(c.id);
   ctx.bot.pararTimers();
-  assert.match(ctx.client.chamadas[0].system, /INSS estimado pela calculadora/);
+  assert.match(ctx.client.chamadas[0].system, /INSS que a Receita cobraria sem planejamento/);
   assert.doesNotMatch(ctx.client.chamadas[0].system, /ORIGEM DO CONTATO/);
 });
 
@@ -2915,7 +2926,7 @@ async function conversaDoBotao(roteiro) {
 await teste('fluxo completo: ela passa os dados, o bot envia a simulação na conversa, manda e-mail ao Gabriel e preenche o card', async () => {
   const { ctx, c, lead0 } = await conversaDoBotao([
     [uso('registrar_nome', { nome: 'Carlos' }), uso('calcular_simulacao', DADOS_SIM)],
-    texto('É uma estimativa inicial e o Gabriel confirma com os documentos. Durante a obra houve pedreiro, pintor ou outro prestador autônomo?'),
+    texto('Durante a obra houve pedreiro, pintor ou outro prestador autônomo?'),
   ]);
   const antes = ctx.wa.enviados.length;
   await chegou(ctx, 'Sou o Carlos, pessoa física, em SP. Casa de alvenaria, obra nova, 241,87 m², de março de 2023 a dezembro de 2024.');
@@ -2956,7 +2967,7 @@ await teste('fluxo completo: ela passa os dados, o bot envia a simulação na co
 await teste('depois da simulação o assistente passa a tratar como lead com números (sem repetir a simulação)', async () => {
   const { ctx, c } = await conversaDoBotao([
     [uso('calcular_simulacao', DADOS_SIM)],
-    texto('É uma estimativa inicial. Durante a obra houve algum prestador autônomo?'),
+    texto('Durante a obra houve algum prestador autônomo?'),
     texto('Entendi. Ele cuida do cadastro e do recolhimento, e o saldo ainda pode ser parcelado.'),
   ]);
   await chegou(ctx, 'Casa em SP, alvenaria, obra nova, 241,87 m², março/2023 a dezembro/2024. Sou pessoa física.');
@@ -2966,7 +2977,7 @@ await teste('depois da simulação o assistente passa a tratar como lead com nú
   ctx.bot.pararTimers();
   const sistema2 = ctx.client.chamadas[2].system;
   assert.match(sistema2, /SIMULAÇÃO JÁ FOI ENVIADA/);
-  assert.match(sistema2, /INSS estimado pela calculadora, antes da redução/);
+  assert.match(sistema2, /INSS que a Receita cobraria sem planejamento, antes da redução/);
   assert.match(sistema2, /MÃO DE OBRA \(pessoa física\)/);
   assert.doesNotMatch(sistema2, /AINDA SEM SIMULAÇÃO/);
   assert.doesNotMatch(sistema2, /TEXTO DOS NÚMEROS:/);
@@ -3060,7 +3071,7 @@ await teste('lead da calculadora: ao confirmar, a Lia manda o PDF (sem números 
     roteiro: [
       texto('Sem nenhum planejamento, a Receita cobraria cerca de R$ 80.000 de INSS da sua obra. Com o planejamento, você pagaria cerca de R$ 38.000.'),
       [uso('enviar_simulacao_pdf', {})],
-      texto('Te mandei a simulação da sua obra em PDF. É uma estimativa, confirmada na análise do Gabriel. Você vai precisar da CND para averbar?'),
+      texto('Te mandei a simulação da sua obra em PDF. Você vai precisar da CND para averbar?'),
       [uso('enviar_simulacao_pdf', {}, 'tu_2')],
       texto('A redução vem do Fator de Ajuste. Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?'),
     ],

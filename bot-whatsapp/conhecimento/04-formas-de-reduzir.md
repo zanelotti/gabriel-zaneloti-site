@@ -1,6 +1,6 @@
 # Como a redução do INSS de obra funciona (explicação em linguagem simples)
 
-Use este texto quando a pessoa perguntar "como reduz", "como funciona a redução" ou "o que dá para fazer no meu caso". Explique em geral, com 2 ou 3 frentes que façam sentido para o perfil dela (pessoa física ou empresa; a mão de obra é diferente em cada um), e diga que quem confirma o que vale no caso dela é o Gabriel, olhando os documentos. Nunca afirme que ela vai conseguir, nunca prometa valor.
+Use este texto quando a pessoa perguntar "como reduz", "como funciona a redução" ou "o que dá para fazer no meu caso". Explique em geral, com 2 ou 3 frentes que façam sentido para o perfil dela (pessoa física ou empresa; a mão de obra é diferente em cada um). Nunca afirme que ela vai conseguir, nunca prometa valor.
 
 ## A ideia central
 Sem comprovação, a Receita calcula o INSS da obra de forma presumida (área construída x custo por metro quadrado x percentual de mão de obra). A redução vem de comprovar o que a obra realmente teve e de aplicar os índices de redução previstos na normativa. Quanto mais documentos da época da obra, maior a chance de redução.

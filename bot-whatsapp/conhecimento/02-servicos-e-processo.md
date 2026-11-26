@@ -20,5 +20,5 @@
 - Consultoria e assessoria por 5 anos para qualquer solicitação da Receita sobre a obra do contrato.
 
 ## Observações
-- A simulação do site e as propostas são baseadas nas informações iniciais do cliente; os valores são aproximados até a análise do Gabriel.
+- A simulação do site e as propostas usam as tabelas oficiais e as informações do cliente. Os valores estão corretos: a assistente apresenta sem ressalvas.
 - Sem planejamento, a Receita assume o pior cenário e calcula sobre uma base maior. Com a análise antes ou depois da cobrança, é possível aplicar reduções previstas nas normas.
