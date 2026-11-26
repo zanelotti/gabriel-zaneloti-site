@@ -123,6 +123,9 @@ class Painel : Form
         var rodape = new Label { AutoSize = true, ForeColor = Color.FromArgb(110, 110, 110), Margin = new Padding(0, 8, 0, 0), Text = "A senha do servidor nunca é guardada por este painel." };
         raiz.Controls.Add(rodape, 0, 3);
 
+        // Avisos de "tentando de novo" só aparecem quando o Gabriel clicou em algo (não na verificação automática).
+        AvisoTentativa = t => { try { BeginInvoke((Action)(() => { if (ocupado) Escrever(t); })); } catch { } };
+
         relogio = new Timer { Interval = 3 * 60 * 1000 };
         relogio.Tick += async (s, e) => { if (!ocupado) await Verificar(true); };
         Shown += async (s, e) => { AjustarBotoes(); await Verificar(); relogio.Start(); };
@@ -213,7 +216,39 @@ class Painel : Form
         get { return "-o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new"; }
     }
 
+    // Quando robôs ficam batendo na porta 22, o servidor às vezes derruba a conexão logo no começo
+    // ("kex_exchange_identification ... Connection reset"). Nesse caso nada chegou a rodar lá, então é seguro
+    // tentar de novo. O ssh/scp tenta até 6 vezes, esperando um pouco mais a cada vez (até uns 2,5 minutos no total).
+    static Action<string> AvisoTentativa;
+
+    static bool QuedaNoInicio(Resultado r)
+    {
+        if (r.Codigo != 255) return false;
+        if (Regex.IsMatch(r.Saida, "Permission denied|Host key verification failed", RegexOptions.IgnoreCase)) return false;
+        return Regex.IsMatch(r.Saida,
+            "kex_exchange_identification|banner exchange|Connection reset|Connection closed by|Connection timed out|Connection refused|ssh_exchange_identification",
+            RegexOptions.IgnoreCase);
+    }
+
     static Task<Resultado> Rodar(string exe, string args, string entrada = null, string pasta = null)
+    {
+        if (exe != Ssh && exe != Scp) return RodarUmaVez(exe, args, entrada, pasta);
+        return Task.Run(async () =>
+        {
+            int[] esperas = { 10, 15, 20, 30, 45 };
+            var r = await RodarUmaVez(exe, args, entrada, pasta);
+            for (int i = 0; i < esperas.Length && QuedaNoInicio(r); i++)
+            {
+                var aviso = AvisoTentativa;
+                if (aviso != null) aviso("   O servidor recusou a conexão (robôs na porta). Tentando de novo em " + esperas[i] + " s... (" + (i + 2) + "/6)");
+                await Task.Delay(esperas[i] * 1000);
+                r = await RodarUmaVez(exe, args, entrada, pasta);
+            }
+            return r;
+        });
+    }
+
+    static Task<Resultado> RodarUmaVez(string exe, string args, string entrada = null, string pasta = null)
     {
         return Task.Run(() =>
         {
@@ -446,7 +481,31 @@ class Painel : Form
         }
         catch { }
         Escrever(">> Atualização instalada.");
+        await ProtegerServidor();
         await Verificar();
+    }
+
+    // Uma vez só: liga o fail2ban (bloqueia por 1 hora quem erra a senha 5 vezes, ou seja, os robôs) e deixa o
+    // servidor aceitar mais conexões ao mesmo tempo, para os robôs não "lotarem a porta" e derrubarem o Painel.
+    // Quem entra pelo Painel usa chave (não erra senha) e o IP de quem está instalando fica liberado.
+    async Task ProtegerServidor()
+    {
+        var r = await NoServidor(
+            "[ -f /etc/fail2ban/jail.d/lia.conf ] && systemctl is-active --quiet fail2ban && exit 0\n" +
+            "echo '>> Protegendo o servidor contra robôs (só desta vez, leva cerca de 1 minuto)...'\n" +
+            "MEU_IP=$(echo $SSH_CLIENT | cut -d' ' -f1)\n" +
+            "export DEBIAN_FRONTEND=noninteractive\n" +
+            "apt-get -o DPkg::Lock::Timeout=120 install -y -q fail2ban python3-systemd >/dev/null 2>&1 || " +
+            "{ apt-get -o DPkg::Lock::Timeout=120 update -q >/dev/null 2>&1; apt-get -o DPkg::Lock::Timeout=120 install -y -q fail2ban python3-systemd >/dev/null 2>&1; }\n" +
+            "mkdir -p /etc/fail2ban/jail.d\n" +
+            "printf '[sshd]\\nenabled = true\\nbackend = systemd\\nmaxretry = 5\\nfindtime = 10m\\nbantime = 1h\\nignoreip = 127.0.0.1/8 ::1 %s\\n' \"$MEU_IP\" > /etc/fail2ban/jail.d/lia.conf\n" +
+            "systemctl enable fail2ban >/dev/null 2>&1; systemctl restart fail2ban >/dev/null 2>&1; sleep 3\n" +
+            "printf 'MaxStartups 50:30:200\\nLoginGraceTime 20\\n' > /etc/ssh/sshd_config.d/10-lia.conf\n" +
+            "if /usr/sbin/sshd -t >/dev/null 2>&1; then systemctl reload ssh >/dev/null 2>&1 || true; else rm -f /etc/ssh/sshd_config.d/10-lia.conf; fi\n" +
+            "if systemctl is-active --quiet fail2ban; then echo 'Proteção ligada: robôs que errarem a senha ficam bloqueados por 1 hora.';\n" +
+            "else rm -f /etc/fail2ban/jail.d/lia.conf; echo 'Aviso: não consegui ligar a proteção agora (a Lia está ok). Tento de novo na próxima atualização.'; fi\n");
+        if (r.Codigo == 255 || r.Codigo == -1) return; // sem conexão: tenta na próxima atualização
+        Escrever(r.Saida);
     }
 
     async Task TrocarChave()
