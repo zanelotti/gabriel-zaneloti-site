@@ -107,6 +107,7 @@ class Painel : Form
         Botao("Reinstalar a Lia", "Servidor novo: instala tudo do zero", false, async () => await ReinstalarLia());
         Botao("Conectar o WhatsApp", "Mostra o QR code para ler no celular", false, async () => { ConectarWhatsApp(); await Task.FromResult(0); });
         Botao("Organizar o quadro", "A Lia lê as conversas e arruma os cards", false, async () => await OrganizarQuadro());
+        Botao("Clientes para agir", "Quem tem chance de fechar e o que fazer", true, async () => await ClientesParaAgir());
         raiz.Controls.Add(botoes, 0, 1);
         botoes.Resize += (s, e) => AjustarBotoes();
 
@@ -658,6 +659,16 @@ class Painel : Form
         r = await NoServidor("cd " + dir + " && node scripts/organizar-quadro.js --aplicar 2>&1\n");
         if (SemAcesso(r)) return;
         Escrever(r.Saida);
+    }
+
+    async Task ClientesParaAgir()
+    {
+        Escrever("\r\n>> A Lia está lendo as conversas para ver quem tem chance de fechar (leva de 1 a 3 minutos, nada é alterado)...");
+        string dir = Cfg.PastaServidor + "/bot-whatsapp";
+        var r = await NoServidor("cd " + dir + " && node scripts/clientes-para-agir.js 2>&1\n");
+        if (SemAcesso(r)) return;
+        Escrever(r.Saida);
+        if (!r.Ok) Escrever("Parei: deu erro na análise. Me mande um print.");
     }
 
     // Caixinha de pergunta com um campo de texto.

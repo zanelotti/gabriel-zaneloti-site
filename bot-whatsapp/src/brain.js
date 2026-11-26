@@ -7,6 +7,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { aceitouVerInvestimento, citouNumerosDoCalculo, dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, precisaExplicarNumeros, repeticaoExcessiva, validarSaida } from './guards.js';
 import { citouHonorarios } from './funil.js';
 import { formatarTrechos } from './documentos.js';
+import { MARCA_PDF } from './pdf-simulacao.js';
 import { formatarAprendidos } from './aprendizado.js';
 import { ehLeadExterno } from './origem.js';
 import { montarSistema } from './prompt.js';
@@ -111,6 +112,14 @@ export const FERRAMENTA_SIMULACAO = {
     required: ['responsavel'],
     additionalProperties: false,
   },
+};
+
+/** Lead da calculadora com números: a simulação é mostrada em PDF (pedido do Gabriel, 25/11), nunca no texto. */
+const FERRAMENTA_PDF = {
+  name: 'enviar_simulacao_pdf',
+  description:
+    'Envia à pessoa, no WhatsApp, o PDF com a simulação da obra (INSS sem planejamento, com planejamento, economia e parcelamento). É ASSIM que você mostra a simulação: use quando ela confirmar a metragem e o prazo. Nunca escreva os números na conversa no lugar do PDF.',
+  input_schema: { type: 'object', properties: {}, additionalProperties: false },
 };
 
 /** Só é oferecida quando existe a pasta de documentos (normativa, manual do SERO...). */
@@ -225,7 +234,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     const msgsLead = historico.filter((m) => m.direcao === 'lead');
     const perguntouPreco = leadPerguntouPreco(msgsLead.slice(-2).map((m) => m.texto).join(' '));
     const jaFalouHonorario = historico.some((m) => m.direcao !== 'lead' && citouHonorarios(m.texto));
-    const numerosExplicados = !precisaExplicarNumeros(lead) || historico.some((m) => m.direcao !== 'lead' && citouNumerosDoCalculo(m.texto, lead));
+    const numerosExplicados = !precisaExplicarNumeros(lead) || historico.some((m) => m.direcao !== 'lead' && (m.texto === MARCA_PDF || citouNumerosDoCalculo(m.texto, lead)));
     // O honorário só sai quando: o lead perguntou o preço, OU aceitou o convite "posso te mostrar o investimento?",
     // OU a conversa já vai longe (5+ mensagens do lead, com os números explicados). Nunca logo depois dos números.
     const aceitou = aceitouVerInvestimento(historico);
@@ -235,7 +244,15 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
       'fala de honorário/preço, mas a pessoa não perguntou o custo e ainda não aceitou ver o investimento. Reescreva SEM citar honorário, percentual ou valor do serviço: passe VALOR (como a redução funciona no caso dela, o que o Gabriel faz do começo ao fim, prova real) e termine convidando: "Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?"';
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
     const temBusca = (documentos && documentos.total > 0) || (aprendizado && aprendizado.total > 0);
-    const base = ehLeadExterno(lead) ? [...FERRAMENTAS, FERRAMENTA_SIMULACAO] : FERRAMENTAS;
+    const comPdf = !ehLeadExterno(lead) && precisaExplicarNumeros(lead);
+    const base = ehLeadExterno(lead) ? [...FERRAMENTAS, FERRAMENTA_SIMULACAO] : comPdf ? [...FERRAMENTAS, FERRAMENTA_PDF] : FERRAMENTAS;
+    // Antes do PDF, os números da simulação não podem ir no texto da conversa.
+    // (Conversas antigas, de antes do PDF, que já tiveram os números no texto, seguem normalmente.)
+    let pdfEnviado = historico.some((m) => m.direcao !== 'lead' && (m.texto === MARCA_PDF || citouNumerosDoCalculo(m.texto, lead)));
+    // A apresentação do honorário cita a economia ("12% sobre a economia estimada de..."): isso pode.
+    const numerosAntesDoPdf = (t) => comPdf && !pdfEnviado && citouNumerosDoCalculo(t, lead) && !falaDeHonorario(t);
+    const MOTIVO_NUMEROS_SEM_PDF =
+      'escreveu os números da simulação na conversa. Os números vão SÓ no PDF: use a ferramenta enviar_simulacao_pdf e depois escreva uma mensagem curta, sem valores em reais, dizendo que mandou a simulação em PDF e com UMA pergunta objetiva sobre a obra';
     const ferramentasApi = temBusca ? [...base, FERRAMENTA_DOCUMENTOS] : base;
     let consultas = 0;
     const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato, aprendidos, parcelamentoCitado);
@@ -305,6 +322,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
             const fn = ferramentas[uso.name];
             if (!fn) throw new Error(`ferramenta desconhecida: ${uso.name}`);
             const saida = await fn(uso.input || {});
+            if (uso.name === 'enviar_simulacao_pdf' && saida?.ok) pdfEnviado = true;
             if (uso.name === 'passar_para_gabriel') {
               acao = { tipo: 'passar', motivo: uso.input?.motivo || '', resumo: uso.input?.resumo || '' };
             } else if (uso.name === 'encerrar_conversa') {
@@ -333,6 +351,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
         ? { ok: false, motivo: 'a resposta foi cortada por ser longa demais (escreva mais curta, em no máximo 3 mensagens pequenas)' }
         : validarSaida(texto, lead, valoresExtras);
       if (v.ok && precoPrematuro(texto)) v = { ok: false, motivo: MOTIVO_PRECO_CEDO };
+      if (v.ok && numerosAntesDoPdf(texto)) v = { ok: false, motivo: MOTIVO_NUMEROS_SEM_PDF };
       if (v.ok && muitoLonga(texto) && !jaPediuResumo) {
         // Resposta correta mas comprida: pede UMA reescrita mais curta (não conta como bloqueio; se continuar longa, envia assim mesmo).
         jaPediuResumo = true;

@@ -9,6 +9,9 @@ import { criarAprendizado } from './aprendizado.js';
 import { indexarDocumentos } from './documentos.js';
 import { config, validarConfig } from './config.js';
 import { criarNotificador } from './notify.js';
+import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
+import { analisarClientes, horaDoResumo, diaDeBrasilia, montarEmail } from './clientes-para-agir.js';
 import { criarSite } from './site.js';
 import { sincronizarTabelasDoSite } from './simulacao.js';
 import { criarStore } from './store.js';
@@ -103,6 +106,26 @@ async function principal() {
     bot.sincronizarCardsConsultorias().catch((e) => log.warn(`[funil] ${e.message}`));
     bot.processarConsultorias().catch((e) => log.warn(`[consultoria] ${e.message}`));
   }, 2 * 60 * 1000);
+  // Resumo diário "Clientes para agir": às 8h (Brasília) a Lia lê as conversas e manda por e-mail quem precisa do Gabriel.
+  let resumoRodando = false;
+  setInterval(async () => {
+    if (resumoRodando) return;
+    resumoRodando = true;
+    try {
+      const agora = new Date();
+      if (!horaDoResumo(agora, await store.lerEstado('resumo_clientes_dia'))) return;
+      await store.gravarEstado('resumo_clientes_dia', diaDeBrasilia(agora)); // antes de rodar: nunca manda dois no mesmo dia
+      const db = createClient(config.supabaseUrl, config.supabaseKey, { auth: { persistSession: false } });
+      const r = await analisarClientes({ db, anthropic: new Anthropic({ apiKey: config.anthropicKey }), modelo: config.modelo, log });
+      const { assunto, html } = montarEmail(r, agora);
+      await notificar.enviar(assunto, html);
+      log.info(`[clientes] resumo do dia enviado (${r.analisadas} conversas).`);
+    } catch (e) {
+      log.warn(`[clientes] ${e.message}`);
+    } finally {
+      resumoRodando = false;
+    }
+  }, 10 * 60 * 1000);
   log.info(`Painel do CRM ligado. Assistente: ${config.assistenteNome}.${config.ativo ? '' : ' (desligado pelo painel)'}`);
 
   let avisouParado = false;

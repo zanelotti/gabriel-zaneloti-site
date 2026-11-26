@@ -15,6 +15,7 @@ import { citouHonorarios, ehDocumentoDoLead, movimentoDaConsultoria, podeMover }
 import { dividirMensagens, pediuParar, validarSaida } from './guards.js';
 import { montarAbertura } from './opening.js';
 import { detectarOrigemSite, ehLeadExterno, idLeadEbook, montarBoasVindas, novoIdLeadExterno, origemDoLead, rotuloDaOrigem } from './origem.js';
+import { gerarPdfSimulacao, MARCA_PDF, nomeArquivoPdf, simulacaoDoLead } from './pdf-simulacao.js';
 import { camposDoLead, montarEmailSimulacao, montarMensagemSimulacao, normalizarEntrada, simular } from './simulacao.js';
 import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, leadValorAlto, limparNomeInformado, normalizarTelefoneBR, primeiroNomePessoa } from './util.js';
 
@@ -77,6 +78,24 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   async function enviar(conversa, texto) {
     const waId = await wa.enviarTexto(conversa.jid, texto);
     await store.addMensagem({ conversa_id: conversa.id, direcao: 'bot', texto, wa_id: waId });
+  }
+
+  /**
+   * Manda o PDF da simulação no WhatsApp (pedido do Gabriel, 25/11: vai junto com os números, no momento em que a Lia
+   * mostra a simulação). Nunca derruba a conversa: se falhar, só registra no log.
+   */
+  async function enviarPdfSimulacao(conversa, { nome, dados, r }) {
+    if (typeof wa.enviarDocumento !== 'function') return false;
+    try {
+      const pdf = await gerarPdfSimulacao({ nome, dados, r });
+      const waId = await wa.enviarDocumento(conversa.jid, pdf, { nomeArquivo: nomeArquivoPdf(nome) });
+      await store.addMensagem({ conversa_id: conversa.id, direcao: 'bot', texto: MARCA_PDF, wa_id: waId });
+      log.info(`[bot] PDF da simulação enviado a ${conversa.telefone}.`);
+      return true;
+    } catch (e) {
+      log.warn(`[bot] não consegui enviar o PDF da simulação: ${e.message}`);
+      return false;
+    }
   }
 
   /** Modo de teste: só fala com os números da lista (mesma regra da abertura). */
@@ -728,6 +747,21 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
         await store.atualizarLead(lead.id, { status, nota, motivoPerda });
         return { ok: true };
       },
+      // Lead da calculadora: a Lia mostra a simulação mandando o PDF (os números não vão no texto da conversa).
+      enviar_simulacao_pdf: async () => {
+        const sim = simulacaoDoLead(lead);
+        if (!sim) return { ok: false, erro: 'este lead não tem simulação com valores; siga o roteiro sem números' };
+        const historicoAtual = await store.historico(conversa.id);
+        if (historicoAtual.some((m) => m.direcao === 'bot' && m.texto === MARCA_PDF)) return { ok: true, ja_enviado: true, orientacao: 'O PDF já tinha sido enviado antes; não mande de novo. Siga o atendimento.' };
+        const foi = await enviarPdfSimulacao(conversa, { nome: nomeAtual || conversa.nome_contato || primeiroNomePessoa(lead.nome) || '', ...sim });
+        if (!foi) return { ok: false, erro: 'não consegui enviar o PDF agora; use passar_para_gabriel com o motivo "falha ao enviar o PDF da simulação"' };
+        return {
+          ok: true,
+          enviado: true,
+          orientacao:
+            'O PDF com a simulação JÁ foi enviado. Agora escreva UMA mensagem curta, SEM nenhum valor em reais e sem percentuais: diga que mandou a simulação da obra em PDF, em meia frase que é uma estimativa confirmada na análise do Gabriel, e termine com UMA pergunta objetiva sobre a obra (passo 2 da ESTRATÉGIA DE VENDA). NÃO fale de honorário ainda.',
+        };
+      },
       // Simulação do INSS feita na conversa (quem chegou pelo botão do site): calcula, ENVIA ao cliente, avisa o Gabriel por e-mail e preenche o card.
       calcular_simulacao: async (args) => {
         const entrada = normalizarEntrada(args);
@@ -756,7 +790,9 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
         const r = simular(dados);
         await store.salvarDadosObra(lead.id, camposDoLead(dados, r));
-        await enviar(conversa, montarMensagemSimulacao(dados, r, { nome: nomeCliente }));
+        // Pedido do Gabriel (25/11): os números vão SÓ no PDF, não no texto da conversa. Se o PDF falhar, manda o texto para o cliente não ficar sem nada.
+        const foiPdf = await enviarPdfSimulacao(conversa, { nome: nomeCliente || primeiroNomePessoa(lead.nome) || '', dados, r });
+        if (!foiPdf) await enviar(conversa, montarMensagemSimulacao(dados, r, { nome: nomeCliente }));
         simulacoesFeitas.set(conversa.id, feitas + 1);
         log.info(`[bot] simulação enviada a ${conversa.telefone} (${dados.estado}, ${dados.areaPrincipal} m²).`);
 
@@ -780,8 +816,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
           enviada: true,
           tem_estimativa_de_economia: temEconomia,
           orientacao: temEconomia
-            ? 'A simulação JÁ foi enviada à pessoa na conversa e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais e sem repetir os números: diga em meia frase que é uma estimativa confirmada com os documentos e termine com UMA pergunta objetiva sobre a obra que ajude a fechar (por exemplo, se ela vai precisar da CND para averbar, vender ou financiar). Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.'
-            : 'A simulação JÁ foi enviada à pessoa (só o INSS estimado, sem economia: o caso depende de análise) e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais, dizendo que o Gabriel analisa o caso (obras antigas costumam ter boas frentes de redução, como a decadência, com prova da época da obra) e termine com UMA pergunta objetiva (por exemplo, se ela tem habite-se, alvará ou IPTU da época). Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.',
+            ? 'A simulação JÁ foi enviada à pessoa em PDF na conversa e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais e sem repetir os números: diga que mandou a simulação em PDF com os valores da obra, em meia frase que é uma estimativa confirmada com os documentos e termine com UMA pergunta objetiva sobre a obra que ajude a fechar (por exemplo, se ela vai precisar da CND para averbar, vender ou financiar). Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.'
+            : 'A simulação JÁ foi enviada à pessoa em PDF (só o INSS estimado, sem economia: o caso depende de análise) e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais, dizendo que o Gabriel analisa o caso (obras antigas costumam ter boas frentes de redução, como a decadência, com prova da época da obra) e termine com UMA pergunta objetiva (por exemplo, se ela tem habite-se, alvará ou IPTU da época). Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.',
         };
       },
     };
@@ -850,6 +886,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       conversa = await store.conversaPorId(conversaId);
       if (!conversa || conversa.estado !== 'ativa') return;
 
+      resultado.mensagens = resultado.mensagens.filter((m) => String(m).trim() !== MARCA_PDF); // a marca é só do histórico
       for (const [i, msg] of resultado.mensagens.entries()) {
         if (i > 0) await dormirFn(aleatorio(800, 1800));
         await enviar(conversa, msg);

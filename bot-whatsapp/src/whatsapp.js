@@ -200,6 +200,23 @@ export function criarWhatsApp({ pastaAuth = 'auth', log = console, modoTeste = f
     return id || null;
   }
 
+  /** Envia um arquivo (ex.: o PDF da simulação). Devolve o id da mensagem. */
+  async function enviarDocumento(jid, buffer, { nomeArquivo = 'arquivo.pdf', mimetype = 'application/pdf', legenda = '' } = {}) {
+    if (modoTeste) {
+      log.info(`[TESTE] → ${jid}: [arquivo ${nomeArquivo}, ${buffer.length} bytes]${legenda ? ` ${legenda}` : ''}`);
+      return `teste-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    }
+    await sock.presenceSubscribe(jid);
+    await dormir(1500 + aleatorio(0, 1000));
+    const r = await sock.sendMessage(jid, { document: buffer, mimetype, fileName: nomeArquivo, ...(legenda ? { caption: legenda } : {}) });
+    const id = r?.key?.id;
+    if (id) {
+      enviados.add(id);
+      if (enviados.size > 500) enviados.delete(enviados.values().next().value);
+    }
+    return id || null;
+  }
+
   async function encerrar() {
     encerrando = true;
     try {
@@ -209,5 +226,5 @@ export function criarWhatsApp({ pastaAuth = 'auth', log = console, modoTeste = f
     }
   }
 
-  return { iniciar, resolverJid, enviarTexto, conectado: () => conectado, encerrar };
+  return { iniciar, resolverJid, enviarTexto, enviarDocumento, conectado: () => conectado, encerrar };
 }

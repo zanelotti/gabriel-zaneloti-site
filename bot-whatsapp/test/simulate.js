@@ -21,9 +21,12 @@ import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAp
 import { citouHonorarios, MOTIVOS_PERDA, podeMover } from '../src/funil.js';
 import { descreverQuando, lembreteDevido, montarFollowup, montarMensagemConsultoria, proximoFollowup } from '../src/acompanhamento.js';
 import { detectarOrigemSite, ehLeadExterno, montarBoasVindas, ORIGENS, origemDoLead } from '../src/origem.js';
+import { gerarPdfSimulacao, nomeArquivoPdf, simulacaoDoLead } from '../src/pdf-simulacao.js';
 import { camposDoLead, lerTabelasDoSite, montarEmailSimulacao, montarMensagemSimulacao, normalizarEntrada, origemDasTabelas, simular, sincronizarTabelasDoSite } from '../src/simulacao.js';
 import { semSimulacao } from '../src/origem.js';
 import { calcularHonorario, criarChamador, leadValorAlto, limparNomeInformado, mensagemDadosContrato, nomeParecePessoa, PERGUNTA_FECHAMENTO, normalizarTelefoneBR, obraEmAndamento, primeiroNomePessoa } from '../src/util.js';
+
+import { analisarClientes, horaDoResumo, lerResposta, montarEmail, montarTexto, separar } from '../src/clientes-para-agir.js';
 
 let passou = 0;
 const teste = async (nome, fn) => {
@@ -247,6 +250,11 @@ function criarWaFalso() {
     async enviarTexto(jid, texto) {
       enviados.push({ jid, texto });
       return `id${enviados.length}`;
+    },
+    arquivos: [],
+    async enviarDocumento(jid, buffer, opcoes) {
+      this.arquivos.push({ jid, buffer, ...opcoes, depoisDe: enviados.length });
+      return `doc${this.arquivos.length}`;
     },
   };
 }
@@ -484,7 +492,7 @@ await teste('lead pergunta o custo: assistente responde (12% sobre economia comp
   assert.equal(ctx.avisos.length, 0, 'não manda e-mail só porque o lead respondeu');
   // O modelo recebeu o histórico e as ferramentas
   const chamada = ctx.client.chamadas[0];
-  assert.ok(chamada.tools.length === 6);
+  assert.ok(chamada.tools.length === 7, 'inclui enviar_simulacao_pdf');
   assert.equal(chamada.messages[chamada.messages.length - 1].role, 'user');
 });
 
@@ -2242,10 +2250,12 @@ await teste('lead comum: o honorário (mesmo depois de várias trocas) só sai s
   const comHonorario = 'Os honorários são de R$ 960 (12% da economia estimada de R$ 8.000). Posso te passar a lista de dados para o Gabriel já preparar o seu contrato?';
   const textoNumeros = 'Pela estimativa da calculadora, a Receita cobraria R$ 20.000 e, com a redução, ficaria em R$ 12.000, uma economia de R$ 8.000. O saldo ainda pode ser parcelado em até 60 vezes. Isso faz sentido para a sua obra?';
   // 5 mensagens, mas os números ainda não foram explicados: o honorário é barrado e a conversa pede o texto dos números.
-  const a = cerebroRoteiro([texto(comHonorario), texto(textoNumeros)]);
-  const r = await a.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', 'b', 'c', 'd', 'e'), ferramentas: {}, log: silencioso });
-  assert.deepEqual(r.mensagens, [textoNumeros], 'o texto dos números pode sair (sem falar de honorário)');
+  const aposPdf = 'Te mandei a simulação da sua obra em PDF. É uma estimativa, confirmada na análise do Gabriel. Você vai precisar da CND para averbar?';
+  const a = cerebroRoteiro([texto(comHonorario), texto(textoNumeros), [uso('enviar_simulacao_pdf', {})], texto(aposPdf)]);
+  const r = await a.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', 'b', 'c', 'd', 'e'), ferramentas: { enviar_simulacao_pdf: async () => ({ ok: true, enviado: true }) }, log: silencioso });
+  assert.deepEqual(r.mensagens, [aposPdf], 'os números vão no PDF, não no texto');
   assert.match(JSON.stringify(a.chamadas[1].messages.at(-1).content), /aceitou ver o investimento/);
+  assert.match(JSON.stringify(a.chamadas[2].messages.at(-1).content), /SÓ no PDF/, 'números no texto são barrados');
   // Se a pessoa pergunta o custo, o honorário sai direto.
   const b = cerebroRoteiro([texto(comHonorario)]);
   const r2 = await b.cerebro.gerarResposta({ lead: leadPequeno(), historico: hist('a', 'b', 'Quanto custa o serviço?'), ferramentas: {}, log: silencioso });
@@ -2913,11 +2923,11 @@ await teste('fluxo completo: ela passa os dados, o bot envia a simulação na co
   ctx.bot.pararTimers();
 
   const novas = ctx.wa.enviados.slice(antes).map((m) => m.texto);
-  assert.equal(novas.length, 2, 'simulação + uma mensagem de continuação');
-  assert.match(novas[0], /^Pronto, Carlos!/, 'a simulação sai primeiro');
-  assert.match(novas[0], /Economia estimada/);
-  assert.match(novas[1], /prestador autônomo\?$/);
-  assert.doesNotMatch(novas[1], /R\$/, 'a continuação não repete números');
+  assert.equal(novas.length, 1, 'só a mensagem de continuação: os números vão no PDF');
+  assert.equal(ctx.wa.arquivos.length, 1, 'o PDF da simulação foi enviado');
+  assert.equal(ctx.wa.arquivos[0].depoisDe, antes, 'o PDF sai antes da continuação');
+  assert.match(novas[0], /prestador autônomo\?$/);
+  assert.doesNotMatch(novas[0], /R\$/, 'a continuação não tem números');
 
   // o card do CRM ficou com os dados da obra e os números
   const card = ctx.store.leads.get(lead0.id);
@@ -2940,7 +2950,7 @@ await teste('fluxo completo: ela passa os dados, o bot envia a simulação na co
 
   // a simulação foi gravada no histórico como mensagem do bot (os números contam como "já explicados")
   const hist = ctx.store.mensagens.filter((m) => m.conversa_id === c.id && m.direcao === 'bot');
-  assert.ok(hist.some((m) => /Economia estimada/.test(m.texto)));
+  assert.ok(hist.some((m) => m.texto === '[arquivo enviado: PDF da simulação]'));
 });
 
 await teste('depois da simulação o assistente passa a tratar como lead com números (sem repetir a simulação)', async () => {
@@ -2960,7 +2970,7 @@ await teste('depois da simulação o assistente passa a tratar como lead com nú
   assert.match(sistema2, /MÃO DE OBRA \(pessoa física\)/);
   assert.doesNotMatch(sistema2, /AINDA SEM SIMULAÇÃO/);
   assert.doesNotMatch(sistema2, /TEXTO DOS NÚMEROS:/);
-  assert.match(sistema2, /JÁ FORAM enviados na simulação/);
+  assert.match(sistema2, /SIMULAÇÃO JÁ FOI ENVIADA a ela nesta conversa em PDF/);
   assert.ok(ctx.client.chamadas[2].tools.some((f) => f.name === 'calcular_simulacao'), 'ainda pode corrigir os dados');
 });
 
@@ -3008,9 +3018,8 @@ await teste('obra anterior a 2021: envia só o INSS estimado, sem economia, e o 
   await chegou(ctx, 'dados da obra: PF, SP, casa alvenaria obra nova 241 m², jan/2020 a jun/2022');
   await ctx.bot.responder(c.id);
   ctx.bot.pararTimers();
-  const simMsg = ctx.wa.enviados[antes].texto;
-  assert.match(simMsg, /INSS estimado sem planejamento/);
-  assert.doesNotMatch(simMsg, /Economia estimada/);
+  assert.equal(ctx.wa.arquivos.length, 1, 'a simulação vai em PDF');
+  assert.doesNotMatch(ctx.wa.enviados.slice(antes).map((m) => m.texto).join(' '), /R\$/);
   const card = ctx.store.leads.get(lead0.id);
   assert.equal(card.economia_estimada, null);
   assert.ok(card.inss_estimado >= 0);
@@ -3023,8 +3032,7 @@ await teste('no máximo 3 simulações por conversa (trava contra repetição)',
   await chegou(ctx, 'dados da obra completos');
   await ctx.bot.responder(c.id);
   ctx.bot.pararTimers();
-  const enviadas = ctx.wa.enviados.filter((m) => /Economia estimada|INSS estimado sem planejamento/.test(m.texto));
-  assert.equal(enviadas.length, 3);
+  assert.equal(ctx.wa.arquivos.length, 3);
 });
 
 await teste('quem veio da calculadora não recebe a ferramenta da simulação', async () => {
@@ -3034,6 +3042,147 @@ await teste('quem veio da calculadora não recebe a ferramenta da simulação', 
   await ctx.bot.responder(c.id);
   ctx.bot.pararTimers();
   assert.ok(!ctx.client.chamadas[0].tools.some((f) => f.name === 'calcular_simulacao'));
+});
+
+console.log('\nPDF da simulação no WhatsApp');
+
+await teste('o PDF da simulação sai sem honorário e com os números do cliente', async () => {
+  const { dados } = normalizarEntrada(DADOS_SIM);
+  const r = simular(dados);
+  const pdf = await gerarPdfSimulacao({ nome: 'Carlos', dados, r });
+  assert.ok(pdf.length > 5000 && pdf.slice(0, 5).toString() === '%PDF-', 'é um PDF de verdade');
+  assert.equal(nomeArquivoPdf('Carlos Souza'), 'Simulacao INSS da obra - carlos-souza.pdf');
+});
+
+await teste('lead da calculadora: ao confirmar, a Lia manda o PDF (sem números no texto) e só uma vez', async () => {
+  const l = lead({ estado: 'SP', destinacao: 'residencial_unifamiliar', tipo_obra: 'alvenaria', categoria: 'obra_nova', data_fim: '2024-06-01' });
+  const ctx = montar({
+    roteiro: [
+      texto('Sem nenhum planejamento, a Receita cobraria cerca de R$ 80.000 de INSS da sua obra. Com o planejamento, você pagaria cerca de R$ 38.000.'),
+      [uso('enviar_simulacao_pdf', {})],
+      texto('Te mandei a simulação da sua obra em PDF. É uma estimativa, confirmada na análise do Gabriel. Você vai precisar da CND para averbar?'),
+      [uso('enviar_simulacao_pdf', {}, 'tu_2')],
+      texto('A redução vem do Fator de Ajuste. Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?'),
+    ],
+  });
+  const c = await abrir(ctx, l);
+  const antes = ctx.wa.enviados.length;
+  await ctx.bot.aoReceber({ telefone: c.telefone, texto: 'Sim, está certo' });
+  await ctx.bot.responder(c.id);
+  assert.equal(ctx.wa.arquivos.length, 1, 'PDF enviado');
+  assert.equal(ctx.wa.arquivos[0].depoisDe, antes, 'o PDF vem antes da mensagem');
+  assert.match(ctx.wa.arquivos[0].nomeArquivo, /^Simulacao INSS da obra.*\.pdf$/);
+  const novos = ctx.wa.enviados.slice(antes).map((m) => m.texto).join(' ');
+  assert.doesNotMatch(novos, /R\$/, 'sem números na conversa');
+  await ctx.bot.aoReceber({ telefone: c.telefone, texto: 'Sim, vou precisar' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.wa.arquivos.length, 1, 'não manda de novo');
+});
+
+await teste('PDF a partir do lead da calculadora tem os números do cadastro', async () => {
+  const sim = simulacaoDoLead(lead({ data_fim: '2024-06-01' }));
+  assert.equal(sim.r.inssEstimado, 80000);
+  assert.equal(sim.r.economiaEstimada, 42000);
+  assert.equal(sim.r.parcelamento.numeroParcelas, 60);
+  assert.equal(simulacaoDoLead(lead({ responsavel: 'PJ' })), null);
+  const pdf = await gerarPdfSimulacao({ nome: 'maria da SILVA', ...sim });
+  assert.equal(pdf.slice(0, 5).toString(), '%PDF-');
+});
+
+await teste('lead da calculadora: sem números na mensagem, nada de PDF', async () => {
+  const ctx = montar({ roteiro: [texto('Oi! Me confirma a metragem?')] });
+  const c = await abrir(ctx, lead());
+  await ctx.bot.aoReceber({ telefone: c.telefone, texto: 'Oi' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  assert.equal(ctx.wa.arquivos.length, 0);
+});
+
+// ---------- Clientes para agir (v33) ----------
+function dbClientesFalso({ leads, conversas, mensagens }) {
+  const q = (linhas) => {
+    let r = [...linhas];
+    const api = {
+      select: () => api,
+      not: (campo, _op, lista) => { const fora = lista.replace(/[()"]/g, '').split(','); r = r.filter((x) => !fora.includes(x[campo])); return api; },
+      neq: (campo, v) => { r = r.filter((x) => x[campo] !== v); return api; },
+      eq: (campo, v) => { r = r.filter((x) => x[campo] === v); return api; },
+      order: (campo, { ascending }) => { r.sort((a, b) => (a[campo] < b[campo] ? -1 : 1) * (ascending ? 1 : -1)); return api; },
+      limit: (n) => { r = r.slice(0, n); return api; },
+      then: (ok) => ok({ data: r, error: null }),
+    };
+    return api;
+  };
+  return { from: (t) => q({ leads, bot_conversas: conversas, bot_mensagens: mensagens }[t]) };
+}
+
+await teste('clientes para agir: lê só conversas abertas, recentes e com resposta do cliente', async () => {
+  const agora = new Date('2026-11-26T12:00:00Z');
+  const h = (dias) => new Date(agora - dias * 864e5).toISOString();
+  const db = dbClientesFalso({
+    leads: [
+      { id: 'a', nome: 'Ana', status: 'decidindo' },
+      { id: 'b', nome: 'Bruno', status: 'contatado' },
+      { id: 'c', nome: 'Carla', status: 'fechado' },
+      { id: 'd', nome: 'Davi', status: 'sem_resposta' },
+      { id: 'e', nome: 'Eva', status: 'contatado' },
+    ],
+    conversas: [
+      { id: 'ca', lead_id: 'a', telefone: '5511912345678', estado: 'humano' },
+      { id: 'cb', lead_id: 'b', telefone: '5511900000001', estado: 'ativa' },
+      { id: 'cc', lead_id: 'c', telefone: '5511900000002', estado: 'ativa' },
+      { id: 'cd', lead_id: 'd', telefone: '5511900000003', estado: 'ativa' },
+      { id: 'ce', lead_id: 'e', telefone: '5511900000004', estado: 'ativa' },
+    ],
+    mensagens: [
+      { id: 1, conversa_id: 'ca', direcao: 'bot', texto: 'Posso te mandar o contrato?', criado_em: h(2) },
+      { id: 2, conversa_id: 'ca', direcao: 'lead', texto: 'Pode mandar, quero fechar', criado_em: h(1) },
+      { id: 3, conversa_id: 'cb', direcao: 'lead', texto: 'Oi', criado_em: h(3) },
+      { id: 4, conversa_id: 'cc', direcao: 'lead', texto: 'Fechado', criado_em: h(1) },
+      { id: 5, conversa_id: 'cd', direcao: 'bot', texto: 'Oi!', criado_em: h(1) },
+      { id: 6, conversa_id: 'ce', direcao: 'lead', texto: 'Oi', criado_em: h(60) },
+    ],
+  });
+  const lidas = [];
+  const anthropic = {
+    messages: {
+      create: async ({ messages }) => {
+        const c = messages[0].content;
+        lidas.push(c);
+        const quer = c.includes('quero fechar');
+        return { content: [{ type: 'text', text: JSON.stringify(quer
+          ? { chance: 'alta', precisa_de_voce: true, urgencia: 'hoje', o_que_fazer: 'Mande o contrato', por_que: 'Pediu para fechar' }
+          : { chance: 'media', precisa_de_voce: false, urgencia: 'nao', o_que_fazer: '', por_que: 'Tirando dúvidas' }) }] };
+      },
+    },
+  };
+  const cacheArquivo = join(mkdtempSync(join(tmpdir(), 'cpa-')), 'cache.json');
+  const r = await analisarClientes({ db, anthropic, modelo: 'x', agora, cacheArquivo, log: { warn() {} } });
+  assert.equal(r.analisadas, 2, 'só Ana e Bruno');
+  assert.ok(lidas.some((c) => c.includes('CALADA')), 'avisa que a Lia está calada');
+  const { voce, lia } = separar(r.itens);
+  assert.deepEqual(voce.map((x) => x.nome), ['Ana']);
+  assert.deepEqual(lia.map((x) => x.nome), ['Bruno']);
+  const txt = montarTexto(r);
+  assert.match(txt, /PRECISAM DE VOCÊ \(1\)/);
+  assert.match(txt, /Ana - \(11\) 91234-5678 - chance ALTA - fazer HOJE/);
+  assert.match(txt, /O que fazer: Mande o contrato/);
+  const email = montarEmail(r, agora);
+  assert.match(email.assunto, /1 cliente\(s\) precisam de você/);
+  assert.match(email.html, /wa\.me\/5511912345678/);
+  // segunda vez no mesmo dia, sem mensagem nova: usa o que já leu (não gasta de novo)
+  const antes = lidas.length;
+  await analisarClientes({ db, anthropic, modelo: 'x', agora, cacheArquivo, log: { warn() {} } });
+  assert.equal(lidas.length, antes);
+});
+
+await teste('clientes para agir: resposta da Claude e horário do e-mail', async () => {
+  assert.equal(lerResposta('ok {"chance":"nenhuma","precisa_de_voce":true}').precisa_de_voce, false, 'sem chance não pede ação');
+  assert.throws(() => lerResposta('{"chance":"talvez"}'));
+  assert.equal(horaDoResumo(new Date('2026-11-26T10:30:00Z'), null), false, '7h30 em Brasília: ainda não');
+  assert.equal(horaDoResumo(new Date('2026-11-26T11:05:00Z'), null), true, '8h05: sai');
+  assert.equal(horaDoResumo(new Date('2026-11-26T11:05:00Z'), '2026-11-26'), false, 'já saiu hoje');
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);
