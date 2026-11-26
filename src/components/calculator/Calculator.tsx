@@ -55,23 +55,36 @@ export function Calculator({ embedded = false, onResultChange }: CalculatorProps
   const formContatoRef = useRef<HTMLFormElement>(null);
   const botaoEnviarRef = useRef<HTMLButtonElement>(null);
 
-  // Ao chegar no último passo, rola a tela para mostrar o formulário de contato inteiro (com o botão de enviar).
-  // Só rola se o botão estiver fora da tela, para não "pular" à toa.
+  // A cada troca de etapa (Continuar ou Voltar), a tela sobe até o topo do formulário, logo abaixo do menu fixo,
+  // para o cliente ver que tem uma etapa nova para preencher (antes ele ficava parado no fim da página).
+  // No último passo, no PC, se o formulário inteiro não couber a partir do topo, mantém o jeito da v36: mostra do
+  // título "Último passo" até o botão (ou pelo menos o botão). No celular o botão já fica grudado no rodapé.
+  const etapaAnterior = useRef(step);
   useEffect(() => {
-    if (step !== 3 || enviado) return;
+    if (enviado) return;
+    if (etapaAnterior.current === step) return; // primeira abertura da página: não rola nada
+    etapaAnterior.current = step;
     const id = window.setTimeout(() => {
+      const cartao = cartaoRef.current;
+      if (!cartao) return;
+      const menu = document.querySelector('header');
+      const cabecalho = (menu ? Math.max(0, menu.getBoundingClientRect().bottom) : 80) + 12; // menu fixo + folga
+      const alturaTela = window.innerHeight;
+      let alvo = window.scrollY + cartao.getBoundingClientRect().top - cabecalho;
+
       const form = formContatoRef.current;
       const botao = botaoEnviarRef.current;
-      if (!form || !botao) return;
-      const b = botao.getBoundingClientRect();
-      const alturaTela = window.innerHeight;
-      if (b.top >= 0 && b.bottom <= alturaTela) return;
-      const f = form.getBoundingClientRect();
-      const cabecalho = 88; // menu fixo no topo
-      const alvo =
-        f.height + cabecalho <= alturaTela
-          ? window.scrollY + f.top - cabecalho // cabe tudo: mostra do título "Último passo" até o botão
-          : window.scrollY + b.bottom - alturaTela + 16; // não cabe: garante pelo menos o botão
+      const botaoGrudado = botao?.parentElement ? getComputedStyle(botao.parentElement).position === 'sticky' : false;
+      if (step === 3 && form && botao && !botaoGrudado) {
+        const fimDoBotao = window.scrollY + botao.getBoundingClientRect().bottom;
+        if (fimDoBotao - alvo > alturaTela - 16) {
+          const f = form.getBoundingClientRect();
+          alvo =
+            f.height + cabecalho <= alturaTela
+              ? window.scrollY + f.top - cabecalho
+              : fimDoBotao - alturaTela + 16;
+        }
+      }
       window.scrollTo({ top: Math.max(0, alvo), behavior: 'smooth' });
     }, 60);
     return () => window.clearTimeout(id);
