@@ -104,9 +104,32 @@ async function classificar({ anthropic, modelo, lead, conversa, msgs, agora }) {
   return lerResposta(r.content.filter((c) => c.type === 'text').map((c) => c.text).join(''));
 }
 
-function checar({ data, error }, ctx) {
-  if (error) throw new Error(`Supabase (${ctx}): ${error.message}`);
-  return data;
+/** Erro curto e legível (o Supabase às vezes devolve uma página HTML inteira de erro). */
+export function erroLegivel(msg) {
+  const m = String(msg || '');
+  if (/<html|<!doctype|<\/div>/i.test(m)) {
+    const codigo = m.match(/\b(5\d\d|52[0-9])\b/);
+    return `o servidor do banco de dados respondeu com uma página de erro${codigo ? ` (código ${codigo[1]})` : ''}; costuma ser passageiro`;
+  }
+  return m.slice(0, 300);
+}
+
+const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Roda a consulta do Supabase e tenta de novo (até 4 vezes) se der erro passageiro. */
+async function consultar(fn, ctx, tentativas = 4, pausaMs = 4000) {
+  let ultimo;
+  for (let n = 1; n <= tentativas; n++) {
+    try {
+      const { data, error } = await fn();
+      if (!error) return data;
+      ultimo = error.message;
+    } catch (e) {
+      ultimo = e.message;
+    }
+    if (n < tentativas) await esperar(pausaMs * n);
+  }
+  throw new Error(`Supabase (${ctx}): ${erroLegivel(ultimo)}`);
 }
 
 function lerCache(arquivo) {
@@ -125,9 +148,9 @@ function lerCache(arquivo) {
  * @param {string} p.modelo
  * @returns {Promise<{itens: object[], analisadas: number, erros: number}>}
  */
-export async function analisarClientes({ db, anthropic, modelo, agora = new Date(), cacheArquivo = CACHE_PADRAO, log = console }) {
-  const leads = checar(await db.from('leads').select('*').not('status', 'in', '("fechado","perdido")'), 'leads');
-  const conversas = checar(await db.from('bot_conversas').select('*').neq('estado', 'optout'), 'conversas');
+export async function analisarClientes({ db, anthropic, modelo, agora = new Date(), cacheArquivo = CACHE_PADRAO, log = console, pausaMs = 4000 }) {
+  const leads = await consultar(() => db.from('leads').select('*').not('status', 'in', '("fechado","perdido")'), 'leads', 4, pausaMs);
+  const conversas = await consultar(() => db.from('bot_conversas').select('*').neq('estado', 'optout'), 'conversas', 4, pausaMs);
   const porLead = new Map(conversas.map((c) => [c.lead_id, c]));
   const alvos = leads.filter((l) => porLead.has(l.id));
   const cache = lerCache(cacheArquivo);
@@ -144,10 +167,12 @@ export async function analisarClientes({ db, anthropic, modelo, agora = new Date
       const conversa = porLead.get(lead.id);
       try {
         const msgs = (
-          checar(
-            await db.from('bot_mensagens').select('id,direcao,texto,criado_em').eq('conversa_id', conversa.id).order('criado_em', { ascending: false }).limit(60),
-            'mensagens'
-          ) || []
+          (await consultar(
+            () => db.from('bot_mensagens').select('id,direcao,texto,criado_em').eq('conversa_id', conversa.id).order('criado_em', { ascending: false }).limit(60),
+            'mensagens',
+            3,
+            pausaMs
+          )) || []
         ).reverse();
         if (!msgs.length) continue;
         const ultima = msgs[msgs.length - 1];
@@ -169,7 +194,7 @@ export async function analisarClientes({ db, anthropic, modelo, agora = new Date
         });
       } catch (e) {
         erros++;
-        log.warn?.(`  (não consegui analisar ${lead.nome || lead.id}: ${e.message})`);
+        log.warn?.(`  (não consegui analisar ${lead.nome || lead.id}: ${erroLegivel(e.message)})`);
       }
     }
   }

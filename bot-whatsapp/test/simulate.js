@@ -26,7 +26,7 @@ import { camposDoLead, lerTabelasDoSite, montarEmailSimulacao, montarMensagemSim
 import { semSimulacao } from '../src/origem.js';
 import { calcularHonorario, criarChamador, leadValorAlto, limparNomeInformado, mensagemDadosContrato, nomeParecePessoa, PERGUNTA_FECHAMENTO, normalizarTelefoneBR, obraEmAndamento, primeiroNomePessoa } from '../src/util.js';
 
-import { analisarClientes, horaDoResumo, lerResposta, montarEmail, montarTexto, separar } from '../src/clientes-para-agir.js';
+import { analisarClientes, erroLegivel, horaDoResumo, lerResposta, montarEmail, montarTexto, separar } from '../src/clientes-para-agir.js';
 
 let passou = 0;
 const teste = async (nome, fn) => {
@@ -3158,8 +3158,10 @@ await teste('clientes para agir: lê só conversas abertas, recentes e com respo
     },
   };
   const cacheArquivo = join(mkdtempSync(join(tmpdir(), 'cpa-')), 'cache.json');
-  const r = await analisarClientes({ db, anthropic, modelo: 'x', agora, cacheArquivo, log: { warn() {} } });
-  assert.equal(r.analisadas, 2, 'só Ana e Bruno');
+  let falhas = 1;
+  const dbInstavel = { from: (t) => (t === 'leads' && falhas-- > 0 ? { select: () => ({ not: async () => ({ data: null, error: { message: '<html>522</html>' } }) }) } : db.from(t)) };
+  const r = await analisarClientes({ db: dbInstavel, anthropic, modelo: 'x', agora, cacheArquivo, log: { warn() {} }, pausaMs: 1 });
+  assert.equal(r.analisadas, 2, 'só Ana e Bruno (e tentou de novo depois do erro)');
   assert.ok(lidas.some((c) => c.includes('CALADA')), 'avisa que a Lia está calada');
   const { voce, lia } = separar(r.itens);
   assert.deepEqual(voce.map((x) => x.nome), ['Ana']);
@@ -3180,6 +3182,7 @@ await teste('clientes para agir: lê só conversas abertas, recentes e com respo
 await teste('clientes para agir: resposta da Claude e horário do e-mail', async () => {
   assert.equal(lerResposta('ok {"chance":"nenhuma","precisa_de_voce":true}').precisa_de_voce, false, 'sem chance não pede ação');
   assert.throws(() => lerResposta('{"chance":"talvez"}'));
+  assert.match(erroLegivel('<!DOCTYPE html><html>... 522 ...</div><!-- /.error-footer --></html>'), /página de erro \(código 522\)/);
   assert.equal(horaDoResumo(new Date('2026-11-26T10:30:00Z'), null), false, '7h30 em Brasília: ainda não');
   assert.equal(horaDoResumo(new Date('2026-11-26T11:05:00Z'), null), true, '8h05: sai');
   assert.equal(horaDoResumo(new Date('2026-11-26T11:05:00Z'), '2026-11-26'), false, 'já saiu hoje');

@@ -6,7 +6,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../src/config.js';
-import { analisarClientes, montarEmail, montarTexto } from '../src/clientes-para-agir.js';
+import { analisarClientes, erroLegivel, montarEmail, montarTexto } from '../src/clientes-para-agir.js';
 import { criarNotificador } from '../src/notify.js';
 
 const db = createClient(config.supabaseUrl, config.supabaseKey, { auth: { persistSession: false } });
@@ -21,6 +21,6 @@ try {
     console.log(ok ? '\nE-mail enviado.' : '\nNão consegui mandar o e-mail.');
   }
 } catch (e) {
-  console.error('ERRO:', e.message);
+  console.error(`ERRO: ${erroLegivel(e.message)}. Espere 2 minutos e clique de novo.`);
   process.exit(1);
 }

@@ -667,8 +667,75 @@ class Painel : Form
         string dir = Cfg.PastaServidor + "/bot-whatsapp";
         var r = await NoServidor("cd " + dir + " && node scripts/clientes-para-agir.js 2>&1\n");
         if (SemAcesso(r)) return;
-        Escrever(r.Saida);
-        if (!r.Ok) Escrever("Parei: deu erro na análise. Me mande um print.");
+        if (!r.Ok) { Escrever(r.Saida); Escrever("Parei: deu erro na análise. Me mande um print."); return; }
+        Escrever("Pronto: abri a lista numa janela grande.");
+        MostrarClientes(r.Saida);
+    }
+
+    // Janela grande, fundo branco e letra grande, para ler a lista com calma.
+    void MostrarClientes(string texto)
+    {
+        var f = new Form
+        {
+            Text = "Clientes para agir — " + DateTime.Now.ToString("dd/MM HH:mm"), Icon = Icon,
+            StartPosition = FormStartPosition.CenterScreen, WindowState = FormWindowState.Maximized,
+            MinimumSize = new Size(700, 500), BackColor = Color.White
+        };
+        var caixa = new RichTextBox
+        {
+            Dock = DockStyle.Fill, ReadOnly = true, BorderStyle = BorderStyle.None, BackColor = Color.White,
+            Font = new Font("Segoe UI", 13f), ForeColor = Color.FromArgb(30, 30, 30), DetectUrls = false
+        };
+        var margem = new Panel { Dock = DockStyle.Fill, Padding = new Padding(40, 24, 40, 24), BackColor = Color.White };
+        margem.Controls.Add(caixa);
+        var fechar = new Button { Text = "Fechar", Dock = DockStyle.Bottom, Height = 44, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(31, 122, 90), ForeColor = Color.White, Font = new Font("Segoe UI", 12f, FontStyle.Bold) };
+        fechar.Click += (s, e) => f.Close();
+        f.Controls.Add(margem);
+        f.Controls.Add(fechar);
+
+        var verde = Color.FromArgb(31, 122, 90);
+        var cinza = Color.FromArgb(100, 100, 100);
+        foreach (var bruta in texto.Replace("\r", "").Split('\n'))
+        {
+            string l = bruta.TrimEnd();
+            string t = l.TrimStart();
+            if (t.StartsWith("PRECISAM DE VOCÊ") || t.StartsWith("BOA CHANCE") || t.StartsWith("POUCA OU NENHUMA"))
+            {
+                Por(caixa, "\n" + t + "\n", new Font("Segoe UI", 17f, FontStyle.Bold), t.StartsWith("PRECISAM") ? Color.FromArgb(185, 28, 28) : verde);
+            }
+            else if (t.StartsWith("O que fazer:"))
+            {
+                Por(caixa, "      O que fazer: ", new Font("Segoe UI", 13f, FontStyle.Bold), verde);
+                Por(caixa, t.Substring(12).Trim() + "\n", new Font("Segoe UI", 13f, FontStyle.Bold), Color.FromArgb(30, 30, 30));
+            }
+            else if (t.StartsWith("Por quê:"))
+            {
+                Por(caixa, "      " + t + "\n\n", new Font("Segoe UI", 12f), cinza);
+            }
+            else if (t.Length > 2 && char.IsDigit(t[0]) && t.Contains(". "))
+            {
+                Por(caixa, t + "\n", new Font("Segoe UI", 14f, FontStyle.Bold), Color.FromArgb(30, 30, 30));
+            }
+            else if (t.StartsWith("- "))
+            {
+                Por(caixa, "  •  " + t.Substring(2) + "\n", new Font("Segoe UI", 12.5f), Color.FromArgb(30, 30, 30));
+            }
+            else if (t.Length > 0)
+            {
+                Por(caixa, t + "\n", new Font("Segoe UI", 12f), cinza);
+            }
+        }
+        caixa.SelectionStart = 0;
+        f.Show(this);
+    }
+
+    static void Por(RichTextBox caixa, string texto, Font fonte, Color cor)
+    {
+        caixa.SelectionStart = caixa.TextLength;
+        caixa.SelectionLength = 0;
+        caixa.SelectionFont = fonte;
+        caixa.SelectionColor = cor;
+        caixa.AppendText(texto);
     }
 
     // Caixinha de pergunta com um campo de texto.

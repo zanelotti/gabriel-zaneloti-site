@@ -133,3 +133,35 @@ A partir desta análise, só o período desde a análise anterior (pedido do Gab
 - Muitas sessões em Chrome de computador (72%): parte deve ser teste interno.
 
 **Conclusão:** o site novo (resultado depois do contato, Pessoa Física marcada, sem pulo) melhorou bastante a conversão.
+
+## Análise 6: 26/11/2026 (manhã), período desde a análise 5 (25/11 à tarde até 26/11 ~11h)
+
+**Google Ads, [Leads-22/09]** (dados pelo Adspirer)
+
+| Período | Cliques | Simulações | Custo |
+|---|---|---|---|
+| 25/11, depois da análise 5 | 9 | 4,5 | R$ 25,79 |
+| 26/11 (até ~11h) | 5 | 2 | R$ 22,62 |
+| **Total** | 14 | 6,5 | R$ 48,41 |
+
+- Custo por simulação: cerca de R$ 7,50 (análise 5: R$ 11). O Google divide algumas conversões ao meio ("0,5"); na prática, 7 simulações.
+- 25/11 fechou com 19 cliques, 5,5 simulações, R$ 62,19.
+- Últimos 7 dias (20 a 26/11): 94 cliques, 23 simulações, R$ 373, R$ 16 por simulação, CTR 8%, CPC médio R$ 3,97. Melhor que os R$ 20 da semana anterior.
+
+**Clarity, últimos 2 dias (25 e 26/11)**
+- 31 sessões reais (7 robôs). 23 do Google, 2 do Instagram. Rolagem média 9%, 59 s ativos.
+- Funil: 13 começaram, 12 passaram a etapa 1, 12 passaram o tamanho, 7 enviaram. Maior queda: de novo a etapa do contato (5 de 12 não enviaram).
+- Desempenho: LCP 1,9 s (bom), CLS 0 (bom), INP 260 ms (precisa melhorar). 0 erros de JavaScript.
+- Cliques mortos em 6 sessões (19%).
+
+**Gravações de quem parou no contato (depois da análise 5)**
+- 25/11 17h44, PC, Pessoa Jurídica: passou as 2 etapas em 53 s e saiu 3 s depois de ver o pedido de contato.
+- 25/11 18h46, celular: preencheu nome e WhatsApp, tocou logo acima do botão "Ver o resultado da minha obra" e saiu sem enviar.
+- 26/11 8h36, PC: preencheu nome e WhatsApp e saiu sem enviar. Na tela dele, o botão "Ver o resultado" ficava abaixo da dobra (era preciso rolar para ver).
+- Conferido no código: o envio não tem como falhar sem aviso (o lead é salvo antes de qualquer chamada externa). Então não é erro, é gente que não apertou o botão.
+
+**Sugestões**
+- Contato: botão "Ver o resultado" sempre visível (fixo embaixo no celular / subir o formulário no PC).
+- Se a pessoa preencheu nome e WhatsApp e não enviou, salvar mesmo assim como "lead incompleto" para a Lia chamar (avisar na tela).
+- Melhorar o INP (resposta ao toque) da calculadora.
+- Gestor: custo por simulação caiu para ~R$ 16 na semana; manter a reavaliação de orçamento em 02/12.
