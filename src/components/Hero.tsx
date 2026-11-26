@@ -10,8 +10,9 @@ export function Hero() {
   // Depois do cálculo o resultado é largo: o cartão passa a ocupar a linha inteira.
   const [temResultado, setTemResultado] = useState(false);
 
+  // overflow-clip (e não hidden) para o botão "Ver o resultado" poder ficar grudado no rodapé da tela no celular.
   return (
-    <section id="inicio" className="relative overflow-hidden bg-navy-950 pb-24 pt-10 sm:pb-32 sm:pt-14">
+    <section id="inicio" className="relative overflow-hidden supports-[overflow:clip]:overflow-clip bg-navy-950 pb-24 pt-10 sm:pb-32 sm:pt-14">
       <div
         className="pointer-events-none absolute inset-0 opacity-40"
         style={{

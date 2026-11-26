@@ -52,6 +52,30 @@ export function Calculator({ embedded = false, onResultChange }: CalculatorProps
   }, [enviado, onResultChange]);
 
   const cartaoRef = useRef<HTMLDivElement>(null);
+  const formContatoRef = useRef<HTMLFormElement>(null);
+  const botaoEnviarRef = useRef<HTMLButtonElement>(null);
+
+  // Ao chegar no último passo, rola a tela para mostrar o formulário de contato inteiro (com o botão de enviar).
+  // Só rola se o botão estiver fora da tela, para não "pular" à toa.
+  useEffect(() => {
+    if (step !== 3 || enviado) return;
+    const id = window.setTimeout(() => {
+      const form = formContatoRef.current;
+      const botao = botaoEnviarRef.current;
+      if (!form || !botao) return;
+      const b = botao.getBoundingClientRect();
+      const alturaTela = window.innerHeight;
+      if (b.top >= 0 && b.bottom <= alturaTela) return;
+      const f = form.getBoundingClientRect();
+      const cabecalho = 88; // menu fixo no topo
+      const alvo =
+        f.height + cabecalho <= alturaTela
+          ? window.scrollY + f.top - cabecalho // cabe tudo: mostra do título "Último passo" até o botão
+          : window.scrollY + b.bottom - alturaTela + 16; // não cabe: garante pelo menos o botão
+      window.scrollTo({ top: Math.max(0, alvo), behavior: 'smooth' });
+    }, 60);
+    return () => window.clearTimeout(id);
+  }, [step, enviado]);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -122,17 +146,25 @@ export function Calculator({ embedded = false, onResultChange }: CalculatorProps
       )}
 
       {!enviado && step === 3 && (
-        <form onSubmit={handleSubmit} noValidate>
+        <form ref={formContatoRef} onSubmit={handleSubmit} noValidate>
           <LeadForm data={data} errors={errors} onChange={updateField} />
-          <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-            <button type="button" onClick={goBack} className="btn-outline" disabled={isSubmitting}>
-              Voltar
-            </button>
-            <button type="submit" className="btn-primary" disabled={isSubmitting}>
+          {/*
+            O botão de enviar precisa estar SEMPRE na tela: o Clarity mostrou gente preenchendo nome e WhatsApp e
+            indo embora sem apertar (no PC o botão ficava abaixo da dobra; no celular, escondido pelo teclado).
+            No celular ele fica "grudado" no rodapé da tela enquanto o formulário estiver visível (com espaço à
+            direita para não ficar embaixo do botão flutuante do WhatsApp). No PC volta ao normal.
+          */}
+          <div className="sticky bottom-0 z-30 -mx-5 mt-6 border-t border-navy-100 bg-white py-3 pl-5 pr-16 sm:static sm:mx-0 sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0">
+            <button ref={botaoEnviarRef} type="submit" className="btn-primary w-full" disabled={isSubmitting}>
               {isSubmitting ? 'Enviando...' : 'Ver o resultado da minha obra'}
             </button>
           </div>
-          <p className="mt-3 text-center text-xs text-navy-400 sm:text-right">Sem custo e sem compromisso.</p>
+          <div className="mt-3 flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+            <button type="button" onClick={goBack} className="btn-outline w-full sm:w-auto" disabled={isSubmitting}>
+              Voltar
+            </button>
+            <p className="text-center text-xs text-navy-400 sm:text-right">Sem custo e sem compromisso.</p>
+          </div>
         </form>
       )}
 
