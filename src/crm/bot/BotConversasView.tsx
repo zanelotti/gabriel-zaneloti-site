@@ -220,6 +220,18 @@ function ConversaChat({ conversa, lead, nome, onChange, onApagada }: ConversaCha
     }
   };
 
+  const devolver = async () => {
+    const esperando = mensagens.length > 0 && mensagens[mensagens.length - 1].direcao === 'lead';
+    if (await executar('devolver')) {
+      setAviso({
+        tipo: 'ok',
+        texto: esperando
+          ? 'Conversa devolvida. A Lia está lendo a conversa toda (inclusive o que você escreveu) e responde o cliente em instantes.'
+          : 'Conversa devolvida. A Lia continua quando o cliente responder.',
+      });
+    }
+  };
+
   const apagar = async () => {
     setApagando(true);
     setAviso(null);
@@ -262,7 +274,7 @@ function ConversaChat({ conversa, lead, nome, onChange, onApagada }: ConversaCha
             </button>
           ) : (
             conversa.estado !== 'optout' && (
-              <button onClick={() => void executar('devolver')} disabled={enviando} className="rounded-full bg-accent-500 px-4 py-1.5 text-xs font-semibold text-navy-950 hover:bg-accent-400 disabled:opacity-60">
+              <button onClick={() => void devolver()} disabled={enviando} className="rounded-full bg-accent-500 px-4 py-1.5 text-xs font-semibold text-navy-950 hover:bg-accent-400 disabled:opacity-60">
                 Devolver ao bot
               </button>
             )

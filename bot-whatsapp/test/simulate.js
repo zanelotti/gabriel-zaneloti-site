@@ -3199,4 +3199,33 @@ await teste('clientes para agir: resposta da Claude e horário do e-mail', async
   assert.equal(horaDoResumo(new Date('2026-11-26T11:05:00Z'), '2026-11-26'), false, 'já saiu hoje');
 });
 
+await teste('devolver ao bot: a Lia lê o que o Gabriel escreveu e responde sozinha o cliente que ficou esperando', async () => {
+  const ctx = montar({ roteiro: [texto('Funciona assim: o Gabriel cuida de tudo, do CNO até a CND. Posso te mostrar o investimento?')] });
+  const c = await abrir(ctx, lead());
+  const painel = criarPainel({ store: ctx.store, wa: ctx.wa, bot: ctx.bot, config: ctx.config, conhecimento: { texto: '', valores: [] }, log: silencioso, controle: criarControleDePausa({ ...ctx.config, ativo: true, arquivoParar: 'x.txt' }) });
+  const novo = (o) => ctx.store.comandos.push({ id: ctx.store.comandos.length + 1, status: 'pendente', criado_em: new Date().toISOString(), conversa_id: c.id, ...o });
+  novo({ tipo: 'enviar', texto: 'Gostaria de prosseguir com a regularização da sua obra?' });
+  await painel.processarComandos();
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'Boa tarde! Como funciona o seu serviço e quando custa?' });
+  const antes = ctx.wa.enviados.length;
+  assert.equal(antes, ctx.wa.enviados.length, 'com o Gabriel, a Lia fica calada');
+  novo({ tipo: 'devolver' });
+  await painel.processarComandos();
+  await new Promise((r) => setTimeout(r, 2000)); // responde sozinha, sem ninguém chamar responder()
+  ctx.bot.pararTimers();
+  assert.equal(ctx.wa.enviados.length, antes + 1, 'respondeu o cliente sozinha depois de devolver');
+  const msgs = ctx.client.chamadas.at(-1).messages;
+  const tudo = JSON.stringify(msgs);
+  assert.match(tudo, /\(Mensagem do Gabriel:\) Gostaria de prosseguir/, 'a Lia sabe o que o Gabriel escreveu');
+  assert.match(tudo, /Ele devolveu a conversa para você/);
+});
+
+await teste('"quando custa" (com D) é pergunta de preço; "Zaneloti" sozinho é bloqueado', () => {
+  assert.equal(leadPerguntouPreco('Boa tarde! Como funciona o seu serviço e quando custa?'), true);
+  assert.equal(leadPerguntouPreco('quando você começa?'), false);
+  assert.equal(validarSaida('O Zaneloti já economizou R$ 1,09 milhão em INSS de obra.', {}, [1090000]).ok, false);
+  assert.equal(validarSaida('Aqui é a Lia, assistente do Gabriel Zaneloti.', {}).ok, true);
+  assert.equal(validarSaida('(Mensagem do Gabriel:) oi', {}).ok, false);
+});
+
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

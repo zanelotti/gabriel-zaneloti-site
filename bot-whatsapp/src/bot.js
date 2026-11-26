@@ -830,7 +830,10 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     }
     emAndamento.add(conversaId);
     try {
-      if (parado()) return;
+      if (parado()) {
+        log.info(`[bot] não respondi a conversa ${conversaId}: a Lia está parada agora (respondo quando ela voltar).`);
+        return;
+      }
       let conversa = await store.conversaPorId(conversaId);
       if (!conversa || conversa.estado !== 'ativa') return;
       if (!(await abaixoDoTeto())) {
@@ -952,12 +955,24 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     await store.setEstado(conversaId, 'humano', observacao);
   }
 
+  /**
+   * "Devolver ao bot" (CRM): a Lia volta a cuidar da conversa. Se a última mensagem é do lead (ficou sem resposta),
+   * ela lê a conversa toda, inclusive o que o Gabriel escreveu, e responde na hora, sem esperar o lead escrever de novo.
+   * Retorna true quando vai responder agora.
+   */
   async function devolver(conversaId) {
     await store.setEstado(conversaId, 'ativa', null);
+    falhasResposta.delete(conversaId);
+    avisosEspera.delete(conversaId);
     const historico = await store.historico(conversaId);
     const ultima = historico[historico.length - 1];
-    // Se o lead ficou sem resposta, o bot retoma de onde parou.
-    if (ultima && ultima.direcao === 'lead') agendarResposta(conversaId, 3000);
+    if (ultima && ultima.direcao === 'lead') {
+      log.info(`[bot] conversa ${conversaId} devolvida para a Lia: o cliente estava esperando resposta, respondendo agora.`);
+      agendarResposta(conversaId, 1500);
+      return true;
+    }
+    log.info(`[bot] conversa ${conversaId} devolvida para a Lia: a última mensagem não é do cliente, ela espera ele responder.`);
+    return false;
   }
 
   async function enviarComoGabriel(conversa, texto) {

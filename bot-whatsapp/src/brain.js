@@ -143,6 +143,9 @@ const TEXTO_PADRAO = {
   encerrar: 'Tudo bem! Obrigado pelo seu tempo. Se mudar de ideia ou surgir alguma dúvida, é só me chamar por aqui.',
 };
 
+/** Marca das mensagens escritas pelo próprio Gabriel no histórico enviado ao Claude (nunca vai para o lead). */
+export const MARCA_GABRIEL = '(Mensagem do Gabriel:)';
+
 /** Converte o histórico do banco em mensagens da API (alternando user/assistant, começando por user). */
 export function montarHistorico(historico) {
   const base = [
@@ -152,17 +155,32 @@ export function montarHistorico(historico) {
         '[Nota do sistema: o lead acabou de preencher a calculadora do site. A primeira mensagem abaixo já foi enviada por você. Continue a conversa a partir das mensagens do lead.]',
     },
   ];
+  // Mensagens que o próprio Gabriel escreveu (pelo CRM ou pelo celular) entram marcadas, para a assistente saber o que ELE disse.
+  let temGabriel = false;
   for (const m of historico) {
     const role = m.direcao === 'lead' ? 'user' : 'assistant';
+    let texto = m.texto;
+    if (m.direcao === 'humano') {
+      temGabriel = true;
+      texto = `${MARCA_GABRIEL} ${m.texto}`;
+    }
     const ultimo = base[base.length - 1];
     if (ultimo.role === role && typeof ultimo.content === 'string') {
-      ultimo.content += `\n\n${m.texto}`;
+      ultimo.content += `\n\n${texto}`;
     } else {
-      base.push({ role, content: m.texto });
+      base.push({ role, content: texto });
     }
   }
   if (base[base.length - 1].role !== 'user') {
     base.push({ role: 'user', content: '[Nota do sistema: continue a conversa de forma natural.]' });
+  }
+  if (temGabriel) {
+    const ultima = base[base.length - 1];
+    ultima.content +=
+      `\n\n[Nota do sistema: as mensagens que começam com ${MARCA_GABRIEL} foram escritas pelo próprio Gabriel, pessoalmente. ` +
+      'Ele devolveu a conversa para você. Leia a conversa toda e continue de onde parou, coerente com o que o Gabriel disse: ' +
+      'responda direto a última mensagem da pessoa, sem se reapresentar, sem repetir o que já foi dito e sem contradizer o Gabriel. ' +
+      `Fale dele na terceira pessoa ("o Gabriel", "ele"). Nunca escreva ${MARCA_GABRIEL} na sua resposta.]`;
   }
   return base;
 }

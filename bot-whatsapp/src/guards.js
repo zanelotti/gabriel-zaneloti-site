@@ -22,6 +22,9 @@ export function pediuParar(texto) {
 
 // Palavras e promessas que o Gabriel NÃO quer em texto enviado a lead.
 const PROIBIDAS = [
+  // O Gabriel é SEMPRE "Gabriel" (pedido dele, 26/11). Nunca só o sobrenome. "Gabriel Zaneloti" junto pode.
+  [/(?<!gabriel\s{1,3})\bzan+el+ot+i\b/i, 'o sobrenome "Zaneloti" sozinho (chame-o sempre de "Gabriel"; para não repetir o nome, use "ele" ou "nós")'],
+  [/mensagem do gabriel:/i, 'a marca interna "(Mensagem do Gabriel:)" (ela é só do histórico; escreva só a sua resposta)'],
   [/\b(legal|legais|legalmente|ilegal|ilegais)\b/i, 'palavra "legal"'],
   // "pessoa jurídica" é o termo correto para empresa e pode; o que fica proibido é "jurídico/jurídica" em outro sentido (assessoria jurídica etc.).
   [/(?<!pessoas?\s)\bjur[ií]dic[oa]s?\b/i, 'palavra "jurídico/jurídica" fora de "pessoa jurídica"'],
@@ -163,7 +166,7 @@ export function leadPerguntouPreco(texto) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
-  return /(honorari|quanto (voce|vc|ele|o gabriel|vcs|voces)?\s*(cobra|cobram|custa|fica|e que|sai)|quanto (e|eh|custa|fica|sai|seria)|\bcusto\b|\bcustos\b|\bcustar\b|\bpreco|valor do (servico|trabalho|honorario)|qual (e )?o valor|cobranca|\bcobra|\bcobram|\bpagar (pra|para) (voce|vc|ele|o gabriel)|percentual|\bporcentagem|comissao|\btaxa\b|mensalidade|\bcaro\b|\bbarato\b|desconto)/.test(t);
+  return /(honorari|quanto (voce|vc|ele|o gabriel|vcs|voces)?\s*(cobra|cobram|custa|fica|e que|sai)|quanto (e|eh|custa|fica|sai|seria)|\bquando (custa|cobra|fica|sai|e o (servico|honorario|investimento))|\bquanto\b[^?.!\n]{0,30}\b(servico|trabalho|honorario|investimento)|\bcusto\b|\bcustos\b|\bcustar\b|\bpreco|valor do (servico|trabalho|honorario)|qual (e )?o valor|cobranca|\bcobra|\bcobram|\bpagar (pra|para) (voce|vc|ele|o gabriel)|percentual|\bporcentagem|comissao|\btaxa\b|mensalidade|\bcaro\b|\bbarato\b|desconto)/.test(t);
 }
 
 /**
@@ -272,8 +275,8 @@ export function repeticaoExcessiva(texto, historico = [], nomes = []) {
 
   if (contem(t, 'gabriel')) {
     const recentes = ultimas.filter((m) => contem(m, 'gabriel')).length;
-    if (ocorrencias(t, 'gabriel') > 1) motivos.push('cita "o Gabriel" mais de uma vez na mesma resposta (use "ele" ou reescreva sem o nome)');
-    else if (recentes >= 2) motivos.push('cita "o Gabriel" de novo, e o nome dele já aparece em quase todas as últimas mensagens (diga "ele", "nós", ou só a ação, sem repetir o nome)');
+    if (ocorrencias(t, 'gabriel') > 1) motivos.push('cita "o Gabriel" mais de uma vez na mesma resposta (use "ele" ou reescreva sem o nome; NUNCA troque por "Zaneloti")');
+    else if (recentes >= 2) motivos.push('cita "o Gabriel" de novo, e o nome dele já aparece em quase todas as últimas mensagens (diga "ele", "nós", ou só a ação, sem repetir o nome; NUNCA troque por "Zaneloti")');
   }
 
   const inicio = palavras(t).slice(0, 2).join(' ');

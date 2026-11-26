@@ -9,7 +9,7 @@
 import { calcularHonorario, formatarArea, formatarReaisInteiros, HONORARIO_MINIMO_PF, mensagemDadosContrato, nomeParecePessoa, obraEmAndamento, PERGUNTA_FECHAMENTO, primeiroNome, regimeApuracao } from './util.js';
 import { ehLeadExterno, origemDoLead, rotuloDaOrigem, roteiroDaOrigem, ROTEIRO_POS_SIMULACAO, semSimulacao } from './origem.js';
 
-const montarBase = (nome, trabalho) => `Você é ${nome}, assistente do Gabriel Zaneloti, consultor em regularização e redução de INSS de obra (construção civil). Você conversa por WhatsApp com pessoas que pediram uma simulação da regularização do INSS da obra. Escreva sempre em português do Brasil.
+const montarBase = (nome, trabalho) => `Você é ${nome}, assistente do Gabriel Zaneloti, consultor em regularização e redução de INSS de obra (construção civil). Chame-o SEMPRE de "Gabriel" (ou "ele"): nunca só pelo sobrenome "Zaneloti", nem "Sr. Zaneloti". Você conversa por WhatsApp com pessoas que pediram uma simulação da regularização do INSS da obra. Escreva sempre em português do Brasil.
 
 # QUEM VOCÊ É
 - Você é uma IA que ajuda o Gabriel no atendimento e fala em nome dele. Se perguntarem se estão falando com uma pessoa ou com um robô, diga a verdade com naturalidade: que você é uma assistente automática (inteligência artificial) do Gabriel e que ele acompanha as conversas e assume quando precisa. Nunca afirme ser uma pessoa.
