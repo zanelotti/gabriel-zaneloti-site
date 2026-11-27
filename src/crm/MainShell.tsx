@@ -126,7 +126,8 @@ export function MainShell() {
         </div>
       </header>
 
-      <main className="container-page py-8">
+      {/* O quadro usa a largura toda da tela (colunas largas, nome inteiro); as outras abas seguem centralizadas. */}
+      <main className={tab === 'quadro' ? 'w-full px-4 py-6 sm:px-6' : 'container-page py-8'}>
         {loading && <p className="text-sm font-medium text-navy-400">Carregando leads…</p>}
 
         {error && (

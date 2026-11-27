@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DragEvent } from 'react';
 import type { Lead, LeadStatus } from '@/types/lead';
 import { LEAD_STATUS_LABEL, LEAD_STATUS_ORDER } from '@/types/lead';
@@ -31,6 +31,25 @@ function loadCollapsedColumns(): Partial<Record<LeadStatus, boolean>> {
   }
 }
 
+/** Tira acentos e deixa minúsculo, pra "joao" achar "João". */
+function normalizarTexto(texto: string): string {
+  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+/**
+ * Diz se o lead bate com o que foi digitado na pesquisa.
+ * Nome: sem acento, qualquer parte do nome. Telefone: compara só os números,
+ * então "99734", "(21) 99734" e "21997341731" acham o mesmo lead.
+ */
+function leadBateComPesquisa(lead: Lead, pesquisa: string): boolean {
+  const termo = normalizarTexto(pesquisa);
+  if (!termo) return true;
+  if (normalizarTexto(lead.nome || '').includes(termo)) return true;
+  const digitos = pesquisa.replace(/\D/g, '');
+  if (digitos.length >= 3 && (lead.whatsapp || '').replace(/\D/g, '').includes(digitos)) return true;
+  return false;
+}
+
 /**
  * Quadro estilo Trello: cada lead é arrastável (Drag and Drop nativo do
  * navegador, sem depender de nenhuma biblioteca externa) entre as colunas do
@@ -47,6 +66,8 @@ export function BoardView({ leads, onChange }: BoardViewProps) {
   // Colunas recolhidas (cards escondidos) — carregado do localStorage, pra
   // lembrar a preferência entre acessos neste mesmo navegador.
   const [collapsedColumns, setCollapsedColumns] = useState<Partial<Record<LeadStatus, boolean>>>(loadCollapsedColumns);
+  const [pesquisa, setPesquisa] = useState('');
+  const pesquisando = pesquisa.trim().length > 0;
 
   useEffect(() => {
     try {
@@ -77,10 +98,17 @@ export function BoardView({ leads, onChange }: BoardViewProps) {
     });
   }, [leads]);
 
+  const leadsVisiveis = useMemo(
+    () => (pesquisando ? leads.filter((lead) => leadBateComPesquisa(lead, pesquisa)) : leads),
+    [leads, pesquisa, pesquisando],
+  );
+
   const columns = LEAD_STATUS_ORDER.map((status) => ({
     status,
-    leads: leads.filter((lead) => (pendingMoves[lead.id] ?? lead.status ?? 'novo') === status),
-  }));
+    leads: leadsVisiveis.filter((lead) => (pendingMoves[lead.id] ?? lead.status ?? 'novo') === status),
+  }))
+    // Pesquisando, só aparecem as colunas que têm resultado (os achados ficam juntos, sem rolar a tela).
+    .filter((column) => !pesquisando || column.leads.length > 0);
 
   const handleDragStart = (lead: Lead) => (event: DragEvent<HTMLButtonElement>) => {
     event.dataTransfer.effectAllowed = 'move';
@@ -125,11 +153,61 @@ export function BoardView({ leads, onChange }: BoardViewProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8">
+      {/* Barra de pesquisa: acha o lead pelo nome ou pelo telefone, em todas as colunas. */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <label className="relative w-full max-w-md">
+          <span className="sr-only">Pesquisar lead</span>
+          <svg
+            viewBox="0 0 20 20"
+            fill="none"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-400"
+            aria-hidden="true"
+          >
+            <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth={2} />
+            <path d="M14 14l4 4" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+          </svg>
+          <input
+            type="text"
+            inputMode="search"
+            autoComplete="off"
+            value={pesquisa}
+            onChange={(event) => setPesquisa(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setPesquisa('');
+            }}
+            placeholder="Pesquisar por nome ou telefone"
+            className="w-full rounded-full border border-navy-200 bg-white py-2.5 pl-10 pr-10 text-sm text-navy-900 shadow-soft placeholder:text-navy-400 focus:border-navy-400 focus:outline-none"
+          />
+          {pesquisando && (
+            <button
+              type="button"
+              onClick={() => setPesquisa('')}
+              aria-label="Limpar pesquisa"
+              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-navy-400 hover:bg-navy-100 hover:text-navy-700"
+            >
+              ✕
+            </button>
+          )}
+        </label>
+        {pesquisando && (
+          <p className="text-sm font-medium text-navy-500">
+            {leadsVisiveis.length === 0
+              ? 'Nenhum lead encontrado'
+              : `${leadsVisiveis.length} lead${leadsVisiveis.length > 1 ? 's' : ''} encontrado${leadsVisiveis.length > 1 ? 's' : ''}`}
+          </p>
+        )}
+      </div>
+
+      {/* Colunas largas lado a lado; se não couberem na tela, o quadro rola para o lado. */}
+      <div className="flex gap-3 overflow-x-auto pb-4">
         {columns.map(({ status, leads: columnLeads }) => {
-          const isCollapsed = Boolean(collapsedColumns[status]);
+          // Pesquisando, as colunas recolhidas abrem sozinhas pra mostrar o que foi achado.
+          const isCollapsed = Boolean(collapsedColumns[status]) && !pesquisando;
           return (
-            <div key={status} className="flex min-w-0 flex-col">
+            <div
+              key={status}
+              className={`flex shrink-0 flex-col ${isCollapsed ? 'w-44' : 'w-[260px] min-w-[260px] max-w-[340px] flex-1'}`}
+            >
               <button
                 type="button"
                 onClick={() => toggleColumn(status)}
@@ -137,7 +215,7 @@ export function BoardView({ leads, onChange }: BoardViewProps) {
                 className={`flex w-full items-center gap-2 rounded-full px-3 py-1 text-left transition-colors ${STATUS_STYLES[status].bg}`}
               >
                 <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_STYLES[status].dot}`} />
-                <p className={`truncate text-xs font-bold uppercase tracking-wide ${STATUS_STYLES[status].text}`}>
+                <p className={`min-w-0 truncate text-xs font-bold uppercase tracking-wide ${STATUS_STYLES[status].text}`}>
                   {LEAD_STATUS_LABEL[status]}
                 </p>
                 <span className="ml-auto shrink-0 text-xs font-bold text-navy-400">{columnLeads.length}</span>
@@ -188,7 +266,7 @@ export function BoardView({ leads, onChange }: BoardViewProps) {
                   <>
                     {columnLeads.length === 0 && (
                       <p className="rounded-xl border border-dashed border-navy-200 p-3 text-center text-xs text-navy-300">
-                        Nenhum lead aqui
+                        {pesquisando ? 'Nada aqui' : 'Nenhum lead aqui'}
                       </p>
                     )}
                     {columnLeads.map((lead) => (

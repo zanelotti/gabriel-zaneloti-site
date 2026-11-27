@@ -36,21 +36,20 @@ export function LeadCard({ lead, onClick, onDragStart, onDragEnd, isDragging }: 
         isDragging ? 'opacity-40' : ''
       }`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <p className="truncate text-sm font-semibold text-navy-900" title={lead.nome || 'Sem nome'}>
+      {/* Nome inteiro (quebra em quantas linhas precisar): antes ficava cortado com "..." e não dava pra achar a pessoa. */}
+      <div className="flex items-start justify-between gap-2">
+        <p className="min-w-0 break-words text-sm font-semibold leading-snug text-navy-900">
           {lead.nome || 'Sem nome'}
         </p>
-        <span className="shrink-0 text-[11px] font-medium text-navy-400">{timeAgo(lead.createdAt)}</span>
+        <span className="mt-0.5 shrink-0 whitespace-nowrap text-[11px] font-medium text-navy-400">{timeAgo(lead.createdAt)}</span>
       </div>
 
-      <p className="mt-1 truncate text-xs text-navy-500" title={detalhes ? `${lead.whatsapp} · ${detalhes}` : lead.whatsapp}>
-        <span>{lead.whatsapp || 'Sem WhatsApp'}</span>
-        {detalhes && <span className="capitalize text-navy-400"> · {detalhes}</span>}
-      </p>
+      <p className="mt-1 whitespace-nowrap text-xs tabular-nums text-navy-500">{lead.whatsapp || 'Sem WhatsApp'}</p>
+      {detalhes && <p className="mt-0.5 break-words text-[11px] capitalize text-navy-400">{detalhes}</p>}
 
       {lead.economiaEstimada !== null && (
-        // Nome em cima e valor embaixo: nas colunas estreitas do quadro, lado a lado o valor era cortado.
-        <dl className="mt-2 grid grid-cols-1 gap-1">
+        // Colunas agora são largas: economia e honorário cabem lado a lado.
+        <dl className="mt-2 grid grid-cols-2 gap-2 border-t border-navy-50 pt-2">
           <div className="min-w-0">
             <dt className="text-[10px] uppercase tracking-wide text-navy-400">Economia</dt>
             <dd className="whitespace-nowrap text-xs font-bold tabular-nums text-accent-600">{formatCurrency(lead.economiaEstimada)}</dd>
