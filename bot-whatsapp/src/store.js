@@ -353,12 +353,12 @@ export function criarStore({ url, key }) {
     },
 
     /** Atualiza o funil do CRM (só avança; nunca mexe em leads fechados, perdidos ou movidos à mão pelo Gabriel — ver funil.js). */
-    async atualizarLead(leadId, { status, nota, motivoPerda, regredirDe }) {
+    async atualizarLead(leadId, { status, nota, motivoPerda, regredirDe, recusa }) {
       const atual = checar(await db.from('leads').select('*').eq('id', leadId).maybeSingle(), 'ler lead');
       if (!atual) return;
       const patch = {};
       // Card que o Gabriel mudou de coluna à mão: a Lia só deixa a nota, nunca muda a coluna (ver podeMudarCard em funil.js).
-      if (status && podeMudarCard(atual, status, regredirDe)) {
+      if (status && podeMudarCard(atual, status, regredirDe, { recusa })) {
         patch.status = status;
         // Só preenche o motivo da perda se o card realmente foi para "perdido", o Gabriel ainda não escolheu um
         // e a coluna já existe no banco (se ainda não rodou o SQL, o card vai para "perdido" do mesmo jeito).

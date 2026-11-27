@@ -35,11 +35,15 @@ export function movidoAMao(lead) {
 }
 
 /**
- * A Lia pode mudar este card para a coluna `novo`? Nunca se o Gabriel já o moveu à mão. `regredirDe`: exceção controlada
+ * A Lia pode mudar este card para a coluna `novo`? Não se o Gabriel já o moveu à mão (salvo `recusa`, abaixo). `regredirDe`: exceção controlada
  * (volta uma coluna só se o card ainda está exatamente nela, ex.: "agendado" -> "contatado" quando o lead falta à consultoria).
  */
-export function podeMudarCard(lead, novo, regredirDe) {
-  if (!novo || movidoAMao(lead)) return false;
+export function podeMudarCard(lead, novo, regredirDe, { recusa = false } = {}) {
+  if (!novo) return false;
+  // Exceção (pedido do Gabriel, 27/11/2026): a conversa terminou com o cliente dizendo que NÃO vai fechar.
+  // Aí o card vai para Perdido mesmo que o Gabriel o tenha movido à mão (só não sai de Fechado).
+  if (recusa && novo === 'perdido') return !STATUS_PROTEGIDOS.includes(lead?.status);
+  if (movidoAMao(lead)) return false;
   const atual = lead?.status;
   if (regredirDe && atual === regredirDe && novo !== atual) return true;
   return podeMover(atual, novo);

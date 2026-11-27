@@ -597,7 +597,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       cancelarTimer(conversa.id);
       await enviar(conversa, 'Tudo bem, não te envio mais mensagens. Obrigado pelo seu tempo!');
       await store.setEstado(conversa.id, 'optout', 'pediu para parar');
-      await store.atualizarLead(conversa.lead_id, { status: 'perdido', nota: 'Pediu para não receber mais mensagens.', motivoPerda: 'pediu_para_parar' });
+      await store.atualizarLead(conversa.lead_id, { status: 'perdido', nota: 'Pediu para não receber mais mensagens.', motivoPerda: 'pediu_para_parar', recusa: true });
       return;
     }
 
@@ -941,7 +941,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       } else if (acao?.tipo === 'encerrar') {
         await store.setEstado(conversaId, 'encerrada', acao.motivo);
         log.info(`[bot] conversa com ${conversa.telefone} encerrada: ${acao.motivo}`);
-        await store.atualizarLead(lead.id, { status: 'perdido', nota: `Conversa encerrada pelo bot: ${acao.motivo}`, motivoPerda: acao.motivo_perda || 'outro' });
+        // recusa: a conversa terminou com o cliente não querendo fechar; vai para Perdido mesmo se o Gabriel moveu o card à mão.
+        await store.atualizarLead(lead.id, { status: 'perdido', nota: `Conversa encerrada pelo bot: ${acao.motivo}`, motivoPerda: acao.motivo_perda || 'outro', recusa: true });
       }
     } finally {
       emAndamento.delete(conversaId);

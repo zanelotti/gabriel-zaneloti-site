@@ -141,10 +141,10 @@ function criarStoreMemoria() {
     async contarMensagensBot() {
       return mensagens.filter((m) => m.direcao === 'bot').length;
     },
-    async atualizarLead(id, { status, nota, motivoPerda, regredirDe }) {
+    async atualizarLead(id, { status, nota, motivoPerda, regredirDe, recusa }) {
       const l = leads.get(id);
       if (!l) return;
-      if (status && podeMudarCard(l, status, regredirDe)) {
+      if (status && podeMudarCard(l, status, regredirDe, { recusa })) {
         l.status = status;
         if (status === 'perdido' && motivoPerda && MOTIVOS_PERDA.includes(motivoPerda) && !l.motivo_perda) l.motivo_perda = motivoPerda;
       }
@@ -1866,7 +1866,7 @@ await teste('se o banco ainda não aceita o status "agendado", o agendamento nã
   assert.equal(ctx.store.agendou.length, 1);
 });
 
-await teste('card movido à mão pelo Gabriel no CRM: a Lia nunca mais muda a coluna (só deixa nota)', async () => {
+await teste('card movido à mão pelo Gabriel no CRM: a Lia não muda a coluna, salvo conversa encerrada com recusa (vai para Perdido)', async () => {
   const marcado = { status: 'decidindo', notas: 'cliente bom\n[Movido à mão 27/11] Decidindo' };
   assert.equal(movidoAMao(marcado), true);
   assert.equal(movidoAMao({ status: 'decidindo', notas: '[Bot WhatsApp 27/11] Passou para o Gabriel' }), false);
@@ -1878,9 +1878,15 @@ await teste('card movido à mão pelo Gabriel no CRM: a Lia nunca mais muda a co
   const l = lead({ status: 'proposta_enviada' });
   await abrir(ctx, l);
   Object.assign(ctx.store.leads.get(l.id), { status: 'proposta_enviada', notas: '[Movido à mão 27/11] Proposta enviada' });
-  await ctx.store.atualizarLead(l.id, { status: 'perdido', nota: 'Conversa encerrada pelo bot: recusou', motivoPerda: 'preco' });
-  assert.equal(ctx.store.leads.get(l.id).status, 'proposta_enviada');
-  assert.match(ctx.store.leads.get(l.id).notas, /recusou/, 'a nota fica registrada');
+  await ctx.store.atualizarLead(l.id, { status: 'perdido', nota: 'registrar_status no meio da conversa', motivoPerda: 'preco' });
+  assert.equal(ctx.store.leads.get(l.id).status, 'proposta_enviada', 'no meio da conversa não mexe');
+  assert.match(ctx.store.leads.get(l.id).notas, /meio da conversa/, 'a nota fica registrada');
+  // conversa terminou com o cliente dizendo que não vai fechar: vai para Perdido mesmo movido à mão (pedido do Gabriel)
+  await ctx.store.atualizarLead(l.id, { status: 'perdido', nota: 'Conversa encerrada pelo bot: recusou', motivoPerda: 'preco', recusa: true });
+  assert.equal(ctx.store.leads.get(l.id).status, 'perdido');
+  assert.equal(podeMudarCard(marcado, 'perdido', undefined, { recusa: true }), true);
+  assert.equal(podeMudarCard(marcado, 'contatado', undefined, { recusa: true }), false, 'a exceção vale só para Perdido');
+  assert.equal(podeMudarCard({ status: 'fechado', notas: '' }, 'perdido', undefined, { recusa: true }), false, 'Fechado nunca sai');
 });
 
 console.log('\nAcompanhamento, lembretes e avisos');
