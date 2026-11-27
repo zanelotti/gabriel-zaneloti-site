@@ -189,6 +189,47 @@ export function aceitouVerInvestimento(historico) {
   return /\b(sim|pode|podes|quero|manda|mande|claro|ok|okay|bora|vamos|beleza|blz|show|isso|por favor|pfv|pode ser|mostra|mostre|gostaria)\b/.test(r);
 }
 
+/**
+ * O bot ofereceu a lista de dados do contrato ("Posso te passar a lista de dados...?") e o lead aceitou na resposta seguinte?
+ * Nesse caso a lista sai na hora, direto pelo código (sem depender do modelo). Se o "sim" vier com uma pergunta junto,
+ * devolve false e o modelo responde (o prompt manda enviar a lista também).
+ */
+export function aceitouListaDeDados(historico) {
+  const h = Array.isArray(historico) ? historico : [];
+  let i = h.length - 1;
+  const respostas = [];
+  while (i >= 0 && h[i].direcao === 'lead') respostas.unshift(h[i--].texto || '');
+  const oferta = i >= 0 ? String(h[i].texto || '') : '';
+  if (!respostas.length || !/lista de dados|dados (do|para o) (seu )?contrato/i.test(oferta) || !/\?/.test(oferta)) return false;
+  if (jaTemListaDeDados(oferta)) return false;
+  const bruto = respostas.join(' ');
+  if (/\?/.test(bruto)) return false;
+  const r = bruto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (/\b(nao|depois|ainda|espera|aguarda|calma|amanha|semana|pensar|ver com|falar com)\b/.test(r)) return false;
+  return /\b(sim|pode|podes|quero|manda|mande|envia|envie|passa|passe|claro|ok|okay|bora|vamos|beleza|blz|show|isso|por favor|pfv|pf|pode ser|perfeito|certo|com certeza|aham|uhum|s)\b/.test(r) || /^\s*(👍|👌|✅|🙏)/u.test(bruto);
+}
+
+/** O texto já traz a lista de dados do contrato (itens com "•" de CPF/CNPJ)? */
+export function jaTemListaDeDados(texto) {
+  return /•\s*(CPF|CNPJ|Nome completo|Raz[aã]o social)/i.test(String(texto ?? ''));
+}
+
+/**
+ * A resposta fala em "mandar os dados" (para o contrato) mas não traz a lista? Foi o que aconteceu com a Ester em 27/11/2026:
+ * ela aceitou e a Lia respondeu só "Assim que você mandar os dados, encaminho para o Gabriel", sem a lista.
+ */
+export function prometeDadosSemLista(texto, historico = []) {
+  const t = String(texto ?? '');
+  if (jaTemListaDeDados(t)) return false;
+  // Só frases que PEDEM os dados ("assim que você mandar os dados", "me envie os dados"), não "recebi os dados".
+  if (!/assim que (voc[eê] )?(me )?(mandar|enviar|passar)|(me |pode )?(mande|envie|manda|envia|passa|passe)( pra mim| para mim| por aqui)? (os|seus) dados/i.test(t)) return false;
+  const doBot = (Array.isArray(historico) ? historico : []).filter((m) => m.direcao !== 'lead');
+  return !doBot.some((m) => jaTemListaDeDados(m.texto));
+}
+
 /** Pessoa física com economia estimada: tem números (INSS, redução, valor final) para o bot explicar antes de falar do honorário. */
 export function precisaExplicarNumeros(lead) {
   const h = calcularHonorario(lead);

@@ -23,6 +23,7 @@ const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
 const TRINTA_MIN = 30 * 60 * 1000;
 const MAX_ANEXOS = 4; // fotos/PDFs lidos por resposta (os mais recentes)
 const MSG_SO_TEXTO = 'Recebi o seu arquivo, mas por aqui eu consigo ler só texto. Consegue me escrever em poucas palavras?';
+export const MARCA_AUDIO = '[áudio transcrito] '; // a Lia sabe que veio de um áudio (a transcrição pode trocar alguma palavra)
 const ehMarcaDeMidia = (t) => /^\[o lead enviou [^\]]+\]$/.test(String(t || '').trim());
 const MARCA_ESPERA = 'ESPERA_GABRIEL: '; // guardada em observacao: a conversa segue 'ativa', mas já foi passada ao Gabriel
 
@@ -529,7 +530,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
     log.info(`[bot] boas-vindas enviadas a ${telefone} (origem: ${det.origem})`);
   }
 
-  async function aoReceber({ telefone, texto, tipo = 'texto', waId = null, jid = null, nome = null, anexo = null }) {
+  async function aoReceber({ telefone, texto, tipo = 'texto', waId = null, jid = null, nome = null, anexo = null, audio = false }) {
     let conversa = await store.conversaPorTelefone(telefone);
     // Conversa antiga já encerrada (ex.: teste anterior) e a pessoa voltou pelo botão do site: abre uma conversa nova.
     if (conversa && conversa.estado === 'encerrada' && tipo === 'texto' && detectarOrigemSite(texto)) conversa = null;
@@ -537,7 +538,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       // Só reage a quem veio de um botão do site; qualquer outro número desconhecido é ignorado (o bot nunca puxa assunto sozinho).
       if (abrindoPorSite.has(telefone)) {
         await abrindoPorSite.get(telefone);
-        return aoReceber({ telefone, texto, tipo, waId, jid, nome });
+        return aoReceber({ telefone, texto, tipo, waId, jid, nome, audio });
       }
       const tarefa = abrirPorSite({ telefone, jid, texto, tipo, nome, waId })
         .catch((e) => log.error(`[bot] erro ao abrir conversa pelo botão do site (${telefone}):`, e.message))
@@ -549,7 +550,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
 
     const rotuloAnexo = anexo ? (anexo.tipo === 'pdf' ? 'PDF' : 'imagem') : null;
     const conteudo = texto && texto.trim()
-      ? `${texto.trim()}${rotuloAnexo ? ` [com ${rotuloAnexo}]` : ''}`
+      ? `${audio ? MARCA_AUDIO : ''}${texto.trim()}${rotuloAnexo ? ` [com ${rotuloAnexo}]` : ''}`
       : `[o lead enviou ${rotuloAnexo || tipo}]`;
     await store.addMensagem({ conversa_id: conversa.id, direcao: 'lead', texto: conteudo, wa_id: waId });
     if (ehDocumentoDoLead(tipo) || anexo) await tratarDocumentoDoLead(conversa, rotuloAnexo || tipo);
@@ -592,7 +593,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       }
     }
 
-    if (tipo === 'texto' && pediuParar(conteudo)) {
+    if (tipo === 'texto' && pediuParar(audio ? texto : conteudo)) {
       cancelarTimer(conversa.id);
       await enviar(conversa, 'Tudo bem, não te envio mais mensagens. Obrigado pelo seu tempo!');
       await store.setEstado(conversa.id, 'optout', 'pediu para parar');

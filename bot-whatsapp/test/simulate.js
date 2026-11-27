@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { criarBot } from '../src/bot.js';
 import { aceitouVerInvestimento } from '../src/guards.js';
 import { criarCerebro, montarHistorico, anexarArquivos } from '../src/brain.js';
+import { aceitouListaDeDados, prometeDadosSemLista } from '../src/guards.js';
 import { dividirMensagens, extrairValoresReais, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, pediuParar, repeticaoExcessiva, validarSaida } from '../src/guards.js';
 import { montarAbertura } from '../src/opening.js';
 import { montarSistema } from '../src/prompt.js';
@@ -16,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { criarSite } from '../src/site.js';
 import { midiaLegivel } from '../src/whatsapp.js';
+import { limparTranscricao } from '../src/audio.js';
 import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel, dentroDoHorario, montarConhecimentoDeLinhas } from '../src/painel.js';
 import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAprendizado } from '../src/aprendizado.js';
 import { citouHonorarios, MOTIVOS_PERDA, podeMover } from '../src/funil.js';
@@ -767,6 +769,35 @@ await teste('arquivos do lead: um álbum de fotos gera UM pedido de texto (nunca
   ctx.bot.pararTimers();
   assert.equal(ctx.wa.enviados.length, antes + 1, 'o pedido de texto sai no máximo uma vez');
   assert.equal(ctx.client.chamadas.length, 0);
+});
+
+await teste('áudio transcrito: a Lia responde como texto, sabe que veio de áudio e não avisa "mídia que o bot não lê"', async () => {
+  const ctx = montar({ roteiro: [texto('Perfeito, obrigado por confirmar!')] });
+  const c = await abrir(ctx, lead());
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'Sim, está certo, a obra tem 120 metros', tipo: 'texto', audio: true });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  const guardada = ctx.store.mensagens.filter((m) => m.direcao === 'lead').pop();
+  assert.equal(guardada.texto, '[áudio transcrito] Sim, está certo, a obra tem 120 metros');
+  assert.equal(ctx.client.chamadas.length, 1);
+  assert.match(JSON.stringify(ctx.client.chamadas[0].messages), /\[áudio transcrito\] Sim, está certo/);
+  assert.match(ctx.client.chamadas[0].system, /ÁUDIOS:/);
+  assert.equal(ctx.avisos.filter((a) => a.tipo === 'Lead enviou mídia').length, 0);
+  assert.ok(!ctx.wa.enviados.some((e) => /só texto/.test(e.texto)));
+});
+
+await teste('áudio transcrito pedindo para parar: a Lia para', async () => {
+  const ctx = montar();
+  const c = await abrir(ctx, lead());
+  await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'Não quero mais receber mensagem.', tipo: 'texto', audio: true });
+  ctx.bot.pararTimers();
+  assert.equal(ctx.store.conversas[0].estado, 'optout');
+});
+
+await teste('limparTranscricao: descarta legenda fantasma do Whisper', () => {
+  assert.equal(limparTranscricao('  Legendas pela comunidade Amara.org '), '');
+  assert.equal(limparTranscricao('[Música]'), '');
+  assert.equal(limparTranscricao(' Bom dia,  Gabriel '), 'Bom dia, Gabriel');
 });
 
 await teste('falha do Claude: tenta de novo e, na 2ª vez, devolve a conversa ao Gabriel', async () => {
@@ -3226,6 +3257,52 @@ await teste('"quando custa" (com D) é pergunta de preço; "Zaneloti" sozinho é
   assert.equal(validarSaida('O Zaneloti já economizou R$ 1,09 milhão em INSS de obra.', {}, [1090000]).ok, false);
   assert.equal(validarSaida('Aqui é a Lia, assistente do Gabriel Zaneloti.', {}).ok, true);
   assert.equal(validarSaida('(Mensagem do Gabriel:) oi', {}).ok, false);
+});
+
+await teste('lista de dados: "Sim, por favor" depois da pergunta de fechamento manda a lista na hora (caso Ester, 27/11)', async () => {
+  const hist = [
+    { direcao: 'bot', texto: 'Oi, Ester! Ficou alguma dúvida sobre o que conversamos? Se quiser, continuo de onde paramos.' },
+    { direcao: 'lead', texto: 'Bom diia' },
+    { direcao: 'bot', texto: 'Bom dia! Posso te passar a lista de dados para já preparar o seu contrato?' },
+    { direcao: 'lead', texto: 'Sim, por favor' },
+  ];
+  const chamadas = [];
+  const client = { chamadas, messages: { async create(p) { chamadas.push(p); return { content: [{ type: 'text', text: 'Assim que você mandar os dados, encaminho para o Gabriel.' }], stop_reason: 'end_turn' }; } } };
+  const cerebro = criarCerebro({ modelo: 'teste', config, client });
+  const r = await cerebro.gerarResposta({ lead: lead(), historico: hist, ferramentas: {}, log: silencioso });
+  assert.deepEqual(r.mensagens, [mensagemDadosContrato(lead())]);
+  assert.match(r.mensagens[0], /• CPF/);
+  assert.equal(r.acao, null);
+  assert.equal(chamadas.length, 0, 'nem chama o modelo');
+  // respostas que contam como "sim"
+  for (const sim of ['sim', 'Pode', 'pode mandar', 'Manda sim', 'ok', 'Claro!', 'Por favor', 'quero', 'pode sim, obrigada', '👍']) {
+    assert.equal(aceitouListaDeDados([hist[2], { direcao: 'lead', texto: sim }]), true, sim);
+  }
+  // não é "sim": fica com o modelo
+  for (const nao of ['não', 'agora não', 'depois eu vejo', 'vou falar com meu marido', 'sim, mas quanto tempo demora?', 'amanhã']) {
+    assert.equal(aceitouListaDeDados([hist[2], { direcao: 'lead', texto: nao }]), false, nao);
+  }
+  assert.equal(aceitouListaDeDados([{ direcao: 'bot', texto: 'Posso te mostrar o investimento?' }, { direcao: 'lead', texto: 'sim' }]), false);
+});
+
+await teste('lista de dados: se o modelo pedir "os dados" sem a lista, a lista vai no lugar', async () => {
+  const hist = [
+    { direcao: 'bot', texto: 'Posso te passar a lista de dados para já preparar o seu contrato?' },
+    { direcao: 'lead', texto: 'sim, mas como é o pagamento?' },
+  ];
+  const client = { messages: { async create() { return { content: [{ type: 'text', text: 'É à vista ou 6x no cartão. Assim que você mandar os dados, encaminho para ele.' }], stop_reason: 'end_turn' }; } } };
+  const cerebro = criarCerebro({ modelo: 'teste', config, client });
+  const r = await cerebro.gerarResposta({ lead: lead(), historico: hist, ferramentas: {}, log: silencioso });
+  assert.match(r.mensagens.join('\n'), /• CPF/);
+  assert.equal(prometeDadosSemLista('Recebi os dados, obrigada!', hist), false);
+  assert.equal(prometeDadosSemLista('Me envie os dados por aqui.', [...hist, { direcao: 'bot', texto: mensagemDadosContrato(lead()) }]), false, 'lista já enviada antes');
+  // lista na resposta do modelo não é encurtada nem trocada por pedido de "variar"
+  const comLista = { content: [{ type: 'text', text: `Ótimo, Ana! ${mensagemDadosContrato(lead())}` }], stop_reason: 'end_turn' };
+  const chamadas = [];
+  const c2 = criarCerebro({ modelo: 'teste', config, client: { messages: { async create(p) { chamadas.push(p); return comLista; } } } });
+  const r2 = await c2.gerarResposta({ lead: lead(), historico: [{ direcao: 'bot', texto: 'Oi, Ana!' }, { direcao: 'lead', texto: 'quero contratar, o que precisa?' }], ferramentas: {}, log: silencioso });
+  assert.equal(chamadas.length, 1);
+  assert.match(r2.mensagens.join('\n'), /• CPF/);
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

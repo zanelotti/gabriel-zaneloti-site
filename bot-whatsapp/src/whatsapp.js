@@ -18,6 +18,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
+import { LIMITE_AUDIO, transcreverAudio } from './audio.js';
 import { aleatorio, dormir } from './util.js';
 
 const LIMITE_IMAGEM = 3.5 * 1024 * 1024; // a API do Claude aceita até ~5 MB por imagem (em base64)
@@ -116,7 +117,25 @@ export function criarWhatsApp({ pastaAuth = 'auth', log = console, modoTeste = f
         log.warn(`[whatsapp] não consegui baixar o arquivo de ${telefone}: ${e.message}`);
       }
     }
-    await aoReceber({ telefone, jid, texto, tipo, waId: key.id, nome: m.pushName || null, anexo });
+    // Áudio: transcreve no servidor e a Lia responde como se fosse texto (se falhar, segue como antes: avisa o Gabriel).
+    let textoFinal = texto;
+    let audio = false;
+    if (tipo === 'áudio' && sock) {
+      try {
+        const buf = await downloadMediaMessage(m, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage });
+        if (buf && buf.length > 0 && buf.length <= LIMITE_AUDIO) {
+          const transcrito = await transcreverAudio(buf, log);
+          if (transcrito) {
+            textoFinal = transcrito;
+            tipo = 'texto';
+            audio = true;
+          }
+        } else log.warn(`[whatsapp] áudio de ${telefone} grande demais para transcrever (${Math.round((buf?.length || 0) / 1024)} KB).`);
+      } catch (e) {
+        log.warn(`[whatsapp] não consegui transcrever o áudio de ${telefone}: ${e.message}`);
+      }
+    }
+    await aoReceber({ telefone, jid, texto: textoFinal, tipo, waId: key.id, nome: m.pushName || null, anexo, audio });
   }
 
   async function iniciar() {

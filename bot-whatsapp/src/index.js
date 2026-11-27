@@ -17,6 +17,7 @@ import { sincronizarTabelasDoSite } from './simulacao.js';
 import { criarStore } from './store.js';
 import { dormir } from './util.js';
 import { criarWhatsApp } from './whatsapp.js';
+import { prepararModelo } from './audio.js';
 
 // A biblioteca de criptografia do WhatsApp imprime blocos enormes ("Removing old closed session...", com chaves)
 // que enchiam o registro e escondiam as mensagens do bot. Esses avisos internos são descartados aqui.
@@ -63,6 +64,8 @@ try {
 }
 const aprendizadoIndice = { buscar: () => [], total: 0 }; // atualizado pelo painel a cada sincronização
 const cerebro = criarCerebro({ apiKey: config.anthropicKey, modelo: config.modelo, config, conhecimento, documentos, aprendizado: aprendizadoIndice });
+
+if (!config.modoTeste) prepararModelo(log); // baixa o modelo de transcrição de áudio na 1ª vez (em segundo plano)
 
 let bot;
 const wa = criarWhatsApp({

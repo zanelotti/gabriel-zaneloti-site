@@ -8,3 +8,5 @@ PARAR.txt
 documentos/*
 !documentos/_LEIA-ME.md
 cache/
+# Modelo de transcrição de áudio (baixado sozinho no servidor)
+modelos/

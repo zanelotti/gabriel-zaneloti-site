@@ -4,14 +4,14 @@
  * passou nas travas de conteúdo (guards.js).
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { aceitouVerInvestimento, citouNumerosDoCalculo, dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, precisaExplicarNumeros, repeticaoExcessiva, validarSaida } from './guards.js';
+import { aceitouListaDeDados, aceitouVerInvestimento, citouNumerosDoCalculo, jaTemListaDeDados, prometeDadosSemLista, dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, precisaExplicarNumeros, repeticaoExcessiva, validarSaida } from './guards.js';
 import { citouHonorarios } from './funil.js';
 import { formatarTrechos } from './documentos.js';
 import { MARCA_PDF } from './pdf-simulacao.js';
 import { formatarAprendidos } from './aprendizado.js';
 import { ehLeadExterno } from './origem.js';
 import { montarSistema } from './prompt.js';
-import { criarChamador, primeiroNome, primeiroNomePessoa } from './util.js';
+import { criarChamador, mensagemDadosContrato, primeiroNome, primeiroNomePessoa } from './util.js';
 
 export const FERRAMENTAS = [
   {
@@ -216,6 +216,12 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
    * @returns {Promise<{mensagens: string[], acao: null | {tipo: 'passar'|'encerrar', motivo: string, resumo?: string}}>}
    */
   async function gerarResposta({ lead, historico, ferramentas, log = console, espera = null, nomeContato = '', anexos = [] }) {
+    // A pessoa aceitou receber a lista de dados do contrato: manda a lista na hora, sem passar pelo modelo
+    // (em 27/11/2026 a Lia respondeu só "Assim que você mandar os dados..." e a lista não foi).
+    if (!anexos.length && aceitouListaDeDados(historico)) {
+      log.info?.('[cerebro] a pessoa aceitou a lista de dados do contrato; enviando a lista.');
+      return { mensagens: [mensagemDadosContrato(lead)], acao: null, uso: { entrada: 0, saida: 0 } };
+    }
     // Busca nos documentos grandes (normativa, manual) os trechos ligados ao que o lead disse por último.
     let trechos = { texto: '', valores: [] };
     if (documentos && documentos.total > 0) {
@@ -370,6 +376,13 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
         : validarSaida(texto, lead, valoresExtras);
       if (v.ok && precoPrematuro(texto)) v = { ok: false, motivo: MOTIVO_PRECO_CEDO };
       if (v.ok && numerosAntesDoPdf(texto)) v = { ok: false, motivo: MOTIVO_NUMEROS_SEM_PDF };
+      if (v.ok && prometeDadosSemLista(texto, historico)) {
+        // Falou em mandar os dados mas esqueceu a lista: a lista vai junto, como mensagem pronta.
+        log.warn('[cerebro] a resposta pede os dados do contrato sem a lista; enviando a lista.');
+        return { mensagens: [mensagemDadosContrato(lead)], acao, uso: consumo };
+      }
+      // A lista de dados é mensagem pronta: não pede para encurtar nem para variar (isso já fez a lista sumir).
+      if (v.ok && jaTemListaDeDados(texto)) return { mensagens: dividirMensagens(texto), acao, uso: consumo };
       if (v.ok && muitoLonga(texto) && !jaPediuResumo) {
         // Resposta correta mas comprida: pede UMA reescrita mais curta (não conta como bloqueio; se continuar longa, envia assim mesmo).
         jaPediuResumo = true;
