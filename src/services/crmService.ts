@@ -1,5 +1,9 @@
 import { supabase } from './supabaseClient';
 import type { Agendamento, AgendamentoStatus, GuiaLead, Lead, LeadStatus, MotivoPerda } from '@/types/lead';
+import { LEAD_STATUS_LABEL } from '@/types/lead';
+
+/** Início da marca que o CRM deixa nas anotações quando o Gabriel muda o card de coluna (o bot procura este mesmo texto). */
+export const MARCA_MOVIDO_A_MAO = '[Movido à mão';
 
 /**
  * ============================================================================
@@ -125,10 +129,23 @@ export const crmLeadService = {
     return (data as LeadRow[]).map(rowToLead);
   },
 
-  /** Atualiza o status (etapa do funil) de um lead. */
-  async updateStatus(id: string, status: LeadStatus): Promise<void> {
+  /**
+   * Muda o card de coluna pelo CRM (arrastando ou pela janela do lead). Deixa nas anotações a marca
+   * "[Movido à mão dd/mm] Coluna": a partir daí a Lia nunca mais muda esse card de coluna (pedido do Gabriel, 27/11/2026).
+   * `notasBase`: as anotações que a janela do lead vai salvar junto (evita uma gravação apagar a outra).
+   */
+  async updateStatus(id: string, status: LeadStatus, notasBase?: string): Promise<void> {
     const client = requireClient();
-    const { error } = await client.from('leads').update({ status }).eq('id', id);
+    let base = notasBase;
+    if (base === undefined) {
+      const { data, error: erroLeitura } = await client.from('leads').select('notas').eq('id', id).maybeSingle();
+      if (erroLeitura) throw erroLeitura;
+      base = (data?.notas as string | null) ?? '';
+    }
+    const dia = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }).format(new Date());
+    const marca = `${MARCA_MOVIDO_A_MAO} ${dia}] ${LEAD_STATUS_LABEL[status]}`;
+    const notas = base ? `${base}\n${marca}` : marca;
+    const { error } = await client.from('leads').update({ status, notas }).eq('id', id);
     if (error) throw error;
   },
 

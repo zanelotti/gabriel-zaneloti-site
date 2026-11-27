@@ -1,6 +1,6 @@
 /**
  * Mensagens automáticas do bot depois da abertura:
- *   - ACOMPANHAMENTO de quem parou de responder (24h, 3 dias e 7 dias);
+ *   - ACOMPANHAMENTO insistente de quem parou de responder (7 mensagens em ~6 semanas; ver ESPERA_FOLLOWUP_MS);
  *   - LEMBRETES da consultoria (24h antes e 1h antes);
  *   - PÓS-CONSULTORIA (quando o Gabriel marca "Realizado" na aba Agenda do CRM);
  *   - NÃO COMPARECEU (quando o Gabriel marca "Não compareceu"): oferece remarcar.
@@ -15,9 +15,20 @@ import { formatarReaisInteiros, primeiroNomePessoa } from './util.js';
 const HORA = 3600 * 1000;
 const FUSO = 'America/Sao_Paulo';
 
-/** Quanto tempo depois da ÚLTIMA mensagem do bot (sem resposta do lead) sai cada acompanhamento: ~1 dia, ~3 dias, ~7 dias. */
-export const ESPERA_FOLLOWUP_MS = [24 * HORA, 48 * HORA, 96 * HORA];
+/**
+ * Acompanhamento INSISTENTE (pedido do Gabriel, 27/11/2026): com leads em Novo, Contatado, Sem resposta, Proposta enviada e
+ * Decidindo, a Lia insiste até o lead fechar ou dizer que não vai fechar (aí o card vai para Perdido).
+ * Tempo depois da ÚLTIMA mensagem do bot sem resposta: 1, 2, 3, 4, 7, 10 e 14 dias
+ * (somando: dia 1, 3, 6, 10, 17, 27 e 41). A última pergunta é "você desistiu?" e depois disso ela para.
+ */
+const DIA = 24 * HORA;
+export const ESPERA_FOLLOWUP_MS = [1 * DIA, 2 * DIA, 3 * DIA, 4 * DIA, 7 * DIA, 10 * DIA, 14 * DIA];
 export const MAX_FOLLOWUPS = ESPERA_FOLLOWUP_MS.length;
+
+/** Colunas em que a Lia insiste. Agendamento (tem consultoria marcada), Fechado e Perdido ficam de fora. */
+export const COLUNAS_COM_ACOMPANHAMENTO = ['novo', 'contatado', 'sem_resposta', 'proposta_enviada', 'decidindo'];
+/** Colunas em que o lead já viu o preço: as mensagens falam do investimento e do fechamento. */
+const DEPOIS_DO_PRECO = ['proposta_enviada', 'decidindo'];
 
 /** Janela em que o bot pode mandar mensagens automáticas (horário de Brasília). */
 export const JANELA_AUTOMATICA = { inicio: 8 * 60, fim: 20 * 60 };
@@ -42,27 +53,64 @@ function nomeDe(lead, nomeContato) {
   return nomeContato || primeiroNomePessoa(lead?.nome) || '';
 }
 
+const MSG_DESISTIU = (oi) =>
+  `${oi} Como não tive retorno, devo entender que você desistiu de regularizar o INSS da sua obra? Se for só falta de tempo, sem problema: é só me chamar aqui que eu retomo de onde paramos.`;
+
 /**
+ * Textos fixos, com as técnicas de negociação (Voss): rótulo ("Parece que..."), pergunta calibrada ("O que..."),
+ * pergunta que convida ao "não" ("Seria absurdo...?", "Você é contra...?"), auditoria de acusações, aversão à perda
+ * com fatos reais (sem a CND o imóvel não averba, não vende nem financia) e, no fim, "você desistiu?".
+ * Nunca: "estimativa", "análise", "confirmar", "cerca de", percentual do honorário, valores que não estão no cadastro.
+ *
  * @param {object} p
  * @param {object} p.lead
- * @param {1|2|3} p.nivel    qual acompanhamento (1 = 24h, 2 = 3 dias, 3 = 7 dias)
+ * @param {number} p.nivel    qual acompanhamento (1 a MAX_FOLLOWUPS)
  * @param {boolean} p.respondeuAntes  o lead já tinha respondido alguma vez?
  * @param {string} [p.nomeContato]
- * @param {boolean} [p.economiaApresentada]  o bot já mostrou a economia estimada na conversa?
+ * @param {boolean} [p.economiaApresentada]  o bot já mostrou a economia na conversa?
  */
 export function montarFollowup({ lead, nivel, respondeuAntes, nomeContato = '', economiaApresentada = false }) {
   const oi = saudacao(nomeDe(lead, nomeContato));
   const economia = Number(lead?.economia_estimada) > 0 && lead?.responsavel !== 'PJ' ? formatarReaisInteiros(lead.economia_estimada) : '';
-  if (nivel === 1) {
-    if (economiaApresentada && economia)
-      return `${oi} A simulação da sua obra mostrou uma economia de ${economia} no INSS. Ficou alguma dúvida que eu possa tirar para você seguir com o Gabriel?`;
-    if (respondeuAntes) return `${oi} Ficou alguma dúvida sobre o que conversamos? Se quiser, continuo de onde paramos.`;
-    return `${oi} Só passando para ver se você conseguiu ler minha mensagem sobre o INSS da sua obra. Posso te explicar como funciona a redução, sem compromisso?`;
+  const n = Math.min(Math.max(Number(nivel) || 1, 1), MAX_FOLLOWUPS);
+  if (n === MAX_FOLLOWUPS) return MSG_DESISTIU(oi);
+
+  if (DEPOIS_DO_PRECO.includes(lead?.status)) {
+    switch (n) {
+      case 1:
+        return economiaApresentada && economia
+          ? `${oi} A simulação da sua obra mostrou uma economia de ${economia} no INSS. Ficou alguma dúvida sobre o investimento que eu possa tirar agora para você seguir com o Gabriel?`
+          : `${oi} Ficou alguma dúvida sobre o investimento ou sobre como o Gabriel conduz tudo até a CND? Te respondo agora para você decidir com segurança.`;
+      case 2:
+        return `${oi} Parece que alguma coisa ainda está travando a sua decisão. O que precisaria acontecer para você se sentir seguro em seguir com o Gabriel?`;
+      case 3:
+        return `${oi} Seria absurdo eu já te mandar a lista de dados do contrato, só para você ter em mãos quando decidir?`;
+      case 4:
+        return `${oi} Um ponto que pesa: enquanto o INSS da obra não é regularizado, o imóvel fica sem a CND, e sem ela não dá para averbar, vender nem financiar. O que falta para você decidir?`;
+      case 5:
+        return `${oi} Se o que pesa é o momento do caixa: o honorário pode ser à vista, 50% no início e 50% no fim, ou no cartão em até 6x sem juros. Alguma dessas formas funciona para você?`;
+      default:
+        return `${oi} Talvez você esteja achando o investimento alto, ou que é mais uma promessa que não se sustenta. Quero que você sinta que é justo. O que faria isso fazer sentido para você?`;
+    }
   }
-  if (nivel === 2) {
-    return `${oi} Um ponto que pesa: sem planejamento, a Receita calcula o INSS da obra pelo pior cenário, e sem a CND o imóvel não averba, não vende nem financia. O que falta para você decidir?`;
+
+  switch (n) {
+    case 1:
+      if (economiaApresentada && economia)
+        return `${oi} A simulação da sua obra mostrou uma economia de ${economia} no INSS. Ficou alguma dúvida que eu possa tirar para você seguir com o Gabriel?`;
+      if (respondeuAntes) return `${oi} Ficou alguma dúvida sobre o que conversamos? Se quiser, continuo de onde paramos.`;
+      return `${oi} Só passando para ver se você conseguiu ler minha mensagem sobre o INSS da sua obra. Posso te explicar como funciona a redução, sem compromisso?`;
+    case 2:
+      return `${oi} Um ponto que pesa: sem planejamento, a Receita calcula o INSS da obra pelo pior cenário, e sem a CND o imóvel não averba, não vende nem financia. O que falta para você decidir?`;
+    case 3:
+      return `${oi} Parece que a correria da obra apertou a sua agenda. Seria absurdo eu te mostrar por aqui mesmo, em poucas mensagens, como a redução funciona no caso da sua obra?`;
+    case 4:
+      return `${oi} Talvez você esteja pensando que é mais uma promessa de economia que não se sustenta. O Gabriel trabalha com contrato formal, tem nota 5,0 no Google e já economizou mais de 1 milhão de reais para os clientes. Você é contra eu te mostrar como isso funciona na sua obra?`;
+    case 5:
+      return `${oi} O que acontece com o seu imóvel se o INSS da obra ficar sem regularizar? Sem a CND ele não averba, não vende e não financia. Se fizer sentido resolver isso agora, eu te ajudo por aqui.`;
+    default:
+      return `${oi} Para eu não te incomodar à toa: regularizar o INSS da sua obra ainda está nos seus planos, ou já não faz sentido para você?`;
   }
-  return `${oi} Como não tive retorno, devo entender que você desistiu de regularizar o INSS da sua obra? Se for só falta de tempo, sem problema: é só me chamar aqui que eu retomo de onde paramos.`;
 }
 
 /**

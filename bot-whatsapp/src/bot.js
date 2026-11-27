@@ -10,7 +10,7 @@
  *      Claude e envia. O Claude pode agendar a consultoria, passar para o Gabriel ou encerrar.
  *   4. Se o Gabriel responder à mão numa conversa, o bot se cala nela.
  */
-import { dentroDaJanelaAutomatica, lembreteDevido, montarFollowup, montarMensagemConsultoria, proximoFollowup } from './acompanhamento.js';
+import { COLUNAS_COM_ACOMPANHAMENTO, dentroDaJanelaAutomatica, lembreteDevido, montarFollowup, montarMensagemConsultoria, proximoFollowup } from './acompanhamento.js';
 import { citouHonorarios, ehDocumentoDoLead, movimentoDaConsultoria, podeMover } from './funil.js';
 import { dividirMensagens, pediuParar, validarSaida } from './guards.js';
 import { montarAbertura } from './opening.js';
@@ -258,8 +258,8 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
   }
 
   /**
-   * Acompanhamento de quem parou de responder. Quando o bot foi o último a falar e o silêncio dura ~1 dia, ~3 dias e ~7 dias,
-   * manda uma mensagem curta (modelos de acompanhamento.js). Respeita as travas (bot parado, horário 8h–20h, teto, lista de teste)
+   * Acompanhamento insistente de quem parou de responder. Quando o bot foi o último a falar, manda até 7 mensagens curtas
+   * em ~6 semanas (modelos e tempos em acompanhamento.js). Respeita as travas (bot parado, horário 8h–20h, teto, lista de teste)
    * e nunca insiste com quem pediu para parar, com quem já agendou ou com conversa que está com o Gabriel.
    */
   async function processarFollowups({ agora = new Date() } = {}) {
@@ -277,7 +277,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       const chaveFollowup = `${c.id}:${nivel}:${ultima?.id}`; // mesma conversa, mesmo nível, mesma última mensagem = já tratado
       if (!nivel || followupsFeitos.has(chaveFollowup)) continue;
       const lead = await store.leadPorId(c.lead_id);
-      if (!lead || ['agendado', 'fechado', 'perdido'].includes(lead.status)) continue;
+      if (!lead || !COLUNAS_COM_ACOMPANHAMENTO.includes(lead.status || 'novo')) continue; // Agendamento, Fechado e Perdido: não insiste
       // Mesmo telefone em outra conversa (lead repetido)? Quem manda é a conversa mais nova: se o Gabriel assumiu ou o lead já respondeu
       // lá, esta aqui (velha, só com mensagens do bot) não pode mandar acompanhamento nenhum. Fecha esta e segue.
       const principal = await store.conversaPorTelefone(c.telefone);

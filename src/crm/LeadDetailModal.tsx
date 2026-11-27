@@ -37,8 +37,12 @@ export function LeadDetailModal({ lead, onClose, onChange }: LeadDetailModalProp
     setError(null);
     try {
       const tasks: Promise<void>[] = [];
-      if (status !== (lead.status ?? 'novo')) tasks.push(crmLeadService.updateStatus(lead.id, status));
-      if (notas !== (lead.notas ?? '')) tasks.push(crmLeadService.updateNotas(lead.id, notas));
+      if (status !== (lead.status ?? 'novo')) {
+        // Mudou de coluna: grava junto com as anotações (que ganham a marca "Movido à mão").
+        tasks.push(crmLeadService.updateStatus(lead.id, status, notas));
+      } else if (notas !== (lead.notas ?? '')) {
+        tasks.push(crmLeadService.updateNotas(lead.id, notas));
+      }
       if (status === 'perdido' && motivoPerda !== (lead.motivoPerda ?? '')) {
         tasks.push(crmLeadService.updateMotivoPerda(lead.id, motivoPerda === '' ? null : motivoPerda));
       }

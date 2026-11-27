@@ -23,6 +23,28 @@ const POSICAO = {
   perdido: 5,
 };
 
+/**
+ * Marca que o CRM deixa nas anotações quando o Gabriel muda o card de coluna à mão (arrastando ou pela janela do lead).
+ * Card com essa marca nunca mais é mudado de coluna pela Lia (pedido do Gabriel, 27/11/2026). Ver crmService.ts no site.
+ */
+export const MARCA_MOVIDO_A_MAO = '[Movido à mão';
+
+/** true se o Gabriel já mudou este card de coluna à mão (a Lia não mexe mais na coluna dele). */
+export function movidoAMao(lead) {
+  return String(lead?.notas || '').includes(MARCA_MOVIDO_A_MAO);
+}
+
+/**
+ * A Lia pode mudar este card para a coluna `novo`? Nunca se o Gabriel já o moveu à mão. `regredirDe`: exceção controlada
+ * (volta uma coluna só se o card ainda está exatamente nela, ex.: "agendado" -> "contatado" quando o lead falta à consultoria).
+ */
+export function podeMudarCard(lead, novo, regredirDe) {
+  if (!novo || movidoAMao(lead)) return false;
+  const atual = lead?.status;
+  if (regredirDe && atual === regredirDe && novo !== atual) return true;
+  return podeMover(atual, novo);
+}
+
 /** Cards que o bot não mexe mais (decisão final do Gabriel ou do lead). */
 export const STATUS_PROTEGIDOS = ['fechado', 'perdido'];
 

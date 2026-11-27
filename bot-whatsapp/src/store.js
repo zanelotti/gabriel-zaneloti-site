@@ -4,7 +4,8 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-import { MOTIVOS_PERDA, podeMover } from './funil.js';
+import { MOTIVOS_PERDA, podeMudarCard } from './funil.js';
+import { MAX_FOLLOWUPS } from './acompanhamento.js';
 
 function carimbo() {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -289,15 +290,15 @@ export function criarStore({ url, key }) {
     },
 
     // ----------------------------------------------------------------------- acompanhamento e lembretes
-    /** Conversas ativas dos últimos 30 dias que ainda podem receber acompanhamento (a regra fina fica no bot). */
+    /** Conversas ativas dos últimos 75 dias que ainda podem receber acompanhamento (a regra fina fica no bot). */
     async conversasParaFollowup() {
-      const desde = new Date(Date.now() - 30 * 86400000).toISOString();
+      const desde = new Date(Date.now() - 75 * 86400000).toISOString();
       return (
         checar(
-          await db.from('bot_conversas').select('*').eq('estado', 'ativa').gt('criado_em', desde).order('criado_em', { ascending: true }).limit(300),
+          await db.from('bot_conversas').select('*').eq('estado', 'ativa').gt('criado_em', desde).order('criado_em', { ascending: false }).limit(1000),
           'conversas para acompanhamento'
         ) || []
-      ).filter((c) => (c.followup_nivel ?? 0) < 3);
+      ).filter((c) => (c.followup_nivel ?? 0) < MAX_FOLLOWUPS);
     },
 
     async registrarFollowup(conversaId, nivel) {
@@ -351,14 +352,13 @@ export function criarStore({ url, key }) {
       return candidatos.filter((c) => contatados.has(c.lead_id)).map((c) => c.lead_id);
     },
 
-    /** Atualiza o funil do CRM (só avança; nunca mexe em leads fechados ou perdidos — ver funil.js). */
+    /** Atualiza o funil do CRM (só avança; nunca mexe em leads fechados, perdidos ou movidos à mão pelo Gabriel — ver funil.js). */
     async atualizarLead(leadId, { status, nota, motivoPerda, regredirDe }) {
       const atual = checar(await db.from('leads').select('*').eq('id', leadId).maybeSingle(), 'ler lead');
       if (!atual) return;
       const patch = {};
-      // `regredirDe`: exceção controlada — permite voltar o card só se ele ainda está exatamente nessa coluna (ex.: "agendado" -> "contatado" quando o lead falta à consultoria).
-      const regride = Boolean(status && regredirDe && atual.status === regredirDe && status !== atual.status);
-      if (status && (regride || podeMover(atual.status, status))) {
+      // Card que o Gabriel mudou de coluna à mão: a Lia só deixa a nota, nunca muda a coluna (ver podeMudarCard em funil.js).
+      if (status && podeMudarCard(atual, status, regredirDe)) {
         patch.status = status;
         // Só preenche o motivo da perda se o card realmente foi para "perdido", o Gabriel ainda não escolheu um
         // e a coluna já existe no banco (se ainda não rodou o SQL, o card vai para "perdido" do mesmo jeito).

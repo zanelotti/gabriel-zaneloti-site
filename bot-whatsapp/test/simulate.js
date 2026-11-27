@@ -20,8 +20,8 @@ import { midiaLegivel } from '../src/whatsapp.js';
 import { limparTranscricao } from '../src/audio.js';
 import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel, dentroDoHorario, montarConhecimentoDeLinhas } from '../src/painel.js';
 import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAprendizado } from '../src/aprendizado.js';
-import { citouHonorarios, MOTIVOS_PERDA, podeMover } from '../src/funil.js';
-import { descreverQuando, lembreteDevido, montarFollowup, montarMensagemConsultoria, proximoFollowup } from '../src/acompanhamento.js';
+import { citouHonorarios, MOTIVOS_PERDA, movidoAMao, podeMover, podeMudarCard } from '../src/funil.js';
+import { descreverQuando, lembreteDevido, MAX_FOLLOWUPS, montarFollowup, montarMensagemConsultoria, proximoFollowup } from '../src/acompanhamento.js';
 import { detectarOrigemSite, ehLeadExterno, montarBoasVindas, ORIGENS, origemDoLead } from '../src/origem.js';
 import { gerarPdfSimulacao, nomeArquivoPdf, simulacaoDoLead } from '../src/pdf-simulacao.js';
 import { camposDoLead, lerTabelasDoSite, montarEmailSimulacao, montarMensagemSimulacao, normalizarEntrada, origemDasTabelas, simular, sincronizarTabelasDoSite } from '../src/simulacao.js';
@@ -144,14 +144,14 @@ function criarStoreMemoria() {
     async atualizarLead(id, { status, nota, motivoPerda, regredirDe }) {
       const l = leads.get(id);
       if (!l) return;
-      if (status && ((regredirDe && l.status === regredirDe && status !== l.status) || podeMover(l.status, status))) {
+      if (status && podeMudarCard(l, status, regredirDe)) {
         l.status = status;
         if (status === 'perdido' && motivoPerda && MOTIVOS_PERDA.includes(motivoPerda) && !l.motivo_perda) l.motivo_perda = motivoPerda;
       }
       if (nota) l.notas = `${l.notas ? `${l.notas}\n` : ''}${nota}`;
     },
     async conversasParaFollowup() {
-      return conversas.filter((c) => c.estado === 'ativa' && (c.followup_nivel ?? 0) < 3);
+      return conversas.filter((c) => c.estado === 'ativa' && (c.followup_nivel ?? 0) < MAX_FOLLOWUPS);
     },
     async registrarFollowup(id, nivel) {
       Object.assign(conversas.find((c) => c.id === id), { followup_nivel: nivel, ultimo_followup_em: new Date().toISOString() });
@@ -1866,6 +1866,23 @@ await teste('se o banco ainda não aceita o status "agendado", o agendamento nã
   assert.equal(ctx.store.agendou.length, 1);
 });
 
+await teste('card movido à mão pelo Gabriel no CRM: a Lia nunca mais muda a coluna (só deixa nota)', async () => {
+  const marcado = { status: 'decidindo', notas: 'cliente bom\n[Movido à mão 27/11] Decidindo' };
+  assert.equal(movidoAMao(marcado), true);
+  assert.equal(movidoAMao({ status: 'decidindo', notas: '[Bot WhatsApp 27/11] Passou para o Gabriel' }), false);
+  for (const novo of ['proposta_enviada', 'agendado', 'perdido', 'contatado', 'sem_resposta']) assert.equal(podeMudarCard(marcado, novo), false, novo);
+  assert.equal(podeMudarCard(marcado, 'contatado', 'decidindo'), false, 'nem a exceção da consultoria');
+  assert.equal(podeMudarCard({ status: 'contatado', notas: '' }, 'proposta_enviada'), true, 'sem a marca: segue a regra normal');
+  // pelo bot: lead que recusa, num card movido à mão, continua onde o Gabriel deixou
+  const ctx = montar();
+  const l = lead({ status: 'proposta_enviada' });
+  await abrir(ctx, l);
+  Object.assign(ctx.store.leads.get(l.id), { status: 'proposta_enviada', notas: '[Movido à mão 27/11] Proposta enviada' });
+  await ctx.store.atualizarLead(l.id, { status: 'perdido', nota: 'Conversa encerrada pelo bot: recusou', motivoPerda: 'preco' });
+  assert.equal(ctx.store.leads.get(l.id).status, 'proposta_enviada');
+  assert.match(ctx.store.leads.get(l.id).notas, /recusou/, 'a nota fica registrada');
+});
+
 console.log('\nAcompanhamento, lembretes e avisos');
 
 const AGORA = new Date('2026-10-24T15:00:00Z'); // 12h em Brasília
@@ -1878,15 +1895,17 @@ await teste('modelos de acompanhamento: tempos, textos e sem valor para empresa'
   assert.equal(proximoFollowup({ nivelAtual: 0, ultimaDirecao: 'bot', ultimaEm: horasAtras(25), agora: AGORA.getTime() }), 1);
   assert.equal(proximoFollowup({ nivelAtual: 1, ultimaDirecao: 'bot', ultimaEm: horasAtras(47), agora: AGORA.getTime() }), null);
   assert.equal(proximoFollowup({ nivelAtual: 1, ultimaDirecao: 'bot', ultimaEm: horasAtras(49), agora: AGORA.getTime() }), 2);
-  assert.equal(proximoFollowup({ nivelAtual: 2, ultimaDirecao: 'bot', ultimaEm: horasAtras(97), agora: AGORA.getTime() }), 3);
-  assert.equal(proximoFollowup({ nivelAtual: 3, ultimaDirecao: 'bot', ultimaEm: horasAtras(900), agora: AGORA.getTime() }), null, 'máximo de 3');
+  assert.equal(proximoFollowup({ nivelAtual: 2, ultimaDirecao: 'bot', ultimaEm: horasAtras(73), agora: AGORA.getTime() }), 3);
+  assert.equal(proximoFollowup({ nivelAtual: 3, ultimaDirecao: 'bot', ultimaEm: horasAtras(97), agora: AGORA.getTime() }), 4);
+  assert.equal(proximoFollowup({ nivelAtual: 6, ultimaDirecao: 'bot', ultimaEm: horasAtras(14 * 24 + 1), agora: AGORA.getTime() }), 7);
+  assert.equal(proximoFollowup({ nivelAtual: 7, ultimaDirecao: 'bot', ultimaEm: horasAtras(9000), agora: AGORA.getTime() }), null, 'máximo de 7');
   assert.equal(proximoFollowup({ nivelAtual: 0, ultimaDirecao: 'lead', ultimaEm: horasAtras(900), agora: AGORA.getTime() }), null, 'lead esperando resposta: não é caso de acompanhamento');
   assert.doesNotMatch(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: false }), /R\$|o site mostrou/, 'o lead não viu números: o lembrete não cita valores');
   assert.match(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: false }), /como funciona a redução/);
   assert.match(montarFollowup({ lead: pf, nivel: 1, respondeuAntes: true }), /Ficou alguma dúvida/);
   assert.doesNotMatch(montarFollowup({ lead: pf, nivel: 2, respondeuAntes: false }), /parcel/i, 'acompanhamento não promete parcelamento');
-  assert.match(montarFollowup({ lead: pf, nivel: 3, respondeuAntes: false }), /desistiu de regularizar/);
-  for (const nivel of [1, 2, 3]) {
+  assert.match(montarFollowup({ lead: pf, nivel: MAX_FOLLOWUPS, respondeuAntes: false }), /desistiu de regularizar/);
+  for (const nivel of [1, 2, 3, 4, 5, 6, 7]) {
     assert.doesNotMatch(montarFollowup({ lead: lead({ responsavel: 'PJ', economia_estimada: 42000 }), nivel, respondeuAntes: false }), /R\$/, 'empresa: nunca cita economia');
     for (const l of [pf, lead({ responsavel: 'PJ' }), lead({ economia_estimada: null })]) {
       for (const r of [true, false]) assert.equal(validarSaida(montarFollowup({ lead: l, nivel, respondeuAntes: r }), l).ok, true, `nível ${nivel} passa nas travas`);
@@ -1943,10 +1962,10 @@ await teste('acompanhamento de venda: depois de ver a economia, o 1º lembrete c
   assert.doesNotMatch(t1b, /R\$/);
   const pj = montarFollowup({ lead: lead({ responsavel: 'PJ', economia_estimada: 5000 }), nivel: 1, respondeuAntes: true, economiaApresentada: true });
   assert.doesNotMatch(pj, /R\$/);
-  for (const n of [2, 3]) assert.equal(validarSaida(montarFollowup({ lead: l, nivel: n, respondeuAntes: true }), l).ok, true);
+  for (const n of [2, 3, 4, 5, 6, 7]) assert.equal(validarSaida(montarFollowup({ lead: l, nivel: n, respondeuAntes: true }), l).ok, true);
 });
 
-await teste('acompanhamento: 1 dia, 3 dias e 7 dias de silêncio; depois para', async () => {
+await teste('acompanhamento insistente: 7 mensagens (dia 1, 3, 6, 10, 17, 27 e 41), a última é "você desistiu?", depois para', async () => {
   const ctx = montar();
   const l = lead({ economia_estimada: 42000 });
   const c = await abrir(ctx, l);
@@ -1962,14 +1981,54 @@ await teste('acompanhamento: 1 dia, 3 dias e 7 dias de silêncio; depois para', 
   envelhecer(ctx, 49);
   assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
   assert.match(ctx.wa.enviados[enviados() - 1].texto, /pior cenário[^]*O que falta para você decidir/);
-  envelhecer(ctx, 97);
-  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1);
+  for (const [horas, nivel] of [[73, 3], [97, 4], [7 * 24 + 1, 5], [10 * 24 + 1, 6], [14 * 24 + 1, 7]]) {
+    envelhecer(ctx, horas - 2);
+    assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0, `nível ${nivel}: ainda é cedo`);
+    envelhecer(ctx, horas);
+    assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1, `nível ${nivel} sai`);
+    assert.equal(c.followup_nivel, nivel);
+  }
   assert.match(ctx.wa.enviados[enviados() - 1].texto, /desistiu/);
-  assert.equal(c.followup_nivel, 3);
-  envelhecer(ctx, 2000);
-  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0, 'acabou: nunca passa de 3');
-  assert.equal(enviados(), 4, 'abertura + 3 acompanhamentos');
-  assert.equal(ctx.store.mensagens.filter((m) => m.direcao === 'bot').length, 4, 'tudo fica no histórico');
+  envelhecer(ctx, 9000);
+  assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 0, 'acabou: nunca passa de 7');
+  assert.equal(enviados(), 8, 'abertura + 7 acompanhamentos');
+  const textos = ctx.wa.enviados.slice(1).map((m) => m.texto);
+  assert.equal(new Set(textos).size, 7, 'cada acompanhamento é diferente');
+  for (const t of textos) {
+    assert.equal(validarSaida(t, l).ok, true, t);
+    assert.doesNotMatch(t, /estimativ|an[aá]lis|confirm|cerca de|Zaneloti|\d+\s?%/i, t);
+  }
+});
+
+await teste('acompanhamento depois do preço (Proposta enviada e Decidindo): fala do investimento e da lista do contrato, sem percentual', () => {
+  for (const status of ['proposta_enviada', 'decidindo']) {
+    const l = lead({ status, economia_estimada: 21013 });
+    const textos = [1, 2, 3, 4, 5, 6, 7].map((nivel) => montarFollowup({ lead: l, nivel, respondeuAntes: true, economiaApresentada: true }));
+    assert.match(textos[0], /investimento/);
+    assert.match(textos[0], /R\$\s21\.013/);
+    assert.match(textos.join(' '), /lista de dados do contrato/);
+    assert.match(textos.join(' '), /6x sem juros/);
+    assert.match(textos[6], /desistiu/);
+    assert.equal(new Set(textos).size, 7);
+    for (const t of textos) {
+      assert.equal(validarSaida(t, l).ok, true, t);
+      assert.doesNotMatch(t, /estimativ|an[aá]lis|confirm|cerca de|Zaneloti|\b12\s?%|parcel/i, t);
+    }
+    const pj = montarFollowup({ lead: lead({ status, responsavel: 'PJ', economia_estimada: 5000 }), nivel: 1, respondeuAntes: true, economiaApresentada: true });
+    assert.doesNotMatch(pj, /R\$/, 'empresa: nunca cita economia');
+  }
+});
+
+await teste('acompanhamento vale para Novo, Contatado, Sem resposta, Proposta enviada e Decidindo', async () => {
+  for (const status of ['novo', 'contatado', 'sem_resposta', 'proposta_enviada', 'decidindo']) {
+    const ctx = montar();
+    const l = lead();
+    const c = await abrir(ctx, l);
+    ctx.store.leads.get(l.id).status = status;
+    envelhecer(ctx, 30);
+    assert.equal(await ctx.bot.processarFollowups({ agora: AGORA }), 1, `card ${status} recebe acompanhamento`);
+    assert.equal(c.followup_nivel, 1);
+  }
 });
 
 await teste('quando o lead responde, a contagem do acompanhamento recomeça', async () => {

@@ -5,14 +5,14 @@
  *   node scripts/organizar-quadro.js --aplicar  -> aplica o plano da última análise
  *
  * Regras: nunca coloca card em "Fechado" (só avisa "possível fechado, confira"); cards já em "Fechado" não são tocados;
- * cards já em "Perdido" também não são tocados (foi o Gabriel que pôs lá à mão; pedido dele em 27/11/2026);
+ * cards já em "Perdido" também não são tocados, nem os que o Gabriel mudou de coluna à mão no CRM (pedidos dele em 27/11/2026);
  * leads sem conversa no WhatsApp ficam como estão. Cada mudança deixa uma nota no card com o motivo.
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../src/config.js';
-import { MOTIVOS_PERDA } from '../src/funil.js';
+import { MOTIVOS_PERDA, movidoAMao } from '../src/funil.js';
 
 const PLANO = '/root/organizar-quadro-plano.json';
 /** Colunas que a organização nunca mexe: o card fica onde o Gabriel deixou. */
@@ -79,13 +79,13 @@ async function classificar(anthropic, lead, conversa, msgs) {
 
 async function analisar() {
   const anthropic = new Anthropic({ apiKey: config.anthropicKey });
-  const leads = checar(await db.from('leads').select('id,nome,whatsapp,status'), 'leads').filter(
-    (l) => !INTOCAVEIS.includes(l.status || 'novo')
+  const leads = checar(await db.from('leads').select('id,nome,whatsapp,status,notas'), 'leads').filter(
+    (l) => !INTOCAVEIS.includes(l.status || 'novo') && !movidoAMao(l)
   );
   const conversas = checar(await db.from('bot_conversas').select('*'), 'conversas');
   const porLead = new Map(conversas.map((c) => [c.lead_id, c]));
   const alvos = leads.filter((l) => porLead.has(l.id));
-  console.log(`Lendo ${alvos.length} conversas (de ${leads.length} cards fora de "Fechado" e "Perdido")...`);
+  console.log(`Lendo ${alvos.length} conversas (de ${leads.length} cards fora de "Fechado", "Perdido" e dos que você moveu à mão)...`);
 
   const plano = [];
   let i = 0;
@@ -134,7 +134,7 @@ async function aplicar() {
   let feitos = 0;
   for (const p of plano) {
     const atual = checar(await db.from('leads').select('status,notas,motivo_perda').eq('id', p.id).maybeSingle(), 'ler lead');
-    if (!atual || INTOCAVEIS.includes(atual.status) || atual.status !== p.de) continue; // mudou desde a análise: não mexe
+    if (!atual || INTOCAVEIS.includes(atual.status) || movidoAMao(atual) || atual.status !== p.de) continue; // mudou desde a análise: não mexe
     const patch = {
       status: p.para,
       notas: `${atual.notas ? `${atual.notas}\n` : ''}[Organização do quadro ${carimbo()}] ${ROTULO[p.de] || p.de} -> ${ROTULO[p.para]}: ${p.motivo}`,
