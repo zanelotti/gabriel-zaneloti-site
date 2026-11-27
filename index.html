@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
-    <!-- Google Tag Manager: a fila (dataLayer) começa agora; o script só carrega depois da página (ou no 1º toque), para não atrasar o topo do site. -->
+    <!-- Google Tag Manager: a fila (dataLayer) começa agora; o script só carrega depois da página, com o navegador livre (não no 1º toque: isso deixava o toque lento). -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var feito=false;function carregar(){if(feito)return;feito=true;
     var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);}
-    ['pointerdown','keydown','scroll','touchstart'].forEach(function(e){w.addEventListener(e,carregar,{once:true,passive:true});});
-    w.addEventListener('load',function(){setTimeout(carregar,1500);});
+    function livre(){if(w.requestIdleCallback)w.requestIdleCallback(carregar,{timeout:3000});else carregar();}
+    w.addEventListener('load',function(){setTimeout(livre,1500);});
     })(window,document,'script','dataLayer','GTM-NFSNQBZL');</script>
     <!-- End Google Tag Manager -->
     <meta charset="UTF-8" />

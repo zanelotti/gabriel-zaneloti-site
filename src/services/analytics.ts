@@ -1,4 +1,4 @@
-import { depoisDeCarregar } from './depoisDeCarregar';
+import { depoisDeCarregar, depoisDoDesenho } from './depoisDeCarregar';
 import { marcarNoClarity } from './clarity';
 /**
  * ============================================================================
@@ -99,7 +99,8 @@ export function initAnalytics(): void {
 
   // GA4 e/ou Google Ads compartilham a mesma biblioteca (gtag.js).
   if (GA4_ID || GOOGLE_ADS_ID) {
-    const loaderId = GA4_ID ?? GOOGLE_ADS_ID!;
+    // `||` (e não `??`): se a variável existir mas estiver vazia, não carrega um gtag.js sem ID (era baixado à toa).
+    const loaderId = (GA4_ID || GOOGLE_ADS_ID)!;
     const script = document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${loaderId}`;
@@ -179,8 +180,14 @@ export function setEnhancedConversionData(data: { email?: string; whatsappDigits
  * (modo desenvolvimento), sem erros — nada é enviado para lugar nenhum.
  */
 export function trackEvent(name: AnalyticsEventName, payload: AnalyticsEventPayload = {}): void {
-  marcarNoClarity(name);
   if (!isAnalyticsAvailable()) return;
+  // v49: o aviso aos scripts de fora (Clarity, Google, Meta, Tag Manager) vai DEPOIS que a tela responde ao
+  // toque. Antes ia no mesmo instante do clique e o Tag Manager rodava as etiquetas dele antes de a tela mudar.
+  depoisDoDesenho(() => enviarEvento(name, payload));
+}
+
+function enviarEvento(name: AnalyticsEventName, payload: AnalyticsEventPayload): void {
+  marcarNoClarity(name);
 
   if (GA4_ID && typeof window.gtag === 'function') {
     window.gtag('event', name, payload);
