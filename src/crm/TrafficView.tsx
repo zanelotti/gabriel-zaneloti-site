@@ -1,4 +1,5 @@
 import type { PageView } from '@/services/crmService';
+import { canalDaVisita, aparelhoDaVisita } from '@/services/canalVisita';
 import { StatTile } from './charts/StatTile';
 import { HorizontalBarChart, type HorizontalBarDatum } from './charts/HorizontalBarChart';
 import { MonthlyColumnChart, type MonthlyDatum } from './charts/MonthlyColumnChart';
@@ -22,16 +23,6 @@ function pathLabel(path: string): string {
 
 function topEntries(counts: Map<string, number>, limit: number): [string, number][] {
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
-}
-
-/** Agrupa um referrer completo (URL) pelo domínio de origem — mais legível que a URL inteira. */
-function referrerOrigin(referrer: string | null): string {
-  if (!referrer) return 'Direto / desconhecido';
-  try {
-    return new URL(referrer).hostname.replace(/^www\./, '');
-  } catch {
-    return referrer;
-  }
 }
 
 /**
@@ -75,16 +66,28 @@ export function TrafficView({ pageViews }: TrafficViewProps) {
     colorClass: 'bg-navy-400',
   }));
 
-  // De onde vêm os visitantes (domínio de origem do referrer).
+  // De onde vêm os visitantes: anúncio, busca grátis, WhatsApp da Lia, PDF, parceiro, o próprio Gabriel, robôs...
   const referrerCounts = new Map<string, number>();
   pageViews.forEach((v) => {
-    const origem = referrerOrigin(v.referrer);
+    const origem = canalDaVisita(v);
     referrerCounts.set(origem, (referrerCounts.get(origem) ?? 0) + 1);
   });
-  const topReferrers: HorizontalBarDatum[] = topEntries(referrerCounts, 8).map(([origem, count]) => ({
+  const topReferrers: HorizontalBarDatum[] = topEntries(referrerCounts, 12).map(([origem, count]) => ({
     label: origem,
     value: count,
     colorClass: 'bg-accent-500',
+  }));
+
+  // Celular x computador (só visitas a partir da v50, que gravam a largura da tela).
+  const aparelhoCounts = new Map<string, number>();
+  pageViews.forEach((v) => {
+    const a = aparelhoDaVisita(v);
+    if (a && !v.interno) aparelhoCounts.set(a, (aparelhoCounts.get(a) ?? 0) + 1);
+  });
+  const topAparelhos: HorizontalBarDatum[] = topEntries(aparelhoCounts, 3).map(([a, count]) => ({
+    label: a,
+    value: count,
+    colorClass: 'bg-navy-400',
   }));
 
   // Visualizações por mês (últimos 6 meses, incluindo o atual).
@@ -127,6 +130,15 @@ export function TrafficView({ pageViews }: TrafficViewProps) {
         </div>
       </div>
 
+      {topAparelhos.length > 0 && (
+        <div className="card">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-navy-500">Celular ou computador</h2>
+          <div className="mt-4">
+            <HorizontalBarChart data={topAparelhos} />
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <h2 className="text-sm font-bold uppercase tracking-wide text-navy-500">Visualizações por mês</h2>
         <div className="mt-4">
@@ -138,7 +150,8 @@ export function TrafficView({ pageViews }: TrafficViewProps) {
         Dados guardados no seu próprio Supabase (tabela{' '}
         <code className="rounded bg-navy-50 px-1 py-0.5">page_views</code>) — só das páginas públicas do site (home,
         sobre, privacidade e termos). Não conta suas próprias visitas às ferramentas internas (calculadora interna e
-        este CRM).
+        este CRM). Os aparelhos em que você entrou no CRM aparecem como "Você (Gabriel)"; no celular, abra o site uma
+        vez com <code className="rounded bg-navy-50 px-1 py-0.5">?interno=1</code> no fim do endereço para marcar.
       </p>
     </div>
   );

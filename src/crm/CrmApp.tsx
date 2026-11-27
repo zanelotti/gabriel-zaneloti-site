@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isSupabaseConfigured } from '@/services/supabaseClient';
 import { crmAuth } from '@/services/crmService';
+import { marcarAparelhoInterno } from '@/services/pageViewTracker';
 import { LoginScreen } from './LoginScreen';
 import { MainShell } from './MainShell';
 
@@ -13,6 +14,11 @@ import { MainShell } from './MainShell';
 export function CrmApp() {
   const [checking, setChecking] = useState(true);
   const [loggedIn, setLoggedIn] = useState(false);
+
+  // Quem entra no CRM é o Gabriel: as visitas deste aparelho ao site passam a aparecer separadas no Tráfego.
+  useEffect(() => {
+    if (loggedIn) marcarAparelhoInterno(true);
+  }, [loggedIn]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {

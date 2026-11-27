@@ -147,6 +147,16 @@ create table if not exists public.page_views (
   created_at timestamptz not null default now()
 );
 
+-- v50: mais detalhes de cada visita, para separar Google Ads, WhatsApp da Lia, PDF,
+-- parceiros, as visitas do próprio Gabriel e robôs (antes caía tudo em "Direto").
+alter table public.page_views add column if not exists utm_term text;
+alter table public.page_views add column if not exists utm_content text;
+alter table public.page_views add column if not exists click_id text;   -- gclid / gbraid / wbraid (anúncio do Google)
+alter table public.page_views add column if not exists ref text;        -- código de parceiro (?ref=)
+alter table public.page_views add column if not exists interno boolean; -- aparelho do próprio Gabriel
+alter table public.page_views add column if not exists tela integer;    -- largura da tela (celular x computador)
+alter table public.page_views add column if not exists user_agent text; -- navegador/app (identifica robôs)
+
 create index if not exists page_views_created_at_idx on public.page_views (created_at desc);
 create index if not exists page_views_path_idx on public.page_views (path);
 create index if not exists page_views_visitor_id_idx on public.page_views (visitor_id);

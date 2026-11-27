@@ -22,8 +22,8 @@ import { aplicarConfigRemota, configParaLinha, criarControleDePausa, criarPainel
 import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAprendizado } from '../src/aprendizado.js';
 import { citouHonorarios, MOTIVOS_PERDA, movidoAMao, podeMover, podeMudarCard } from '../src/funil.js';
 import { descreverQuando, lembreteDevido, MAX_FOLLOWUPS, montarFollowup, montarMensagemConsultoria, proximoFollowup } from '../src/acompanhamento.js';
-import { detectarOrigemSite, ehLeadExterno, montarBoasVindas, ORIGENS, origemDoLead } from '../src/origem.js';
-import { gerarPdfSimulacao, nomeArquivoPdf, simulacaoDoLead } from '../src/pdf-simulacao.js';
+import { detectarOrigemSite, ehLeadExterno, montarBoasVindas, ORIGENS, origemDoLead, roteiroDaOrigem } from '../src/origem.js';
+import { gerarPdfSimulacao, LINK_SITE_PDF, nomeArquivoPdf, simulacaoDoLead } from '../src/pdf-simulacao.js';
 import { camposDoLead, lerTabelasDoSite, montarEmailSimulacao, montarMensagemSimulacao, normalizarEntrada, origemDasTabelas, simular, sincronizarTabelasDoSite } from '../src/simulacao.js';
 import { semSimulacao } from '../src/origem.js';
 import { calcularHonorario, criarChamador, leadValorAlto, limparNomeInformado, mensagemDadosContrato, nomeParecePessoa, PERGUNTA_FECHAMENTO, normalizarTelefoneBR, obraEmAndamento, primeiroNomePessoa } from '../src/util.js';
@@ -3152,6 +3152,22 @@ await teste('quem veio da calculadora não recebe a ferramenta da simulação', 
 });
 
 console.log('\nPDF da simulação no WhatsApp');
+
+await teste('o rodapé do PDF tem o link do site com UTM do PDF', async () => {
+  const { dados } = normalizarEntrada(DADOS_SIM);
+  const pdf = await gerarPdfSimulacao({ nome: 'Carlos', dados, r: simular(dados) });
+  const { PDFDocument: Doc, PDFName: Nome } = await import('pdf-lib');
+  const lido = await Doc.load(pdf);
+  const annots = lido.getPage(0).node.lookup(Nome.of('Annots'));
+  const uri = annots.lookup(0).lookup(Nome.of('A')).lookup(Nome.of('URI')).decodeText();
+  assert.equal(uri, LINK_SITE_PDF);
+  assert.match(uri, /utm_source=pdf/);
+});
+
+await teste('o link do simulador que a Lia passa leva UTM da Lia', async () => {
+  const roteiro = roteiroDaOrigem('topo', { siteUrl: 'https://exemplo.test' });
+  assert.match(roteiro, /https:\/\/exemplo\.test\/\?utm_source=lia&utm_medium=whatsapp#calculadora/);
+});
 
 await teste('o PDF da simulação sai sem honorário e com os números do cliente', async () => {
   const { dados } = normalizarEntrada(DADOS_SIM);

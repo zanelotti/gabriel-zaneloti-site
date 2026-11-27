@@ -241,6 +241,13 @@ interface PageViewRow {
   utm_campaign: string | null;
   visitor_id: string | null;
   created_at: string;
+  utm_term?: string | null;
+  utm_content?: string | null;
+  click_id?: string | null;
+  ref?: string | null;
+  interno?: boolean | null;
+  tela?: number | null;
+  user_agent?: string | null;
 }
 
 /** Uma visualização de página (tráfego do site público), lida da tabela `page_views`. */
@@ -253,6 +260,15 @@ export interface PageView {
   utmCampaign: string | null;
   visitorId: string | null;
   createdAt: string;
+  utmTerm: string | null;
+  utmContent: string | null;
+  /** gclid / gbraid / wbraid: veio de um anúncio do Google. */
+  clickId: string | null;
+  ref: string | null;
+  interno: boolean;
+  tela: number | null;
+  /** Vazio nas visitas gravadas antes da v50 (não dá para saber o aparelho nem se foi anúncio). */
+  userAgent: string | null;
 }
 
 function rowToPageView(row: PageViewRow): PageView {
@@ -265,6 +281,13 @@ function rowToPageView(row: PageViewRow): PageView {
     utmCampaign: row.utm_campaign,
     visitorId: row.visitor_id,
     createdAt: row.created_at,
+    utmTerm: row.utm_term ?? null,
+    utmContent: row.utm_content ?? null,
+    clickId: row.click_id ?? null,
+    ref: row.ref ?? null,
+    interno: row.interno === true,
+    tela: row.tela ?? null,
+    userAgent: row.user_agent ?? null,
   };
 }
 

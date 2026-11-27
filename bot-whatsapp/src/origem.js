@@ -170,7 +170,7 @@ export function montarAberturaEbook({ nome = '', assistente = 'Lia' }) {
  * Trecho do prompt que explica de onde a pessoa veio e como conduzir. Vale para leads sem simulação (externos).
  */
 export function roteiroDaOrigem(origem, { siteUrl = '' } = {}) {
-  const link = siteUrl ? ` (${siteUrl}/#calculadora)` : '';
+  const link = siteUrl ? ` (${siteUrl}/?utm_source=lia&utm_medium=whatsapp#calculadora)` : '';
   const porOrigem = {
     dores: 'Ela clicou no botão da seção das situações comuns ("Você se identifica com alguma dessas situações?"): tem uma dor com a obra. Acolha em uma frase e siga para os dados.',
     tranquilidade: 'Ela clicou no botão da seção "sua obra em dia, sem dor de cabeça com a Receita": quer a obra regular. Se ela contar que precisa da certidão para vender, financiar ou averbar, a urgência é a certidão (CND).',

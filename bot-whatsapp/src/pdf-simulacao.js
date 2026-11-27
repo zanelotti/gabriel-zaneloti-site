@@ -9,7 +9,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFString, StandardFonts, rgb } from 'pdf-lib';
 import { obraEmAndamento } from './util.js';
 
 /** Gravada no histórico da conversa quando a Lia manda o PDF. */
@@ -17,6 +17,8 @@ export const MARCA_PDF = '[arquivo enviado: PDF da simulação]';
 
 const FOTO = fileURLToPath(new URL('../assets/gabriel-zaneloti.jpg', import.meta.url));
 const WHATSAPP_DISPLAY = '+55 21 98521-3949';
+/** Link do rodapé: com UTM, para o CRM saber que a visita veio do PDF da simulação. */
+export const LINK_SITE_PDF = 'https://www.gabrielzaneloti.com.br/?utm_source=pdf&utm_medium=whatsapp&utm_campaign=simulacao';
 
 const W = 595.28; // A4
 const H = 841.89;
@@ -302,6 +304,24 @@ export async function gerarPdfSimulacao({ nome = '', dados, r, hoje = new Date()
   // ---- Rodapé
   pg.drawRectangle({ x: 0, y: 0, width: W, height: FOOTER, color: NAVY_950 });
   txt(`Gabriel Zaneloti · INSS de obras  ·  WhatsApp ${WHATSAPP_DISPLAY}  ·  gabrielzaneloti.com.br`, M, 11, 8, f, NAVY_SUB);
+  // O endereço do site no rodapé vira link clicável (com UTM do PDF).
+  try {
+    const rodape = limpo(`Gabriel Zaneloti · INSS de obras  ·  WhatsApp ${WHATSAPP_DISPLAY}  ·  `);
+    const x0 = M + f.widthOfTextAtSize(rodape, 8);
+    const x1 = x0 + f.widthOfTextAtSize('gabrielzaneloti.com.br', 8);
+    const link = doc.context.register(
+      doc.context.obj({
+        Type: 'Annot',
+        Subtype: 'Link',
+        Rect: [x0 - 2, 6, x1 + 2, 22],
+        Border: [0, 0, 0],
+        A: { Type: 'Action', S: 'URI', URI: PDFString.of(LINK_SITE_PDF) },
+      }),
+    );
+    pg.node.set(PDFName.of('Annots'), doc.context.obj([link]));
+  } catch {
+    // sem o link o PDF sai do mesmo jeito
+  }
 
   return Buffer.from(await doc.save());
 }

@@ -18,7 +18,50 @@
  * ============================================================================
  */
 
-async function saveToSupabase(view) {
+const corta = (v, n) => (v ? String(v).slice(0, n) : null);
+
+/** Campos que existem desde o começo da tabela. */
+function camposBasicos(view) {
+  return {
+    path: String(view.path || '/').slice(0, 500),
+    referrer: corta(view.referrer, 500),
+    utm_source: corta(view.utmSource, 200),
+    utm_medium: corta(view.utmMedium, 200),
+    utm_campaign: corta(view.utmCampaign, 200),
+    visitor_id: corta(view.visitorId, 100),
+    created_at: new Date().toISOString(),
+  };
+}
+
+/** Campos novos (v50): só gravam depois que o supabase_setup.sql novo rodar; antes disso, a visita é gravada só com os básicos. */
+function camposNovos(view, userAgent) {
+  const tipo = ['gclid', 'gbraid', 'wbraid'].includes(view.clickId) ? view.clickId : null;
+  const tela = Number(view.tela);
+  return {
+    utm_term: corta(view.utmTerm, 200),
+    utm_content: corta(view.utmContent, 200),
+    click_id: tipo,
+    ref: corta(view.ref, 60),
+    interno: view.interno === true,
+    tela: Number.isFinite(tela) && tela > 0 && tela < 20000 ? Math.round(tela) : null,
+    user_agent: corta(userAgent, 400),
+  };
+}
+
+async function postar(url, key, linha) {
+  return fetch(`${url.replace(/\/$/, '')}/rest/v1/page_views`, {
+    method: 'POST',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(linha),
+  });
+}
+
+async function saveToSupabase(view, userAgent) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -28,24 +71,14 @@ async function saveToSupabase(view) {
   }
 
   try {
-    const response = await fetch(`${url.replace(/\/$/, '')}/rest/v1/page_views`, {
-      method: 'POST',
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({
-        path: String(view.path || '/').slice(0, 500),
-        referrer: view.referrer ? String(view.referrer).slice(0, 500) : null,
-        utm_source: view.utmSource ? String(view.utmSource).slice(0, 200) : null,
-        utm_medium: view.utmMedium ? String(view.utmMedium).slice(0, 200) : null,
-        utm_campaign: view.utmCampaign ? String(view.utmCampaign).slice(0, 200) : null,
-        visitor_id: view.visitorId ? String(view.visitorId).slice(0, 100) : null,
-        created_at: new Date().toISOString(),
-      }),
-    });
+    const basicos = camposBasicos(view);
+    let response = await postar(url, key, { ...basicos, ...camposNovos(view, userAgent) });
+    if (!response.ok && (response.status === 400 || response.status === 404)) {
+      // Colunas novas ainda não criadas no Supabase: grava só o básico, como antes.
+      const detalhe = await response.text();
+      if (/column|coluna|PGRST204/i.test(detalhe)) response = await postar(url, key, basicos);
+      else response = new Response(detalhe, { status: response.status });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -91,6 +124,6 @@ export default async function handler(req, res) {
     return;
   }
 
-  const result = await saveToSupabase(view);
+  const result = await saveToSupabase(view, req.headers?.['user-agent']);
   res.status(200).json(result);
 }

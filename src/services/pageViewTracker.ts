@@ -16,6 +16,37 @@
  */
 
 const VISITOR_ID_KEY = 'gz_visitor_id';
+/** Marca o aparelho do próprio Gabriel (gravada ao entrar no CRM, ou abrindo o site com ?interno=1). */
+export const INTERNO_KEY = 'gz_interno';
+
+/** Marca (ou desmarca) este aparelho como do próprio Gabriel: as visitas dele aparecem separadas no CRM. */
+export function marcarAparelhoInterno(interno = true): void {
+  try {
+    if (interno) window.localStorage.setItem(INTERNO_KEY, '1');
+    else window.localStorage.removeItem(INTERNO_KEY);
+  } catch {
+    // Armazenamento indisponível — segue sem marcar.
+  }
+}
+
+function aparelhoInterno(): boolean {
+  try {
+    const flag = new URLSearchParams(window.location.search).get('interno');
+    if (flag === '1') marcarAparelhoInterno(true);
+    if (flag === '0') marcarAparelhoInterno(false);
+    return window.localStorage.getItem(INTERNO_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Qual identificador de clique do Google Ads veio na URL (gclid no geral; gbraid/wbraid em iPhone e apps). */
+function getClickIdTipo(): string | undefined {
+  for (const nome of ['gclid', 'gbraid', 'wbraid']) {
+    if (getUtmParam(nome)) return nome;
+  }
+  return undefined;
+}
 
 function generateId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -62,6 +93,12 @@ export function trackPageView(): void {
     utmSource: getUtmParam('utm_source'),
     utmMedium: getUtmParam('utm_medium'),
     utmCampaign: getUtmParam('utm_campaign'),
+    utmTerm: getUtmParam('utm_term'),
+    utmContent: getUtmParam('utm_content'),
+    clickId: getClickIdTipo(),
+    ref: getUtmParam('ref'),
+    interno: aparelhoInterno(),
+    tela: window.screen?.width || undefined,
     visitorId: getOrCreateVisitorId(),
   };
 
