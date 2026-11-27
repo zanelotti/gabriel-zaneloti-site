@@ -15,7 +15,7 @@ import { citouHonorarios, ehDocumentoDoLead, movimentoDaConsultoria, podeMover }
 import { dividirMensagens, pediuParar, validarSaida } from './guards.js';
 import { montarAbertura } from './opening.js';
 import { detectarOrigemSite, ehLeadExterno, idLeadEbook, montarBoasVindas, novoIdLeadExterno, origemDoLead, rotuloDaOrigem } from './origem.js';
-import { gerarPdfSimulacao, MARCA_PDF, nomeArquivoPdf, simulacaoDoLead } from './pdf-simulacao.js';
+import { gerarPdfSimulacao, MARCA_PDF, mensagensDaEconomia, nomeArquivoPdf, simulacaoDoLead } from './pdf-simulacao.js';
 import { camposDoLead, montarEmailSimulacao, montarMensagemSimulacao, normalizarEntrada, simular } from './simulacao.js';
 import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, leadValorAlto, limparNomeInformado, normalizarTelefoneBR, primeiroNomePessoa } from './util.js';
 
@@ -23,6 +23,10 @@ const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
 const TRINTA_MIN = 30 * 60 * 1000;
 const MAX_ANEXOS = 4; // fotos/PDFs lidos por resposta (os mais recentes)
 const MSG_SO_TEXTO = 'Recebi o seu arquivo, mas por aqui eu consigo ler só texto. Consegue me escrever em poucas palavras?';
+// Depois do PDF a Lia já mandou, em mensagens separadas, a economia em % (pedido do Gabriel, 27/11). O modelo só fecha com a pergunta.
+const ORIENTACAO_DEPOIS_DA_ECONOMIA =
+  'O PDF com a simulação JÁ foi enviado e, logo depois, você JÁ mandou em mensagens separadas a economia em porcentagem, que segue a normativa da Receita e que é uma oportunidade que não dá para deixar passar (está no histórico). NÃO repita nada disso, NÃO diga de novo que mandou o PDF e NÃO cite valores em reais. Escreva só UMA mensagem curta com UMA pergunta objetiva sobre a obra que ajude a fechar (por exemplo, se ela vai precisar da CND para averbar, vender ou financiar). Sem dizer que é estimativa nem que o Gabriel vai confirmar ou analisar. NÃO fale de honorário ainda.';
+
 export const MARCA_AUDIO = '[áudio transcrito] '; // a Lia sabe que veio de um áudio (a transcrição pode trocar alguma palavra)
 const ehMarcaDeMidia = (t) => /^\[o lead enviou [^\]]+\]$/.test(String(t || '').trim());
 const MARCA_ESPERA = 'ESPERA_GABRIEL: '; // guardada em observacao: a conversa segue 'ativa', mas já foi passada ao Gabriel
@@ -97,6 +101,23 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       log.warn(`[bot] não consegui enviar o PDF da simulação: ${e.message}`);
       return false;
     }
+  }
+
+  /**
+   * Depois do PDF: a economia em % em mensagens curtas e separadas (pedido do Gabriel, 27/11). Devolve quantas foram.
+   * Nunca derruba a conversa.
+   */
+  async function enviarMensagensDaEconomia(conversa, { nome, r }) {
+    let n = 0;
+    try {
+      for (const texto of mensagensDaEconomia({ nome, r })) {
+        await enviar(conversa, texto);
+        n++;
+      }
+    } catch (e) {
+      log.warn(`[bot] não consegui mandar as mensagens da economia: ${e.message}`);
+    }
+    return n;
   }
 
   /** Modo de teste: só fala com os números da lista (mesma regra da abertura). */
@@ -754,13 +775,16 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
         if (!sim) return { ok: false, erro: 'este lead não tem simulação com valores; siga o roteiro sem números' };
         const historicoAtual = await store.historico(conversa.id);
         if (historicoAtual.some((m) => m.direcao === 'bot' && m.texto === MARCA_PDF)) return { ok: true, ja_enviado: true, orientacao: 'O PDF já tinha sido enviado antes; não mande de novo. Siga o atendimento.' };
-        const foi = await enviarPdfSimulacao(conversa, { nome: nomeAtual || conversa.nome_contato || primeiroNomePessoa(lead.nome) || '', ...sim });
+        const nomePdf = nomeAtual || conversa.nome_contato || primeiroNomePessoa(lead.nome) || '';
+        const foi = await enviarPdfSimulacao(conversa, { nome: nomePdf, ...sim });
         if (!foi) return { ok: false, erro: 'não consegui enviar o PDF agora; use passar_para_gabriel com o motivo "falha ao enviar o PDF da simulação"' };
+        const empolgou = await enviarMensagensDaEconomia(conversa, { nome: nomePdf, r: sim.r });
         return {
           ok: true,
           enviado: true,
-          orientacao:
-            'O PDF com a simulação JÁ foi enviado. Agora escreva UMA mensagem curta, SEM nenhum valor em reais e sem percentuais: diga que mandou a simulação da obra em PDF, sem dizer que é estimativa nem que o Gabriel vai confirmar ou analisar, e termine com UMA pergunta objetiva sobre a obra (passo 2 da ESTRATÉGIA DE VENDA). NÃO fale de honorário ainda.',
+          orientacao: empolgou
+            ? ORIENTACAO_DEPOIS_DA_ECONOMIA
+            : 'O PDF com a simulação JÁ foi enviado. Agora escreva UMA mensagem curta, SEM nenhum valor em reais e sem percentuais: diga que mandou a simulação da obra em PDF, sem dizer que é estimativa nem que o Gabriel vai confirmar ou analisar, e termine com UMA pergunta objetiva sobre a obra (passo 2 da ESTRATÉGIA DE VENDA). NÃO fale de honorário ainda.',
         };
       },
       // Simulação do INSS feita na conversa (quem chegou pelo botão do site): calcula, ENVIA ao cliente, avisa o Gabriel por e-mail e preenche o card.
@@ -794,6 +818,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
         // Pedido do Gabriel (25/11): os números vão SÓ no PDF, não no texto da conversa. Se o PDF falhar, manda o texto para o cliente não ficar sem nada.
         const foiPdf = await enviarPdfSimulacao(conversa, { nome: nomeCliente || primeiroNomePessoa(lead.nome) || '', dados, r });
         if (!foiPdf) await enviar(conversa, montarMensagemSimulacao(dados, r, { nome: nomeCliente }));
+        const empolgou = foiPdf ? await enviarMensagensDaEconomia(conversa, { nome: nomeCliente || primeiroNomePessoa(lead.nome) || '', r }) : 0;
         simulacoesFeitas.set(conversa.id, feitas + 1);
         log.info(`[bot] simulação enviada a ${conversa.telefone} (${dados.estado}, ${dados.areaPrincipal} m²).`);
 
@@ -816,7 +841,9 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
           ok: true,
           enviada: true,
           tem_estimativa_de_economia: temEconomia,
-          orientacao: temEconomia
+          orientacao: empolgou
+            ? `${ORIENTACAO_DEPOIS_DA_ECONOMIA} Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.`
+            : temEconomia
             ? 'A simulação JÁ foi enviada à pessoa em PDF na conversa e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais e sem repetir os números: diga que mandou a simulação em PDF com os valores da obra, sem dizer que é estimativa nem que o Gabriel vai confirmar ou analisar, e termine com UMA pergunta objetiva sobre a obra que ajude a fechar (por exemplo, se ela vai precisar da CND para averbar, vender ou financiar). Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.'
             : 'A simulação JÁ foi enviada à pessoa em PDF (só o INSS sem planejamento, sem economia calculada) e por e-mail ao Gabriel. Agora escreva UMA mensagem curta, SEM valores em reais, dizendo que obras assim costumam ter boas frentes de redução (como a decadência, com prova da época da obra), sem dizer que o Gabriel vai analisar ou confirmar, e termine com UMA pergunta objetiva (por exemplo, se ela tem habite-se, alvará ou IPTU da época). Na resposta seguinte: VALOR (como a redução funciona, o que o Gabriel faz, prova) e o convite para mostrar o investimento; honorário só quando ela perguntar ou aceitar.',
         };

@@ -23,7 +23,7 @@ import { criarAprendizado, criarIndiceAprendizado, formatarAprendidos, validarAp
 import { citouHonorarios, MOTIVOS_PERDA, movidoAMao, podeMover, podeMudarCard } from '../src/funil.js';
 import { descreverQuando, lembreteDevido, MAX_FOLLOWUPS, montarFollowup, montarMensagemConsultoria, proximoFollowup } from '../src/acompanhamento.js';
 import { detectarOrigemSite, ehLeadExterno, montarBoasVindas, ORIGENS, origemDoLead, roteiroDaOrigem } from '../src/origem.js';
-import { gerarPdfSimulacao, LINK_SITE_PDF, nomeArquivoPdf, simulacaoDoLead } from '../src/pdf-simulacao.js';
+import { gerarPdfSimulacao, LINK_SITE_PDF, mensagensDaEconomia, nomeArquivoPdf, simulacaoDoLead } from '../src/pdf-simulacao.js';
 import { camposDoLead, lerTabelasDoSite, montarEmailSimulacao, montarMensagemSimulacao, normalizarEntrada, origemDasTabelas, simular, sincronizarTabelasDoSite } from '../src/simulacao.js';
 import { semSimulacao } from '../src/origem.js';
 import { calcularHonorario, criarChamador, leadValorAlto, limparNomeInformado, mensagemDadosContrato, nomeParecePessoa, PERGUNTA_FECHAMENTO, normalizarTelefoneBR, obraEmAndamento, primeiroNomePessoa } from '../src/util.js';
@@ -3030,11 +3030,12 @@ await teste('fluxo completo: ela passa os dados, o bot envia a simulação na co
   ctx.bot.pararTimers();
 
   const novas = ctx.wa.enviados.slice(antes).map((m) => m.texto);
-  assert.equal(novas.length, 1, 'só a mensagem de continuação: os números vão no PDF');
+  assert.equal(novas.length, 5, 'a economia em % em 4 mensagens curtas (v51) + a continuação; os reais vão no PDF');
   assert.equal(ctx.wa.arquivos.length, 1, 'o PDF da simulação foi enviado');
-  assert.equal(ctx.wa.arquivos[0].depoisDe, antes, 'o PDF sai antes da continuação');
-  assert.match(novas[0], /prestador autônomo\?$/);
-  assert.doesNotMatch(novas[0], /R\$/, 'a continuação não tem números');
+  assert.equal(ctx.wa.arquivos[0].depoisDe, antes, 'o PDF sai antes das mensagens');
+  assert.match(novas[0], /^Carlos, olha que notícia boa: .*cai \d+%/);
+  assert.match(novas.at(-1), /prestador autônomo\?$/);
+  assert.doesNotMatch(novas.join(' '), /R\$/, 'a conversa não tem valores em reais');
 
   // o card do CRM ficou com os dados da obra e os números
   const card = ctx.store.leads.get(lead0.id);
@@ -3201,6 +3202,33 @@ await teste('lead da calculadora: ao confirmar, a Lia manda o PDF (sem números 
   await ctx.bot.responder(c.id);
   ctx.bot.pararTimers();
   assert.equal(ctx.wa.arquivos.length, 1, 'não manda de novo');
+});
+
+await teste('depois do PDF a Lia mostra a economia em % em mensagens curtas, empolgada e sem ressalva (v51)', async () => {
+  const l = lead({ estado: 'SP', destinacao: 'residencial_unifamiliar', tipo_obra: 'alvenaria', categoria: 'obra_nova', data_fim: '2024-06-01' });
+  const ctx = montar({
+    roteiro: [[uso('enviar_simulacao_pdf', {})], texto('Você vai precisar da CND para averbar a obra, vender ou financiar o imóvel?')],
+  });
+  const c = await abrir(ctx, l);
+  const antes = ctx.wa.enviados.length;
+  await ctx.bot.aoReceber({ telefone: c.telefone, texto: 'Sim, está correto' });
+  await ctx.bot.responder(c.id);
+  ctx.bot.pararTimers();
+  const novos = ctx.wa.enviados.slice(antes).map((m) => m.texto);
+  assert.equal(ctx.wa.arquivos[0].depoisDe, antes, 'o PDF vem primeiro');
+  assert.ok(novos.length >= 5, 'várias mensagens separadas + a pergunta');
+  assert.match(novos[0], /cai 52%\. Mais da metade!/);
+  assert.match(novos.join(' '), /Instrução Normativa RFB 2\.021\/2021/);
+  assert.match(novos.join(' '), /não dá para deixar passar/);
+  assert.match(novos.at(-1), /CND/);
+  for (const m of novos) {
+    assert.ok(m.length < 160, `mensagem curta: ${m}`);
+    assert.doesNotMatch(m, /R\$|estimativ|cerca de|aproximad|confirm|análise/i);
+    assert.ok(validarSaida(m, l).ok, `passa nas travas: ${m} ${validarSaida(m, l).motivo || ''}`);
+  }
+  assert.deepEqual(mensagensDaEconomia({ nome: 'x', r: { economiaEstimada: 0, percentualReducao: 0 } }), [], 'sem economia, não manda');
+  assert.match(mensagensDaEconomia({ nome: 'sandro silva', r: { economiaEstimada: 9000, percentualReducao: 31.6 } })[0], /^Sandro, olha que notícia boa: com o planejamento, o INSS da sua obra cai 32%\.$/);
+  assert.match(ctx.client.chamadas[1].messages.map((m) => JSON.stringify(m.content)).join(' '), /NÃO repita/, 'o modelo sabe que a economia já foi dita');
 });
 
 await teste('PDF a partir do lead da calculadora tem os números do cadastro', async () => {

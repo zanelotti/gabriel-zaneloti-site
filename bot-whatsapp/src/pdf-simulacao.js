@@ -325,3 +325,21 @@ export async function gerarPdfSimulacao({ nome = '', dados, r, hoje = new Date()
 
   return Buffer.from(await doc.save());
 }
+
+/**
+ * Mensagens que a Lia manda logo depois do PDF (pedido do Gabriel, 27/11): mostrar a economia em porcentagem e deixar o
+ * cliente empolgado, em mensagens curtas e separadas, como uma pessoa falando. Sem valores em reais (eles ficam no PDF)
+ * e sem nenhuma ressalva ("estimativa", "cerca de", "o Gabriel vai confirmar"). Sem economia, devolve lista vazia.
+ */
+export function mensagensDaEconomia({ nome = '', r } = {}) {
+  const pct = Math.round(Number(r?.percentualReducao) || 0);
+  if (!(Number(r?.economiaEstimada) > 0) || pct < 1) return [];
+  const primeiro = nomeBonito(String(nome || '').trim().split(/\s+/)[0] || '');
+  const abre = primeiro ? `${primeiro}, olha que notícia boa:` : 'Olha que notícia boa:';
+  return [
+    `${abre} com o planejamento, o INSS da sua obra cai ${pct}%.${pct >= 50 ? ' Mais da metade!' : ''}`,
+    'É uma redução grande de verdade. A maioria das pessoas paga o valor cheio porque nem sabe que dá para pagar menos.',
+    'E não tem jeitinho nem brecha: tudo segue a Instrução Normativa RFB 2.021/2021, a regra oficial da Receita Federal para obras.',
+    'Sinceramente, é o tipo de oportunidade que não dá para deixar passar.',
+  ];
+}
