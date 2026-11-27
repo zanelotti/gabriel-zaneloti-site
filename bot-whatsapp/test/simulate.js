@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { criarBot } from '../src/bot.js';
-import { aceitouVerInvestimento } from '../src/guards.js';
+import { aceitouVerInvestimento, pediuInvestimentoNaConversa, tirarPerguntasRepetidas } from '../src/guards.js';
 import { criarCerebro, montarHistorico, anexarArquivos } from '../src/brain.js';
 import { aceitouListaDeDados, prometeDadosSemLista } from '../src/guards.js';
 import { dividirMensagens, extrairValoresReais, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, pediuParar, repeticaoExcessiva, validarSaida } from '../src/guards.js';
@@ -511,7 +511,7 @@ await teste('lead pergunta o custo: assistente responde (12% sobre economia comp
 
 await teste('resposta com "só paga se economizar" é bloqueada e reescrita', async () => {
   const ctx = montar({
-    roteiro: [texto('Você só paga se economizar, sem risco!'), texto('O honorário é calculado sobre a economia comprovada. O que você precisa ver para decidir?')],
+    roteiro: [texto('Você só paga se economizar, sem risco!'), texto('O honorário é de 12% sobre a economia comprovada. O que você precisa ver para decidir?')],
   });
   const c = await abrir(ctx, lead());
   await ctx.bot.aoReceber({ telefone: telefoneDe(c), texto: 'como funciona a cobrança?' });
@@ -3296,7 +3296,7 @@ await teste('clientes para agir: resposta da Claude e horário do e-mail', async
 });
 
 await teste('devolver ao bot: a Lia lê o que o Gabriel escreveu e responde sozinha o cliente que ficou esperando', async () => {
-  const ctx = montar({ roteiro: [texto('Funciona assim: o Gabriel cuida de tudo, do CNO até a CND. Posso te mostrar o investimento?')] });
+  const ctx = montar({ roteiro: [texto('Funciona assim: o Gabriel cuida de tudo, do CNO até a CND. Posso te mostrar o investimento?'), texto('Ele cuida de tudo, do CNO até a CND. O honorário é de 12% sobre a economia, à vista ou em 6x sem juros.')] });
   const c = await abrir(ctx, lead());
   const painel = criarPainel({ store: ctx.store, wa: ctx.wa, bot: ctx.bot, config: ctx.config, conhecimento: { texto: '', valores: [] }, log: silencioso, controle: criarControleDePausa({ ...ctx.config, ativo: true, arquivoParar: 'x.txt' }) });
   const novo = (o) => ctx.store.comandos.push({ id: ctx.store.comandos.length + 1, status: 'pendente', criado_em: new Date().toISOString(), conversa_id: c.id, ...o });
@@ -3309,7 +3309,8 @@ await teste('devolver ao bot: a Lia lê o que o Gabriel escreveu e responde sozi
   await painel.processarComandos();
   await new Promise((r) => setTimeout(r, 2000)); // responde sozinha, sem ninguém chamar responder()
   ctx.bot.pararTimers();
-  assert.equal(ctx.wa.enviados.length, antes + 1, 'respondeu o cliente sozinha depois de devolver');
+  assert.ok(ctx.wa.enviados.length > antes, 'respondeu o cliente sozinha depois de devolver');
+  assert.match(ctx.wa.enviados.slice(antes).map((e) => e.texto ?? JSON.stringify(e)).join('\n'), /honorário/i, 'ela perguntou quanto custa: o preço vai');
   const msgs = ctx.client.chamadas.at(-1).messages;
   const tudo = JSON.stringify(msgs);
   assert.match(tudo, /\(Mensagem do Gabriel:\) Gostaria de prosseguir/, 'a Lia sabe o que o Gabriel escreveu');
@@ -3368,6 +3369,45 @@ await teste('lista de dados: se o modelo pedir "os dados" sem a lista, a lista v
   const r2 = await c2.gerarResposta({ lead: lead(), historico: [{ direcao: 'bot', texto: 'Oi, Ana!' }, { direcao: 'lead', texto: 'quero contratar, o que precisa?' }], ferramentas: {}, log: silencioso });
   assert.equal(chamadas.length, 1);
   assert.match(r2.mensagens.join('\n'), /• CPF/);
+});
+
+await teste('investimento: "Mostrar o investimento" mostra o preço na hora e nunca repete o convite (caso Sangela, 27/11)', async () => {
+  const convite = 'Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?';
+  const hist = [
+    { direcao: 'bot', texto: 'O Gabriel cuida de tudo, do CNO até a CND.' },
+    { direcao: 'bot', texto: convite },
+    { direcao: 'lead', texto: 'Mostrar o investimento' },
+  ];
+  assert.equal(aceitouVerInvestimento(hist), true, 'mostrar (infinitivo) vale como aceite');
+  for (const sim of ['Mostrar o investimento', 'pode mostrar', 'quero ver o valor', 'Não, pode mostrar', 'qual o investimento?', 'sim']) {
+    assert.equal(aceitouVerInvestimento([hist[1], { direcao: 'lead', texto: sim }]), true, sim);
+  }
+  for (const nao of ['agora não', 'vou ver com meu marido e te falo', 'tenho uma dúvida sobre o prazo', 'não']) {
+    assert.equal(aceitouVerInvestimento([hist[1], { direcao: 'lead', texto: nao }]), false, nao);
+  }
+  // 1) O modelo insiste em explicar o serviço e repetir o convite: pede uma vez; se insistir, vai a mensagem pronta com o preço.
+  const chamadas = [];
+  const repete = { content: [{ type: 'text', text: `Como a sua obra ainda vai começar, ela já nasce organizada.\n\n${convite}` }], stop_reason: 'end_turn' };
+  const cerebro = criarCerebro({ modelo: 'teste', config, client: { messages: { async create(p) { chamadas.push(p); return repete; } } } });
+  const r = await cerebro.gerarResposta({ lead: lead(), historico: hist, ferramentas: {}, log: silencioso });
+  const tudo = r.mensagens.join('\n');
+  assert.match(tudo, /honorário é de R\$/);
+  assert.match(tudo, /6x sem juros/);
+  assert.match(tudo, /lista de dados/);
+  assert.doesNotMatch(tudo, /mostrar o investimento/);
+  assert.equal(chamadas.length, 2, 'pede uma reescrita e depois usa a mensagem pronta');
+  assert.match(chamadas[0].system, /pediu para ver o investimento/);
+  // 2) Depois de pedir o investimento ela fez outra pergunta: o preço ainda tem de sair.
+  const hist2 = [...hist, { direcao: 'bot', texto: 'Nós cuidamos do SERO e da DCTFWeb.' }, { direcao: 'bot', texto: convite }, { direcao: 'lead', texto: 'Como funciona essa assessoria?' }];
+  assert.equal(pediuInvestimentoNaConversa(hist2), true);
+  const c2 = criarCerebro({ modelo: 'teste', config, client: { messages: { async create() { return repete; } } } });
+  const r2 = await c2.gerarResposta({ lead: lead(), historico: hist2, ferramentas: {}, log: silencioso });
+  assert.match(r2.mensagens.join('\n'), /honorário é de R\$/);
+  // 3) O modelo responde certo, mas repete uma pergunta já feita: a pergunta sai da mensagem.
+  const ok = { content: [{ type: 'text', text: `O honorário é de R$ 1.200, que são 12% sobre a economia de R$ 10.000. Pode ser à vista ou em 6x sem juros.\n\n${convite}` }], stop_reason: 'end_turn' };
+  assert.deepEqual(tirarPerguntasRepetidas(['Nós cuidamos de tudo.', convite], hist), ['Nós cuidamos de tudo.']);
+  assert.deepEqual(tirarPerguntasRepetidas(['Certo. A obra já tem CNO?'], hist), ['Certo. A obra já tem CNO?'], 'pergunta nova fica');
+  void ok;
 });
 
 console.log(`\n${process.exitCode ? 'COM FALHAS' : 'Tudo certo'}: ${passou} testes passaram.\n`);

@@ -4,14 +4,14 @@
  * passou nas travas de conteúdo (guards.js).
  */
 import Anthropic from '@anthropic-ai/sdk';
-import { aceitouListaDeDados, aceitouVerInvestimento, citouNumerosDoCalculo, jaTemListaDeDados, prometeDadosSemLista, dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, precisaExplicarNumeros, repeticaoExcessiva, validarSaida } from './guards.js';
+import { aceitouListaDeDados, aceitouVerInvestimento, jaConvidouInvestimento, pediuInvestimentoNaConversa, tirarPerguntasRepetidas, citouNumerosDoCalculo, jaTemListaDeDados, prometeDadosSemLista, dividirMensagens, falaDeHonorario, leadPerguntouPreco, muitoLonga, passagemJustificada, precisaExplicarNumeros, repeticaoExcessiva, validarSaida } from './guards.js';
 import { citouHonorarios } from './funil.js';
 import { formatarTrechos } from './documentos.js';
 import { MARCA_PDF } from './pdf-simulacao.js';
 import { formatarAprendidos } from './aprendizado.js';
 import { ehLeadExterno } from './origem.js';
 import { montarSistema } from './prompt.js';
-import { criarChamador, mensagemDadosContrato, primeiroNome, primeiroNomePessoa } from './util.js';
+import { criarChamador, mensagemDadosContrato, mensagemInvestimento, primeiroNome, primeiroNomePessoa } from './util.js';
 
 export const FERRAMENTAS = [
   {
@@ -264,8 +264,19 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
     const aceitou = aceitouVerInvestimento(historico);
     const precoPrematuro = (t) =>
       falaDeHonorario(t) && !perguntouPreco && !jaFalouHonorario && !aceitou && (msgsLead.length < 5 || !numerosExplicados);
-    const MOTIVO_PRECO_CEDO =
-      'fala de honorário/preço, mas a pessoa não perguntou o custo e ainda não aceitou ver o investimento. Reescreva SEM citar honorário, percentual ou valor do serviço: passe VALOR (como a redução funciona no caso dela, o que o Gabriel faz do começo ao fim, prova real) e termine convidando: "Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?"';
+    const convidou = jaConvidouInvestimento(historico);
+    const MOTIVO_PRECO_CEDO = convidou
+      ? 'fala de honorário/preço, mas a pessoa ainda não pediu o investimento. Reescreva SEM citar honorário, percentual ou valor do serviço, respondendo só o que ela disse, e NÃO repita o convite para mostrar o investimento (ele já foi feito)'
+      : 'fala de honorário/preço, mas a pessoa não perguntou o custo e ainda não aceitou ver o investimento. Reescreva SEM citar honorário, percentual ou valor do serviço: passe VALOR (como a redução funciona no caso dela, o que o Gabriel faz do começo ao fim, prova real) e termine convidando: "Ficou alguma dúvida sobre como funciona, ou posso te mostrar o investimento?"';
+    // A pessoa pediu o investimento (aceitou o convite ou perguntou o preço) e o honorário ainda não foi dito:
+    // a resposta TEM de trazer o honorário. Se o modelo insistir em outra coisa, vai a mensagem pronta (mensagemInvestimento).
+    const ultimaDoLead = msgsLead.length ? msgsLead[msgsLead.length - 1].texto : '';
+    const pediuInvestimento = !jaFalouHonorario && (aceitou || leadPerguntouPreco(ultimaDoLead) || pediuInvestimentoNaConversa(historico));
+    const MOTIVO_SEM_PRECO =
+      'a pessoa PEDIU o investimento e a resposta não trouxe o honorário. Responda AGORA, direto (se ela fez outra pergunta, responda em UMA frase antes): o honorário exatamente como na linha "COMO APRESENTAR O HONORÁRIO" (ou "HONORÁRIO") dos DADOS, as formas de pagamento em meia frase e a pergunta de fechamento. NÃO explique o serviço de novo e NÃO repita o convite';
+    let jaPediuPreco = false;
+    // Deu o preço: fala de honorário/investimento/cobrança junto de um valor em R$ ou de um percentual.
+    const deuPreco = (t) => citouHonorarios(t) || (/honor[aá]rio|investimento|cobr|custa|percentual|valor do servi/i.test(t) && /R\$\s*\d|\d\s*%/.test(t));
     const valoresExtras = [...conhecimento.valores, ...trechos.valores];
     const temBusca = (documentos && documentos.total > 0) || (aprendizado && aprendizado.total > 0);
     const comPdf = !ehLeadExterno(lead) && precisaExplicarNumeros(lead);
@@ -279,7 +290,16 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
       'escreveu os números da simulação na conversa. Os números vão SÓ no PDF: use a ferramenta enviar_simulacao_pdf e depois escreva uma mensagem curta, sem valores em reais, dizendo que mandou a simulação em PDF e com UMA pergunta objetiva sobre a obra';
     const ferramentasApi = temBusca ? [...base, FERRAMENTA_DOCUMENTOS] : base;
     let consultas = 0;
-    const system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato, aprendidos, parcelamentoCitado);
+    let system = montarSistema(lead, config, conhecimento.texto, trechos.texto, espera, nomeContato, aprendidos, parcelamentoCitado);
+    if (pediuInvestimento) {
+      system += '\n\n# AGORA (prioridade máxima)\nA pessoa pediu para ver o investimento (agora ou antes nesta conversa) e ainda não recebeu o preço. Se a última mensagem dela trouxer outra pergunta, responda-a em UMA frase curta; em seguida, nesta MESMA resposta, apresente o honorário (linha "COMO APRESENTAR O HONORÁRIO" ou "HONORÁRIO" dos DADOS DO LEAD), as formas de pagamento em meia frase e termine com a pergunta de fechamento. Não explique o serviço de novo e não repita nenhuma pergunta já feita.';
+    }
+    // Nunca repete uma pergunta já feita na conversa (pedido do Gabriel, 27/11/2026). Se só sobrar pergunta repetida, manda o texto como veio.
+    const semRepetir = (msgs) => {
+      const limpas = tirarPerguntasRepetidas(msgs, historico);
+      if (limpas.length < msgs.length || limpas.some((m, i) => m !== msgs[i])) log.warn('[cerebro] tirei da resposta uma pergunta que já tinha sido feita.');
+      return limpas.length ? limpas : msgs;
+    };
     const messages = anexarArquivos(montarHistorico(historico), anexos);
     let acao = null;
     const consumo = { entrada: 0, saida: 0 };
@@ -376,6 +396,17 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
         : validarSaida(texto, lead, valoresExtras);
       if (v.ok && precoPrematuro(texto)) v = { ok: false, motivo: MOTIVO_PRECO_CEDO };
       if (v.ok && numerosAntesDoPdf(texto)) v = { ok: false, motivo: MOTIVO_NUMEROS_SEM_PDF };
+      if (v.ok && pediuInvestimento && !deuPreco(texto) && !prometeDadosSemLista(texto, historico) && !jaTemListaDeDados(texto)) {
+        if (jaPediuPreco) {
+          log.warn('[cerebro] a pessoa pediu o investimento e o modelo não deu o preço de novo; enviando a mensagem pronta do investimento.');
+          return { mensagens: dividirMensagens(mensagemInvestimento(lead, { externo: ehLeadExterno(lead) && !lead?.responsavel })), acao, uso: consumo };
+        }
+        jaPediuPreco = true;
+        log.warn('[cerebro] a pessoa pediu o investimento e a resposta não trouxe o preço; pedindo outra versão.');
+        messages.push({ role: 'assistant', content: texto || '(vazio)' });
+        messages.push({ role: 'user', content: `[AVISO INTERNO, não mencione ao lead: ${MOTIVO_SEM_PRECO}.]` });
+        continue;
+      }
       if (v.ok && prometeDadosSemLista(texto, historico)) {
         // Falou em mandar os dados mas esqueceu a lista: a lista vai junto, como mensagem pronta.
         log.warn('[cerebro] a resposta pede os dados do contrato sem a lista; enviando a lista.');
@@ -408,7 +439,7 @@ export function criarCerebro({ apiKey, modelo, config, client, conhecimento = { 
           continue;
         }
       }
-      if (v.ok) return { mensagens: dividirMensagens(texto), acao, uso: consumo };
+      if (v.ok) return { mensagens: semRepetir(dividirMensagens(texto)), acao, uso: consumo };
 
       bloqueios += 1;
       ultimoMotivo = v.motivo;

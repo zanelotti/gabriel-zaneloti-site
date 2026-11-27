@@ -166,7 +166,7 @@ export function leadPerguntouPreco(texto) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
-  return /(honorari|quanto (voce|vc|ele|o gabriel|vcs|voces)?\s*(cobra|cobram|custa|fica|e que|sai)|quanto (e|eh|custa|fica|sai|seria)|\bquando (custa|cobra|fica|sai|e o (servico|honorario|investimento))|\bquanto\b[^?.!\n]{0,30}\b(servico|trabalho|honorario|investimento)|\bcusto\b|\bcustos\b|\bcustar\b|\bpreco|valor do (servico|trabalho|honorario)|qual (e )?o valor|cobranca|\bcobra|\bcobram|\bpagar (pra|para) (voce|vc|ele|o gabriel)|percentual|\bporcentagem|comissao|\btaxa\b|mensalidade|\bcaro\b|\bbarato\b|desconto)/.test(t);
+  return /(honorari|quanto (voce|vc|ele|o gabriel|vcs|voces)?\s*(cobra|cobram|custa|fica|e que|sai)|quanto (e|eh|custa|fica|sai|seria)|\bquando (custa|cobra|fica|sai|e o (servico|honorario|investimento))|\bquanto\b[^?.!\n]{0,30}\b(servico|trabalho|honorario|investimento)|\bcusto\b|\bcustos\b|\bcustar\b|\bpreco|valor do (servico|trabalho|honorario)|qual (e )?o valor|cobranca|\bcobra|\bcobram|\bpagar (pra|para) (voce|vc|ele|o gabriel)|percentual|\bporcentagem|comissao|\btaxa\b|mensalidade|\bcaro\b|\bbarato\b|desconto|\binvestimento\b)/.test(t);
 }
 
 /**
@@ -185,8 +185,63 @@ export function aceitouVerInvestimento(historico) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
-  if (/\b(nao|agora nao|depois)\b/.test(r)) return false;
-  return /\b(sim|pode|podes|quero|manda|mande|claro|ok|okay|bora|vamos|beleza|blz|show|isso|por favor|pfv|pode ser|mostra|mostre|gostaria)\b/.test(r);
+  // Pediu para ver ("Mostrar o investimento", "pode mostrar", "qual o valor?"): vale mesmo com "não" junto ("não, pode mostrar").
+  // Antes "mostrar" (infinitivo) não contava e a Lia explicou tudo de novo e repetiu o convite (bug de 27/11/2026).
+  const pediuVer = /\b(mostr\w*|ver|veja|investimento|valor|valores|preco|quanto|honorari\w*|manda ver)\b/.test(r);
+  if (/\b(agora nao|depois|mais tarde|nao quero|ainda nao|outra hora|vou ver|ver com|vou pensar|pensar|falar com)\b/.test(r)) return false;
+  if (pediuVer) return true;
+  if (/\bnao\b/.test(r)) return false;
+  return /\b(sim|s|pode|podes|quero|manda|mande|envia|envie|claro|ok|okay|bora|vamos|beleza|blz|show|isso|por favor|pfv|pode ser|gostaria|fala|diz|diga|segue|perfeito|certo|com certeza|aham|uhum)\b/.test(r) || /^\s*(👍|👌|✅|🙏)/u.test(respostas.join(' '));
+}
+
+/**
+ * Tira das mensagens as perguntas que a Lia (ou o Gabriel) JÁ fez antes na conversa (pedido do Gabriel, 27/11/2026:
+ * "nunca repetir a mesma pergunta"). Mensagem que fica vazia sai; a lista de dados do contrato nunca é mexida.
+ * Se TUDO for pergunta repetida, devolve [] (quem chama decide o que fazer).
+ */
+export function tirarPerguntasRepetidas(mensagens, historico = []) {
+  const feitas = [];
+  for (const m of historico) {
+    if (m.direcao === 'lead') continue;
+    for (const f of frasesDe(m.texto)) if (f.endsWith('?')) feitas.push(f);
+  }
+  if (!feitas.length) return mensagens;
+  const repetida = (f) => feitas.some((p) => semAcento(p).replace(/[^a-z0-9]/g, '') === semAcento(f).replace(/[^a-z0-9]/g, '') || parecidas(p, f));
+  const saida = [];
+  for (const msg of mensagens) {
+    if (jaTemListaDeDados(msg)) {
+      saida.push(msg);
+      continue;
+    }
+    const linhas = String(msg)
+      .split('\n')
+      .map((linha) => frasesDe(linha).filter((f) => !(f.endsWith('?') && repetida(f))).join(' '))
+      .filter((l) => l.trim());
+    if (linhas.length) saida.push(linhas.join('\n'));
+  }
+  return saida;
+}
+
+/**
+ * Em algum momento da conversa a pessoa pediu o investimento (aceitou o convite ou perguntou o preço)?
+ * Vale mesmo que ela tenha feito outra pergunta depois ("Mostrar o investimento" e, em seguida, "Como funciona a assessoria?"):
+ * enquanto o honorário não for dito, a Lia deve mostrá-lo (caso da Sangela, 27/11/2026).
+ */
+export function pediuInvestimentoNaConversa(historico = []) {
+  const h = Array.isArray(historico) ? historico : [];
+  for (let i = 0; i < h.length; i++) {
+    if (h[i].direcao !== 'lead') continue;
+    if (i + 1 < h.length && h[i + 1].direcao === 'lead') continue; // olha o bloco de respostas inteiro de uma vez
+    const ate = h.slice(0, i + 1);
+    if (aceitouVerInvestimento(ate)) return true;
+    if (leadPerguntouPreco(h[i].texto)) return true;
+  }
+  return false;
+}
+
+/** A conversa já teve o convite "posso te mostrar o investimento?". */
+export function jaConvidouInvestimento(historico = []) {
+  return historico.some((m) => m.direcao !== 'lead' && /mostrar o investimento/i.test(String(m.texto || '')));
 }
 
 /**
@@ -277,6 +332,10 @@ const PERGUNTAS_DE_ENCHIMENTO = [
   /tudo bem at[ée] aqui/i,
   /(voc[êe] )?concorda\??\s*$/i,
 ];
+
+function frasesDe(texto) {
+  return String(texto ?? '').split(/(?<=[.!?])\s+|\n+/).map((f) => f.trim()).filter(Boolean);
+}
 
 function ultimaPergunta(texto) {
   const frases = String(texto ?? '').split(/(?<=[.!?])\s+|\n+/).map((f) => f.trim()).filter(Boolean);

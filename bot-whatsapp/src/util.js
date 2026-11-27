@@ -131,6 +131,31 @@ export function calcularHonorario(lead) {
  */
 export const PERGUNTA_FECHAMENTO = 'Posso te passar a lista de dados para já preparar o seu contrato?';
 
+const FORMAS_PAGAMENTO = 'Você pode pagar à vista, 50% no início e 50% no fim, ou no cartão em até 6x sem juros.';
+
+/**
+ * Mensagem pronta do investimento (honorário + formas de pagamento + pergunta de fechamento), com os valores calculados
+ * pelo sistema. Vai quando a pessoa pede o investimento e a resposta do modelo não traz o honorário (bug de 27/11/2026:
+ * a Lia explicou o serviço de novo em vez de mostrar o preço).
+ */
+export function mensagemInvestimento(lead, { externo = false } = {}) {
+  const cobre = 'e cobre o processo inteiro, do cadastro no CNO até a certidão';
+  const h = calcularHonorario(lead);
+  let frase;
+  if (externo) {
+    frase = `O honorário do Gabriel é de 12% sobre a economia conseguida (para empresa, ${formatarReaisInteiros(HONORARIO_BASE_PJ)} mais 12% sobre a economia), ${cobre}.`;
+  } else if (h.tipo === 'PJ') {
+    frase = `O honorário é de ${formatarReaisInteiros(h.base)} mais 12% sobre a economia conseguida com as frentes de redução, ${cobre}.`;
+  } else if (h.economiaConhecida && h.minimoAplicado) {
+    frase = `O honorário é de ${formatarReaisInteiros(h.valor)} ${cobre}.`;
+  } else if (h.economiaConhecida) {
+    frase = `O honorário é de ${formatarReaisInteiros(h.valor)}, que são 12% sobre a economia de ${formatarReaisInteiros(lead.economia_estimada)}, ${cobre}.`;
+  } else {
+    frase = `O honorário é de 12% sobre a economia conseguida (se der menos de ${formatarReaisInteiros(HONORARIO_MINIMO_PF)}, fica em ${formatarReaisInteiros(HONORARIO_MINIMO_PF)}), ${cobre}.`;
+  }
+  return `${frase} ${FORMAS_PAGAMENTO}\n\n${PERGUNTA_FECHAMENTO}`;
+}
+
 /**
  * Dados que o Gabriel precisa para preparar o contrato. Para mudar a lista, edite só aqui.
  */
