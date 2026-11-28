@@ -105,6 +105,17 @@ function criarStoreMemoria() {
     async religarConversa(conversaId, leadId) {
       conversas.find((c) => c.id === conversaId).lead_id = leadId;
     },
+    async leadsRecentes(desde) {
+      return [...leads.values()].filter((l) => (l.created_at || '') >= desde).reverse();
+    },
+    async trocarWhatsappDoLead(id, whatsapp) {
+      leads.get(id).whatsapp = whatsapp;
+    },
+    async reabrirConversaNoTelefone(id, telefone, jid, estado = 'ativa') {
+      const c = conversas.find((x) => x.id === id);
+      Object.assign(c, { telefone, jid, estado });
+      if (estado === 'ativa') c.observacao = null;
+    },
     async apagarLead(id) {
       leads.delete(id);
     },
@@ -2679,6 +2690,82 @@ await teste('clique no botão: cria o lead, abre a conversa, manda a boas-vindas
   ctx.bot.pararTimers();
 });
 
+const msgCalculadora = (nome) =>
+  `Olá, Gabriel! Acabei de enviar os dados da minha obra pelo site e gostaria de conversar sobre a redução do INSS.\n\nNome: ${nome}\nInício da obra: 04/2025\nFim da obra: 12/2026\nResponsável: Pessoa Física\nEstado: ES — Espírito Santo\nDestinação: Residencial unifamiliar\nÁrea principal: 99,73 m²`;
+
+await teste('mensagem da tela final da simulação é reconhecida (com o nome da pessoa)', () => {
+  const d = detectarOrigemSite(msgCalculadora('MARCELE NASCIMENTO DA MOTTA'));
+  assert.equal(d.origem, 'calculadora');
+  assert.equal(d.soModelo, false);
+  assert.equal(d.nome, 'MARCELE NASCIMENTO DA MOTTA');
+  assert.equal(detectarOrigemSite(msgCalculadora('Não informado')).nome, null);
+});
+
+await teste('mensagem da simulação chega antes da abertura: a Lia abre a conversa da calculadora na hora', async () => {
+  const ctx = montar();
+  const l = lead({ nome: 'Marcele Motta', whatsapp: '(21) 98888-7777' });
+  ctx.store.leads.set(l.id, l);
+  await chegou(ctx, msgCalculadora('Marcele Motta'));
+  const c = ctx.store.conversas.find((x) => x.lead_id === l.id);
+  assert.ok(c, 'abriu a conversa da simulação');
+  assert.equal(c.telefone, TEL_SITE);
+  assert.ok(ctx.wa.enviados.length >= 1, 'mandou a abertura');
+  assert.equal([...ctx.store.leads.values()].length, 1, 'não criou card novo');
+  assert.ok(ctx.store.mensagens.some((m) => m.conversa_id === c.id && m.direcao === 'lead' && /Acabei de enviar/.test(m.texto)), 'guardou a mensagem dela');
+  await ctx.bot.processarNovosLeads();
+  assert.equal(ctx.store.conversas.length, 1, 'não abre de novo depois');
+  ctx.bot.pararTimers();
+});
+
+await teste('número digitado errado na simulação: acha pelo nome completo e fala no número de onde ela chamou', async () => {
+  const ctx = montar();
+  const l = lead({ nome: 'MARCELE NASCIMENTO DA MOTTA', whatsapp: '(27) 3333-4444' });
+  ctx.store.leads.set(l.id, l);
+  await chegou(ctx, msgCalculadora('Marcele Nascimento da Motta'));
+  assert.equal(l.whatsapp, TEL_SITE, 'card passou a usar o número certo');
+  const c = ctx.store.conversas.find((x) => x.lead_id === l.id);
+  assert.equal(c.telefone, TEL_SITE);
+  assert.ok(ctx.wa.enviados.every((e) => e.jid.startsWith(TEL_SITE)));
+  ctx.bot.pararTimers();
+});
+
+await teste('conversa da simulação encerrada em outro número: passa para o número de onde ela chamou e a Lia responde', async () => {
+  const ctx = montar({ roteiro: [texto('Oi, Marcele! Aqui é a Lia. Me conta: a obra é de alvenaria?')] });
+  const l = lead({ nome: 'MARCELE NASCIMENTO DA MOTTA', whatsapp: '(27) 99999-0000' });
+  ctx.store.leads.set(l.id, l);
+  await ctx.bot.processarNovosLeads(); // número digitado não tem WhatsApp: conversa encerrada
+  assert.equal(ctx.store.conversas[0].estado, 'encerrada');
+  await chegou(ctx, msgCalculadora('MARCELE NASCIMENTO DA MOTTA'));
+  const c = ctx.store.conversas[0];
+  assert.equal(c.estado, 'ativa');
+  assert.equal(c.telefone, TEL_SITE);
+  assert.ok(ctx.avisos.some((a) => a.tipo === 'Cliente chamou de outro número'));
+  ctx.bot.pararTimers();
+});
+
+await teste('mensagem da simulação sem card nenhum: vira contato do site e a Lia responde com os dados da mensagem', async () => {
+  const ctx = montar();
+  await chegou(ctx, msgCalculadora('MARCELE NASCIMENTO DA MOTTA'));
+  const l0 = [...ctx.store.leads.values()][0];
+  assert.match(l0.id, /^wa-calculadora-/);
+  assert.equal(l0.nome, 'MARCELE NASCIMENTO DA MOTTA');
+  const c = ctx.store.conversas[0];
+  assert.equal(c.estado, 'ativa');
+  assert.equal(ctx.wa.enviados.length, 0, 'sem boas-vindas pronta: quem responde é a Lia, aos dados');
+  assert.ok(ctx.avisos.some((a) => a.tipo === 'Novo contato pelo WhatsApp do site'));
+  assert.match(roteiroDaOrigem('calculadora'), /AINDA NÃO falou com ela/);
+  ctx.bot.pararTimers();
+});
+
+await teste('mensagem da simulação com o bot parado: não manda nada (a abertura sai quando ele voltar)', async () => {
+  const ctx = montar({ parado: () => true });
+  const l = lead({ whatsapp: '(21) 98888-7777' });
+  ctx.store.leads.set(l.id, l);
+  await chegou(ctx, msgCalculadora('Maria da Silva'));
+  assert.equal(ctx.wa.enviados.length, 0);
+  assert.equal(ctx.store.conversas.length, 0);
+});
+
 await teste('quem manda duas mensagens seguidas não abre duas conversas', async () => {
   const ctx = montar();
   await Promise.all([chegou(ctx, msgSite('topo')), chegou(ctx, 'e aí?')]);
@@ -2690,7 +2777,7 @@ await teste('quem manda duas mensagens seguidas não abre duas conversas', async
 await teste('número desconhecido sem o código do site continua ignorado', async () => {
   const ctx = montar();
   await chegou(ctx, 'Oi, quanto custa?');
-  await chegou(ctx, 'Olá, Gabriel! Fiz uma simulação no seu site e gostaria de analisar a redução do INSS.');
+  await chegou(ctx, 'Gabriel, o cimento chega amanhã na obra');
   assert.equal(ctx.store.conversas.length, 0);
   assert.equal(ctx.wa.enviados.length, 0);
 });

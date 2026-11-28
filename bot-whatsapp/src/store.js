@@ -86,6 +86,26 @@ export function criarStore({ url, key }) {
     },
 
     /** A conversa passa a pertencer a outro lead (quando quem veio pelo WhatsApp depois preenche a simulação). */
+    /** Leads criados desde `desdeIso` (mais novos primeiro). Usado para achar a simulação de quem mandou a mensagem da tela final do site. */
+    async leadsRecentes(desdeIso) {
+      return checar(await db.from('leads').select('*').gte('created_at', desdeIso).order('created_at', { ascending: false }).limit(60), 'leads recentes') || [];
+    },
+
+    /** A pessoa digitou outro número na calculadora: grava no card o número de onde ela realmente chamou. */
+    async trocarWhatsappDoLead(leadId, whatsapp) {
+      checar(await db.from('leads').update({ whatsapp }).eq('id', leadId), 'trocar whatsapp do lead');
+    },
+
+    /** Conversa que ficou presa a outro número (ou encerrada): passa a valer o número de onde a pessoa chamou (encerrada volta a ficar ativa). */
+    async reabrirConversaNoTelefone(conversaId, telefone, jid, estado = 'ativa') {
+      const patch = { telefone, jid, estado, atualizado_em: new Date().toISOString() };
+      if (estado === 'ativa') patch.observacao = null;
+      checar(
+        await db.from('bot_conversas').update(patch).eq('id', conversaId),
+        'reabrir conversa no telefone'
+      );
+    },
+
     async religarConversa(conversaId, leadId) {
       checar(await db.from('bot_conversas').update({ lead_id: leadId, atualizado_em: new Date().toISOString() }).eq('id', conversaId), 'religar conversa');
     },

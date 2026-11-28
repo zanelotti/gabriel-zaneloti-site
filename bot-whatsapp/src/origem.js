@@ -14,7 +14,7 @@
  */
 
 /** Códigos aceitos (o mesmo conjunto usado em src/services/whatsappOrigens.ts, no site). */
-export const ORIGENS = ['topo', 'beneficios', 'dores', 'tranquilidade', 'final', 'flutuante', 'rodape', 'ebook', 'ebook_baixou', 'site'];
+export const ORIGENS = ['topo', 'beneficios', 'dores', 'tranquilidade', 'final', 'flutuante', 'rodape', 'ebook', 'ebook_baixou', 'site', 'calculadora'];
 
 const ROTULO = {
   topo: 'botão de WhatsApp do topo do site',
@@ -27,6 +27,7 @@ const ROTULO = {
   ebook: 'botão de WhatsApp que aparece depois de baixar o e-book "Como reduzir o INSS da sua obra"',
   ebook_baixou: 'download do e-book "Como reduzir o INSS da sua obra" (ela deixou nome, e-mail e WhatsApp; ainda não escreveu para o Gabriel)',
   site: 'mensagem pronta do site',
+  calculadora: 'botão de WhatsApp da tela final da simulação do site (a mensagem já traz os dados da obra)',
 };
 
 export const rotuloDaOrigem = (origem) => ROTULO[origem] || ROTULO.site;
@@ -82,6 +83,11 @@ export function detectarOrigemSite(texto) {
         break;
       }
     }
+  } else if (comeca && n.includes('acabei de enviar os dados da minha obra pelo site')) {
+    // Tela final da calculadora: a mensagem traz os dados da obra ("Nome: ...", "Início da obra: ..."). Nunca é "só o modelo".
+    origem = 'calculadora';
+    const linhaNome = /^\s*nome:\s*(.+)$/im.exec(textoLimpo)?.[1]?.trim() || '';
+    nome = linhaNome && !/^n[aã]o informado$/i.test(linhaNome) ? linhaNome.slice(0, 60) : null;
   }
   if (!origem) return null;
   return { origem, textoLimpo, soModelo, nome };
@@ -182,9 +188,12 @@ export function roteiroDaOrigem(origem, { siteUrl = '' } = {}) {
     flutuante: 'Ela clicou no botão flutuante de WhatsApp: pode ter uma dúvida pontual. Responda a dúvida primeiro, em uma ou duas frases, e volte aos dados da simulação.',
     rodape: 'Ela usou o link de WhatsApp do rodapé do site: pode ter uma dúvida pontual. Responda a dúvida primeiro, em uma ou duas frases, e volte aos dados da simulação.',
     site: 'Ela veio de um botão de WhatsApp do site, sem mais detalhes.',
+    calculadora: 'Ela preencheu a simulação na calculadora do site e mandou os dados da obra pelo WhatsApp (estão na primeira mensagem dela: nome, início e fim da obra, pessoa física ou empresa, estado, uso e área principal), mas a simulação não chegou até você. Use esses dados sem perguntar de novo e peça só o que falta (normalmente o tipo da obra, alvenaria, madeira ou mista, e se é obra nova, acréscimo, reforma ou demolição).',
   };
-  const chegouPeloBotao = origem !== 'ebook_baixou';
-  const abertura = chegouPeloBotao
+  const chegouPeloBotao = !['ebook_baixou', 'calculadora'].includes(origem);
+  const abertura = origem === 'calculadora'
+    ? 'Você AINDA NÃO falou com ela. Na primeira resposta, comece com "Oi" (e o primeiro nome dela, se souber), apresente-se em uma frase ("Aqui é a Lia, assistente do Gabriel Zaneloti, especialista em redução de INSS de obra.") e siga direto para a simulação.'
+    : chegouPeloBotao
     ? 'A mensagem de boas-vindas JÁ foi enviada por você: perguntou quem é a pessoa, explicou o Fator de Ajuste e pediu as informações da obra (pessoa física ou empresa; estado; tipo; uso; categoria; áreas; datas de início e término). Não repita nada disso.'
     : 'Ela ainda não respondeu à sua abertura. Quando responder, conduza para a simulação da obra.';
   return `\n\nROTEIRO DESTE LEAD (CONTATO PELO WHATSAPP, AINDA SEM SIMULAÇÃO): ${porOrigem[origem] || porOrigem.site}

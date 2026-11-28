@@ -17,7 +17,7 @@ import { montarAbertura } from './opening.js';
 import { detectarOrigemSite, ehLeadExterno, idLeadEbook, montarBoasVindas, novoIdLeadExterno, origemDoLead, rotuloDaOrigem } from './origem.js';
 import { gerarPdfSimulacao, MARCA_PDF, mensagensDaEconomia, nomeArquivoPdf, simulacaoDoLead } from './pdf-simulacao.js';
 import { camposDoLead, montarEmailSimulacao, montarMensagemSimulacao, normalizarEntrada, simular } from './simulacao.js';
-import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, leadValorAlto, limparNomeInformado, normalizarTelefoneBR, primeiroNomePessoa } from './util.js';
+import { aleatorio, calcularHonorario, dormir, formatarReaisInteiros, leadValorAlto, limparNomeInformado, normalizarTelefoneBR, primeiroNomePessoa, soDigitos } from './util.js';
 
 const VINTE_E_QUATRO_H = 24 * 60 * 60 * 1000;
 const TRINTA_MIN = 30 * 60 * 1000;
@@ -495,6 +495,7 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       log.warn(`[bot] mensagem do botão do site de ${telefone} ignorada: o bot está em MODO DE TESTE (LISTA_TESTE no arquivo .env) e esse número não está na lista.`);
       return;
     }
+    if (det.origem === 'calculadora' && (await juntarComSimulacao({ telefone, jid, det, waId }))) return;
     if (!(await abaixoDoTeto())) {
       await avisarTeto();
       return;
@@ -549,6 +550,61 @@ export function criarBot({ store, wa, cerebro, site, notificar, config, log = co
       if (m !== mensagens[mensagens.length - 1]) await dormirFn(aleatorio(1200, 2500));
     }
     log.info(`[bot] boas-vindas enviadas a ${telefone} (origem: ${det.origem})`);
+  }
+
+  /**
+   * Mensagem da tela final da simulação ("Acabei de enviar os dados da minha obra pelo site...") de um número sem conversa.
+   * Procura o card da simulação dessa pessoa (pelo telefone; se ela digitou outro número na calculadora, pelo nome completo):
+   *  - card sem conversa: abre a conversa normal da calculadora agora (abertura + simulação), no número de onde ela chamou;
+   *  - card com conversa presa a outro número (ou encerrada): a conversa passa para este número e a Lia responde.
+   * Devolve false quando não acha o card: aí ela é atendida como contato do site (a Lia usa os dados que vieram na mensagem).
+   */
+  async function juntarComSimulacao({ telefone, jid, det, waId }) {
+    const desde = new Date(Date.now() - config.maxIdadeLeadHoras * 3600 * 1000).toISOString();
+    const recentes = ((await store.leadsRecentes?.(desde)) || []).filter((l) => !ehLeadExterno(l));
+    const fim = telefone.slice(-8);
+    const normNome = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const porTelefone = recentes.find((l) => soDigitos(l.whatsapp).slice(-8) === fim);
+    const porNome = !porTelefone && det.nome && normNome(det.nome).includes(' ') ? recentes.find((l) => normNome(l.nome) === normNome(det.nome)) : null;
+    const lead = porTelefone || porNome;
+    if (!lead) {
+      log.warn(`[bot] mensagem da tela final da simulação de ${telefone} sem card da simulação: atendendo como contato do site.`);
+      return false;
+    }
+    if (porNome) {
+      await store.trocarWhatsappDoLead(lead.id, telefone);
+      await store.atualizarLead(lead.id, { nota: `Na simulação o WhatsApp foi digitado como ${lead.whatsapp}, mas ela chamou do ${telefone}. O card passou a usar o ${telefone}.` });
+      lead.whatsapp = telefone;
+    }
+
+    const conversa = await store.conversaPorLead(lead.id);
+    if (!conversa) {
+      if (parado()) {
+        log.info(`[bot] ${telefone} mandou a mensagem da simulação com o bot parado: a abertura sai quando ele voltar.`);
+        return true;
+      }
+      vistos.add(lead.id);
+      await abrirConversa(lead);
+      const aberta = await store.conversaPorLead(lead.id);
+      if (aberta) await store.addMensagem({ conversa_id: aberta.id, direcao: 'lead', texto: det.textoLimpo, wa_id: waId });
+      log.info(`[bot] ${telefone} mandou a mensagem da simulação antes da abertura: conversa da calculadora aberta na hora.`);
+      return true;
+    }
+
+    const jidFinal = jid || (await wa.resolverJid(telefone));
+    // Encerrada (ex.: o número digitado não tinha WhatsApp) volta a ficar ativa; com o Gabriel ou "pediu para parar" continua como está.
+    const novoEstado = conversa.estado === 'encerrada' ? 'ativa' : conversa.estado;
+    await store.reabrirConversaNoTelefone(conversa.id, telefone, jidFinal, novoEstado);
+    await store.addMensagem({ conversa_id: conversa.id, direcao: 'lead', texto: det.textoLimpo, wa_id: waId });
+    await notificar.avisar({
+      tipo: 'Cliente chamou de outro número',
+      lead,
+      telefone,
+      motivo: `A conversa dessa simulação estava no número ${conversa.telefone} (${conversa.estado}). Ela chamou do ${telefone} e a conversa passou para esse número.`,
+      historico: [{ direcao: 'lead', texto: det.textoLimpo }],
+    });
+    if (novoEstado === 'ativa' && !String(conversa.observacao || '').startsWith(MARCA_ESPERA) && !parado()) agendarResposta(conversa.id, config.debounceMs);
+    return true;
   }
 
   async function aoReceber({ telefone, texto, tipo = 'texto', waId = null, jid = null, nome = null, anexo = null, audio = false }) {
